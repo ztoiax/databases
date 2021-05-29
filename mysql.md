@@ -22,9 +22,6 @@
                 * [分窗](#分窗)
         * [UNION (合并多个表的行)](#union-合并多个表的行)
         * [JOIN(关联查询): 改变表关系](#join关联查询-改变表关系)
-            * [基本概念](#基本概念)
-            * [join的实现](#join的实现)
-            * [基本使用](#基本使用)
             * [INNER JOIN(内连接)](#inner-join内连接)
                 * [STRAIGHT_JOIN](#straight_join)
             * [LEFT JOIN(左连接)](#left-join左连接)
@@ -36,7 +33,7 @@
         * [CREATE(创建)](#create创建)
             * [数据类型](#数据类型)
             * [列字段完整性约束](#列字段完整性约束)
-            * [基本使用](#基本使用-1)
+            * [基本使用](#基本使用)
     * [FOREIGN KEY(外键)](#foreign-key外键)
         * [Insert](#insert)
             * [选取另一个表的数据,导入进新表](#选取另一个表的数据导入进新表)
@@ -916,57 +913,6 @@ where name regexp '^北京市';
 ```
 
 ### JOIN(关联查询): 改变表关系
-
-- [数据库表连接的简单解释](http://www.ruanyifeng.com/blog/2019/01/table-join.html?utm_source=tuicool&utm_medium=referral)
-
-- [图解 SQL 里的各种 JOIN](https://zhuanlan.zhihu.com/p/29234064)
-
-- [MySQL 的 join 功能弱爆了？](https://zhuanlan.zhihu.com/p/286581170)
-
-#### 基本概念
-
-从两个或更多的表中获取结果.[图解 SQL 里的各种 JOIN](https://zhuanlan.zhihu.com/p/29234064)
-
-- 只返回两张表匹配的记录,这叫内连接(inner join)
-- 返回匹配的记录,以及表 A 多余的记录,这叫左连接(left join)
-- 返回匹配的记录,以及表 B 多余的记录,这叫右连接(right join)
-- 返回匹配的记录,以及表 A 和表 B 各自的多余记录,这叫全连接(full join)
-
-![image](./Pictures/mysql/join.png)
-
-![image](./Pictures/mysql/join1.png)
-
-#### join的实现
-
-> MySQL 使用了嵌套循环(Nested-Loop Join)的实现方式
-
-- Nested-Loop Join 区分驱动表和被驱动表,先访问驱动表,筛选出结果集,然后将这个结果集作为循环的基础,访问被驱动表过滤出需要的数据
-
-- 使用join关联查询: 用数据量小的表去驱动数据量大的表,这样可以减少内循环个数,也就是被驱动表的扫描次数
-
-- Nested-Loop Join 几种类型:
-
-- SNLJ(简单嵌套循环): 这是最简单的方案,性能也一般
-
-    - 驱动表的结果集作为循环基础数据: 从结果集取出一条条数据(图中的R1, R2...)与被驱动表(图中的S1, S2)一一匹配(Sn次), 然后合并数据
-
-    ![image](./Pictures/mysql/join_SNLJ.webp)
-
-- INLJ(索引嵌套循环): 由于非驱动表上有索引,所以比较的时候不再需要一条条记录进行比较,可以通过索引来减少比较,从而加速查询
-
-    - 这也是做join关联查询时, 必须要求关联字段有索引的一个主要原因
-
-    ![image](./Pictures/mysql/join_INLJ.webp)
-
-- BNLJ(块嵌套循环): 如果 join 字段没索引,被驱动表需要进行扫描
-
-    - 加入了join buffer: 缓存 join 需要的字段, 降低了循环的次数,也就是被驱动表的扫描次数
-
-    - MySQL 默认 buffer 大小 256K,如果有 n 个 join 操作,会生成 n-1 个 join buffer
-
-    ![image](./Pictures/mysql/join_BNLJ.webp)
-
-#### 基本使用
 
 **语法:**
 
