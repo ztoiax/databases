@@ -1082,6 +1082,8 @@ con.close()
 
     > 注意:如果使用外部程序修改数据,需要重启litecli, 才会正确显示
 
+- [sqliteviz: sqlite, csv可视化网页端](https://github.com/lana-k/sqliteviz)
+
 - [sqlitebrowser: 图形客户端 ](https://github.com/sqlitebrowser/sqlitebrowser)
 
 - [sqlite-web: 网页版sqlite](https://github.com/coleifer/sqlite-web)

@@ -14,30 +14,32 @@
                 * [WITH ROLLUP](#with-rollup)
             * [子查询](#子查询)
                 * [IN, NOT IN](#in-not-in)
-                * [EXCEPT](#except)
                 * [标量子查询](#标量子查询)
                 * [with(临时表)](#with临时表)
+            * [集合操作](#集合操作)
+                * [UNION(并操作)](#union并操作)
+                * [EXCEPT(差操作)](#except差操作)
+                * [INTERSECT(交操作)](#intersect交操作)
             * [聚集函数](#聚集函数)
+                * [基本聚集函数](#基本聚集函数)
+                * [加密函数](#加密函数)
                 * [rank(): 排名](#rank-排名)
                 * [分窗](#分窗)
-        * [UNION (合并多个表的行)](#union-合并多个表的行)
         * [JOIN(关联查询): 改变表关系](#join关联查询-改变表关系)
             * [INNER JOIN(内连接)](#inner-join内连接)
                 * [STRAIGHT_JOIN](#straight_join)
             * [LEFT JOIN(左连接)](#left-join左连接)
             * [RIGHT JOIN(左连接)](#right-join左连接)
             * [FULL OUTER JOIN(全连接)](#full-outer-join全连接)
-        * [SQL FUNCTION](#sql-function)
-            * [加密函数](#加密函数)
     * [DML (增删改操作)](#dml-增删改操作)
         * [CREATE(创建)](#create创建)
             * [数据类型](#数据类型)
             * [列字段完整性约束](#列字段完整性约束)
             * [基本使用](#基本使用)
-    * [FOREIGN KEY(外键)](#foreign-key外键)
-        * [Insert](#insert)
+        * [FOREIGN KEY(外键)](#foreign-key外键)
+            * [Insert](#insert)
             * [选取另一个表的数据,导入进新表](#选取另一个表的数据导入进新表)
-        * [Update](#update)
+            * [Update](#update)
             * [case结构](#case结构)
         * [Delete and Drop (删除)](#delete-and-drop-删除)
             * [删除重复的数据](#删除重复的数据)
@@ -96,8 +98,8 @@
             * [UNDO LOG](#undo-log)
             * [TRANSACTION (事务)](#transaction-事务)
                 * [设置事务隔离性为不可重复读](#设置事务隔离性为不可重复读)
-                    * [read uncommitted(读未提交) , dirty read (脏读)](#read-uncommitted读未提交--dirty-read-脏读)
-                    * [read committed(读已提交) , phantom read (幻读):](#read-committed读已提交--phantom-read-幻读)
+                    * [read uncommitted(未提交读) , dirty read (脏读)](#read-uncommitted未提交读--dirty-read-脏读)
+                    * [read committed(已提交读) , phantom read (幻读):](#read-committed已提交读--phantom-read-幻读)
             * [autocommit](#autocommit)
             * [线程](#线程)
             * [锁](#锁-1)
@@ -428,7 +430,6 @@ select name from cnarea_2019
 where name regexp '.*广州';
 ```
 
-
 #### Group by (分组)
 
 - 创建表people, people1
@@ -514,7 +515,7 @@ GROUP BY name
 SELECT color, SUM(quantitty) FROM sales
 GROUP BY color
 
-# WITH ROLLUP
+# WITH ROLLUP 统计每个颜色的销售数量,以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY color, name WITH ROLLUP
 
@@ -536,7 +537,7 @@ GROUP BY color, name WITH ROLLUP
 | <null> | <null> | 54             |
 +--------+--------+----------------+
 
-# name
+# name 统计每个品类的销售数量, 以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY name, color WITH ROLLUP
 
@@ -562,14 +563,18 @@ GROUP BY name, color WITH ROLLUP
 
 ##### IN, NOT IN
 
-- ()表示集合
+- `()`: 表示集合
+
+- `IN`: 判断在集合中的字段
+
+- `NOT IN`: 判断不在集合中的字段
 
 ```sql
-# IN 判断在集合中的字段
+# IN
 SELECT * FROM people
 WHERE salary IN (1000, 3000);
 
-# NOT IN 判断不在集合中的字段
+# NOT IN
 SELECT * FROM people
 WHERE salary NOT IN (1000, 3000);
 
@@ -588,25 +593,6 @@ WHERE name IN ('a1', 'b1', 'c1');
 | a1   |
 | b1   |
 | c1   |
-+------+
-```
-
-##### EXCEPT
-
-```sql
-# people表去除people1表的重复行
-SELECT name FROM people
-except SELECT name FROM people1
-
-+------+
-| name |
-+------+
-| a1   |
-| a2   |
-| a3   |
-| b1   |
-| b2   |
-| b3   |
 +------+
 ```
 
@@ -670,7 +656,126 @@ ON p.id = p1.id;
 +----+------+----+--------+
 ```
 
+#### 集合操作
+
+> 默认去除重复行
+
+##### UNION(并操作)
+
+```sql
+SELECT name FROM people
+UNION
+SELECT name FROM people1
+
++--------+
+| name   |
++--------+
+| a1     |
+| a2     |
+| a3     |
+| b1     |
+| b2     |
+| b3     |
+| c1     |
+| c2     |
+| c3     |
+| d      |
+| <null> |
++--------+
+
+# UNION ALL保留重复行
+SELECT name FROM people
+UNION ALL
+SELECT name FROM people1
+```
+
+##### EXCEPT(差操作)
+
+> 从左边的集合去除右边的集合
+
+```sql
+# people表去除people1表的重复行
+
+SELECT name FROM people
+EXCEPT
+SELECT name FROM people1
+
++------+
+| name |
++------+
+| a1   |
+| a2   |
+| a3   |
+| b1   |
+| b2   |
+| b3   |
++------+
+```
+
+##### INTERSECT(交操作)
+
+```sql
+SELECT name FROM people
+INTERSECT
+SELECT name FROM people1
+
++------+
+| name |
++------+
+| c1   |
+| c2   |
+| c3   |
++------+
+```
+
 #### 聚集函数
+
+**语法**
+
+> ```sql
+> SELECT function(列名称) FROM 表名称
+> ```
+
+##### 基本聚集函数
+
+| 聚集函数             | 操作                  |
+|----------------------|-----------------------|
+| MAX()                | 最大值                |
+| MIN()                | 最小值                |
+| SUM()                | 总值                  |
+| AVG()                | 平均值                |
+| COUNT(1)             | 总行数,等同于COUNT(*) |
+| COUNT(DISTINCT name) | 总行数,去除重复行       |
+
+```sql
+# MAX(), MIN()
+SELECT MAX(id),MIN(level) as max
+FROM cnarea_2019;
+
+# 选取 level 的平均值和 id 的总值
+SELECT SUM(id),AVG(level)
+from ca;
+
+# 查看总列数
+SELECT COUNT(1) as name from cnarea_2019;
+
+# 统计 level 的个数
+SELECT COUNT(DISTINCT level) as totals from cnarea_2019;
+```
+
+##### 加密函数
+
+```sql
+select md5('123');
+
+# 保留两位小数
+select format(111.111,2);
+
+# 加锁函数
+select get_lock('lockname',10);
+select is_free_lock('lockname');
+select release_lock('lockname');
+```
 
 ##### rank(): 排名
 
@@ -806,110 +911,6 @@ FROM class;
 | 80    | 2012 | 450       |
 | 90    | 2013 | 450       |
 +-------+------+-----------+
-```
-
-### UNION (合并多个表的行)
-
-**语法:**
-
-> ```sql
-> SELECT 列名称 FROM 表名称
-> UNION
-> SELECT 列名称 FROM 表名称
-> ```
-
-```sql
-# 创建名为 tz 的数据库作实验
-CREATE TABLE union_test (
-    `id` int (8),
-    `name` varchar(50),
-    `date` DATE
-);
-
-# 插入 2 条数据
-INSERT INTO union_test (id,name,date) values
-(1,'tz','2020-10-24'),
-(100,'tz','2020-10-24');
-
-
-# 从 union_test 表和 cnarea_2019 表,选取 id,name 列
-SELECT id,name FROM cnarea_2019 WHERE id<10
-UNION
-SELECT id,name FROM union_test;
-
-MariaDB [china]> select id,name from cnarea_2019 where id<10 union select id,name from union_test;
-+------+--------------------------+
-| id   | name                     |
-+------+--------------------------+
-|    1 | 北京市                   |
-|    2 | 直辖区                   |
-|    3 | 东城区                   |
-|    4 | 东华门街道               |
-|    5 | 多福巷社区居委会         |
-|    6 | 银闸社区居委会           |
-|    7 | 东厂社区居委会           |
-|    8 | 智德社区居委会           |
-|    9 | 南池子社区居委会         |
-|    1 | tz                       |
-|  100 | tz                       |
-+------+--------------------------+
-
-# 选取列,不包含重复数据
-select id from cnarea_2019 where id<10
-union select id from union_test;
-
-+------+
-| id   |
-+------+
-|    1 |
-|    2 |
-|    3 |
-|    4 |
-|    5 |
-|    6 |
-|    7 |
-|    8 |
-|    9 |
-|  100 |
-+------+
-
-# 选取列,包含重复数据(all)
-select id from cnarea_2019 where id<10
-union all select id from union_test;
-
-+------+
-| id   |
-+------+
-|    1 |
-|    2 |
-|    3 |
-|    4 |
-|    5 |
-|    6 |
-|    7 |
-|    8 |
-|    9 |
-|    1 |
-|  100 |
-+------+
-
-# 选取以 深圳市 和 北京市 开头的数据
-select id,name from cnarea_2019
-where name regexp '^深圳市'
-union select id,name from cnarea_2019
-where name regexp '^北京市';
-
-+--------+-----------------------------------------+
-| id     | name                                    |
-+--------+-----------------------------------------+
-| 482024 | 深圳市                                  |
-| 482546 | 深圳市宝安国际机场                      |
-| 482547 | 深圳市宝安国际机场虚拟社区              |
-| 482884 | 深圳市大工业区                          |
-| 482885 | 深圳市大工业区虚拟社区                  |
-|      1 | 北京市                                  |
-| 150315 | 北京市双河农场                          |
-+--------+-----------------------------------------+
 ```
 
 ### JOIN(关联查询): 改变表关系
@@ -1087,75 +1088,6 @@ UNION
 SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 ```
 
-### SQL FUNCTION
-
-**语法**
-
-> ```sql
-> SELECT function(列名称) FROM 表名称
-> ```
-
-```sql
-# 选取 id 的最大值和 level 的最小值
-select max(id),min(level) as max from cnarea_2019;
-
-# 选取 level 的平均值和 id 的总值
-select sum(id),avg(level) from ca;
-
-# 查看总列数
-select count(1) as name from cnarea_2019;
-
-# 统计 level 的个数
-select count(distinct level) as totals from cnarea_2019;
-
-# 对 level 重复数据的进行统计
-select level, count(1) as totals from cnarea_2019
-group by level;
-
-# 对不同的 level,选取 id 的平均值
-select level,avg(id) from cnarea_2019
-group by level;
-
-MariaDB [china]> select level,avg(id) from cnarea_2019 group by level;
-+-------+-------------+
-| level | avg(id)     |
-+-------+-------------+
-|     0 | 388711.0000 |
-|     1 | 418104.0377 |
-|     2 | 409478.6649 |
-|     3 | 611846.9998 |
-|     4 | 350576.9638 |
-+-------+-------------+
-
-# 对不同的 level,选取 id 的平均值大于400000
-select level,avg(id) from cnarea_2019
-group by level
-having avg(id) > 400000;
-
-MariaDB [china]> select level,avg(id) from cnarea_2019 group by level having avg(id) > 400000;
-+-------+-------------+
-| level | avg(id)     |
-+-------+-------------+
-|     1 | 418104.0377 |
-|     2 | 409478.6649 |
-|     3 | 611846.9998 |
-+-------+-------------+
-```
-
-#### 加密函数
-
-```sql
-select md5('123');
-
-# 保留两位小数
-select format(111.111,2);
-
-# 加锁函数
-select get_lock('lockname',10);
-select is_free_lock('lockname');
-select release_lock('lockname');
-```
-
 ## DML (增删改操作)
 
 - 有的地方把 DML 语句(增删改)和 DQL 语句(查询)统称为 DML 语句
@@ -1325,7 +1257,7 @@ show index from new
 CREATE TEMPORARY TABLE temp (`id` int);
 ```
 
-## [FOREIGN KEY(外键)](https://www.mysqltutorial.org/mysql-foreign-key/)
+### [FOREIGN KEY(外键)](https://www.mysqltutorial.org/mysql-foreign-key/)
 
 - 1.父表和子表必须使用相同的存储引擎
 
@@ -1348,7 +1280,7 @@ CREATE TABLE foreign_test(
 
 - `NO ACTION`: 不允许对父表外键对应值进行操作
 
-### Insert
+#### Insert
 
 **语法**
 
@@ -1416,16 +1348,16 @@ select * from newcn;
 +------+--------------------------+
 | id   | name                     |
 +------+--------------------------+
-|    1 | 北京市                   |
-|    2 | 直辖区                   |
-|    3 | 东城区                   |
-|    4 | 东华门街道               |
-|    5 | 多福巷社区居委会         |
-|    6 | 银闸社区居委会           |
-|    7 | 东厂社区居委会           |
-|    8 | 智德社区居委会           |
-|    9 | 南池子社区居委会         |
-|   10 | 黄图岗社区居委会         |
+| 1  | 北京市           |
+| 2  | 直辖区           |
+| 3  | 东城区           |
+| 4  | 东华门街道       |
+| 5  | 多福巷社区居委会 |
+| 6  | 银闸社区居委会   |
+| 7  | 东厂社区居委会   |
+| 8  | 智德社区居委会   |
+| 9  | 南池子社区居委会 |
+| 10 | 黄图岗社区居委会 |
 +------+--------------------------+
 
 # 插入包含 广州 的数据
@@ -1434,7 +1366,7 @@ select id,name from cnarea_2019
 where name regexp '广州.*';
 ```
 
-### Update
+#### Update
 
 **语法:**
 
@@ -3655,7 +3587,7 @@ insert into test (id,name,date) values
 commit;
 ```
 
-###### read uncommitted(读未提交) , dirty read (脏读)
+###### read uncommitted(未提交读) , dirty read (脏读)
 
 开启事务 a:
 
@@ -3691,7 +3623,7 @@ select * from test;
 
 ![image](./Pictures/mysql/uncommitted1.gif)
 
-###### read committed(读已提交) , phantom read (幻读):
+###### read committed(已提交读) , phantom read (幻读):
 
 开启事务 a:
 
@@ -4101,6 +4033,7 @@ ON a.id=b.id;
 
 # reference
 
+- [mysqltutorial](https://www.mysqltutorial.org/)
 - [MySQL 入门教程](https://github.com/jaywcjlove/mysql-tutorial)
 - [sql 语句教程](https://www.1keydata.com/cn/sql/)
 - [W3cSchool SQL 教程](https://www.w3school.com.cn/sql/index.asp)
