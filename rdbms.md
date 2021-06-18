@@ -623,6 +623,189 @@ WHERE A2 = c2 and A1 = c1
 
         - 如果出现合并或分裂, 导致指针错误, 则会向该结点的右兄弟结点查找
 
+## 日志(恢复系统)
+
+- 更新日志记录(update log record):
+    ![image](./Pictures/rdbms/log_record.png)
+
+    | 日志记录             | 内容                               |
+    |----------------------|------------------------------------|
+    | `<T0, A, 1000, 950>` | 表示数据项A的旧值是1000, 新值是950 |
+    | `<T start>`          | 事务T开始                          |
+    | `<T commit>`         | 事务T提交                          |
+    | `<T abort>`          | 事务T中止                          |
+
+
+- 系统故障后:
+
+    - redo(T):重做事务T
+
+        - 日志包含:`<T start>`, `<T commit>`或`<T abort>`记录时, 就会对事务T进行重做.注意:`<T abort>`也需要重做
+
+        - 重做:将事务T更新过所有数据项的值设置成**新值**
+
+    - undo(T):撤销事务T
+
+        - 日志包含:`<T start>` 就会对事务T进行撤销
+
+        - 撤销:将事务T更新过所有数据项的值设置成**旧值**
+
+        - redo-only日志:将撤销的操作记录到特殊redo-only日志
+            - 记录格式:`<T 数据项 旧值>`
+
+    - `<checkpoint L>`:检测点记录
+
+        - 系统崩溃后需要搜索整个日志, 因此在日志加入`<checkpoint L>`记录, 表示`<checkpoint L>`之前的记录已经写入数据库了.redo, undo只需执行之后的记录
+
+<span id="undo-list"></span>
+- undo-list(撤销列表)流程:
+
+    - 1.从最后一个`<checkpoint L>` 记录后扫描日志
+
+        - 2.发现`<Ti start>`记录时, 就把Ti添加到undo-list
+
+        - 3.发现`<Ti commit>`或`<Ti abort>`记录时, 就把Ti从undo-list去掉
+
+    - 4.扫描完后.开始撤销阶段,从尾部开始反向扫描日志进行回滚
+
+        - 5.发现`<Tj start>`记录时, 就往日志写入`<Tj abort>`记录, 并把Tj从undo-list去掉
+
+        - 6.一旦undo-list变为空表, 则撤销阶段结束
+
+    - 假设系统崩溃在`<T0 abort>`
+
+        ![image](./Pictures/rdbms/log_check.png)
+
+        - 1.undo-list初始发现T0, T1时, 就添加到表里
+
+        - 2.当发现`<T1 commit>`, 把T1从表里去除
+
+        - 3.当发现`<T2 start>`, 就添加到表里
+
+        - 4.当发现`<T0 abort>`, 把T0从表里去除
+
+        - 5.扫描结束, 此时表里只剩下T2. 开始撤销阶段, 从尾部开始反向
+
+        - 6.把T2恢复为旧值也就是`<T2 A 500>`记录
+
+        - 7.当发现`<T2 start>`, 就把`<T2 about>`记录添加到日志, 并把T2从列表去掉
+
+        - 8.undo-list为空,撤销阶段结束
+
+- 日志缓冲区:
+
+    - 一条日志记录比磁盘块要小得多, 则日志在磁盘上会大的多.因此最好一次写入多条记录,在此之前写入日志缓冲区
+
+    - WAL(先写日志):为了保证原子性, 事务T提交写入磁盘之前, 必须先将日志写入磁盘
+
+    - 闩锁(latch):事务T写入磁盘前, 需要获取数据项对应的块的排他锁
+
+        - 这个锁与并发控制的锁无关, 不需要两阶段的可串行化
+
+- 模糊检查点(fuzzy checkpointing):
+
+    - 如果`<checkpoint L>`的时间很长, 那么事务就会中断很久
+
+    - 模糊检查点:`<checkpoint L>`记录写入日志后, 缓冲区才开始写入硬盘.写入完成后,加上`<last_checkpoint>`记录
+
+### 逻辑日志
+
+- 逻辑操作:操作时获取低级别锁,完成后释放. 插入和删除是这一类例子
+
+- 逻辑日志只用于撤销,不用于重做:
+
+    - `<T, O, operation-begin>`: 逻辑undo在修改索引的操作之前添加的日志记录
+
+    - `<T, O, operation-end>`: 操作结束
+
+    - `<T, O, operation-abort>`: 逻辑回滚扫描不到`<T, O, operation-end>`时, 就会减少或添加对应的值, 而不是恢复旧值, 然后添加`<T, O, operation-abort>`记录
+
+- 逻辑回滚:
+
+    - 例子1:
+
+        ![image](./Pictures/rdbms/log_logical-undo.png)
+
+        - 1.数据项C通过添加一个值进行回滚, 对应`<T0, C, 400, 500>`记录
+
+        - 2.数据项B是物理回滚, 对应`<T0, B, 2000>`记录
+
+        - 3.而T1对数据项C的更新得以保留
+
+    - 例子2:
+
+        - 系统崩溃在`<T2, C, 400, 300>`:
+
+        ![image](./Pictures/rdbms/log_logical-undo1.png)
+
+        - 1.undo-list包含T1,T2
+
+        - 2.撤销阶段, 使用物理日志对T2的05进行撤销, 对应`<T2, C, 400>`记录,并记录到redo-only日志
+
+        - 3.当发现`<T2 start>`, 就把`<T2 about>`记录添加到日志, 并把T2从undo-list列表去掉
+
+        - 4.当发现`<T1, O4, operation-end, (C + 300)>`, 通过添加一个值进行逻辑undo, 对应`<T1, C, 400, 700>`记录, 然后添加`<T1, 04, operation-abort>`记录
+
+        - 5.当发现`<T1, O4, operation-begin>`, 使用物理日志对T2的05进行撤销, 对应`<T1, B, 2050>`记录,并记录redo-only日志.并把T1从undo-list列表去掉
+
+### ARIES: 目前最新的恢复技术
+
+- 使用LSN(日志顺序号)标识日志记录
+
+    - 恢复独立性:页能独立恢复
+
+- 支持物理逻辑操作:有逻辑, 物理页
+
+- 多日志:当一个日志达到限度, 就会拆分, 每个文件有个文件号
+
+- ARIES数据结构:
+
+    ![image](./Pictures/rdbms/aries_structures.png)
+
+    - 脏页表(dirtypage table):
+
+        - PageLSN(页日志顺序号): 每一个更新操作, 将更新页的LSN记录到PageLSN
+
+        - RecLSN:记录未写入磁盘的LSN
+
+- ARIES恢复流程:
+
+    - PrevLSN:当前日志记录中, 指向同一事务的前一条日志记录的LSN
+
+    - checkpoint log record(检测点日志记录):包含脏页表
+
+    - CLR(补偿日志记录):类似redo-only日志, 回滚产生的日志记录
+
+        - UndoNextLSN:指向下一个undo的日志LSN
+
+    - 恢复流程中的3个阶段:
+
+        - 分析阶段:
+
+            - 1.找到最后的`<checkpoint log record>`读取其脏页表, 将RedoLSN设置为RecLSN中的最小值
+
+            - 2.然后正向扫描类似[undo-list](#undo-list)
+
+        - 重做阶段:
+
+            - 从RedoLSN开始正向扫描, 如果不在脏页表或LSN小于RecLSN, 就跳过
+
+        - 撤销阶段:
+
+            - 对undo-list列表进行撤销, 并设置CLR的UndoNextLSN为PrevLSN
+
+    - 系统崩溃在LSN 7571:
+
+        ![image](./Pictures/rdbms/aries_structures.png)
+
+        - 1.分析阶段从`<checkpoint log record>`的LSN开始, 也就是LSN 7568
+
+        - 2.分析阶段完成后:RedoLSN为7564, undo-list列表包含事务T145
+
+        - 3.重做阶段从7564开始, 由于小于`<checkpoint log record>`的7568, 因此不会将修改过的页面写入磁盘
+
+        - 4.撤销阶段需要回滚T145, 因此从7567开始反向扫描至7563
+
 ## JOIN(关联查询): 改变表关系
 
 - [数据库表连接的简单解释](http://www.ruanyifeng.com/blog/2019/01/table-join.html?utm_source=tuicool&utm_medium=referral)

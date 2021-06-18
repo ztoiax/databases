@@ -90,6 +90,105 @@
 
         ![image](./Pictures/database_concept/scaleup.png)
 
+#### 分表, 分库(IO并行)
+
+> 数据库出现瓶颈时, 可以使用分表, 分库
+
+- 分表, 分库开源产品
+
+    ![image](./Pictures/mysql/split.webp)
+
+- 水平分库
+
+    - 减少cpu, io
+
+    - 将表的**数据**拆分成不同库, 没有交集
+
+    - 每个库的结构都一样; 数据不一样
+
+    ![image](./Pictures/mysql/transverse_database.webp)
+
+- 垂直分库
+
+    - 将表的**列字段**拆分成不同库, 没有交集
+
+    - 每个库的结构都不一样; 数据也不一样
+
+    ![image](./Pictures/mysql/vertical_database.webp)
+
+- 水平分表
+
+    - 减少cpu
+
+    - 将表的**数据**拆分成不同表, 没有交集
+
+    - 每个表的结构都一样; 数据不一样
+
+    ![image](./Pictures/mysql/transverse_table.webp)
+
+- 垂直分表
+
+    - 将表的**列字段**拆分成不同表, 有交集:每个表至少有一列交集(一般是主键)
+
+    - 每个表的结构都不一样; 数据也不一样
+
+    ![image](./Pictures/mysql/vertical_table.webp)
+
+- 磁盘读 IO 瓶颈: 热点数据太多,数据库缓存放不下,每次查询时会产生大量的 IO,降低查询速度
+
+    - 分库和垂直分表
+
+- 网络 IO 瓶颈:请求的数据太多,网络带宽不够
+    - 分库
+
+- CPU 瓶颈第一种: SQL 中包含 join,group by,order by,非索引字段条件查询等
+
+    - SQL 优化,建立合适的索引,在业务 Service 层进行业务计算
+
+- CPU 瓶颈第二种: 单表数据量太大,查询时扫描的行太多
+
+    - 水平分表
+
+##### 划分技术
+
+- 轮转法(round-robin):
+
+    - 对关系进行顺序扫描, 将第i个元组发送到磁盘Di
+
+    - 保障了元组的平均分布
+
+    - 适合整个关系查询
+
+- 散列划分(hash partitioning):
+
+    - 基于属性salary的划分时, 当执行 `salary = 10000 - 1000`查询语句时, 只需扫描保存这个属性值的单个磁盘
+
+    - 适合单个属性值查询, 整个关系查询. 不适合范围查询
+
+- 范围划分(range partitioning):
+
+    ![image](./Pictures/database_concept/range_partitioning.png)
+
+    - 基于属性的范围划分, 一般查询只需扫描单个磁盘
+
+    - 适合范围查询, 单个属性值查询, 不适合整个关系查询
+
+- 编斜(skew)
+
+    ![image](./Pictures/database_concept/skew.png)
+
+    - 散列划分和范围划分会出现偏斜
+
+    - 解决方法:
+
+        - 虚拟结点(virtual node):
+
+            - 创建实际结点几倍的虚拟结点,虚拟结点依次映射到实际结点
+
+            - 随着关系的增长, 也会动态的创建新虚拟结点.并将数量更多虚拟结点移动到数量少的结点
+
+            ![image](./Pictures/database_concept/virtual-node.png)
+
 ## RDBMS (关系性数据库)
 
 ### [关系数据库理论笔记](./rdbms.md)

@@ -108,7 +108,6 @@
             * [performance_schema](#performance_schema)
     * [极限值测试](#极限值测试)
     * [benchmark](#benchmark)
-    * [分表, 分库](#分表-分库)
     * [日志](#日志)
     * [设计规范](#设计规范)
         * [基本规范](#基本规范)
@@ -3878,64 +3877,6 @@ set @input := 'hello world';
 select benchmark(10000, MD5(@input));
 select benchmark(10000, SHA1(@input));
 ```
-
-## 分表, 分库
-
-> 数据库出现瓶颈时, 可以使用分表, 分库
-
-- 分表, 分库开源产品
-    ![image](./Pictures/mysql/split.webp)
-
-- 水平分库
-
-    - 减少cpu, io
-
-    - 将表的**数据**拆分成不同库, 没有交集
-
-    - 每个库的结构都一样; 数据不一样
-
-    ![image](./Pictures/mysql/transverse_database.webp)
-
-- 垂直分库
-
-    - 将表的**列字段**拆分成不同库, 没有交集
-
-    - 每个库的结构都不一样; 数据也不一样
-
-    ![image](./Pictures/mysql/vertical_database.webp)
-
-- 水平分表
-
-    - 减少cpu
-
-    - 将表的**数据**拆分成不同表, 没有交集
-
-    - 每个表的结构都一样; 数据不一样
-
-    ![image](./Pictures/mysql/transverse_table.webp)
-
-- 垂直分表
-
-    - 将表的**列字段**拆分成不同表, 有交集:每个表至少有一列交集(一般是主键)
-
-    - 每个表的结构都不一样; 数据也不一样
-
-    ![image](./Pictures/mysql/vertical_table.webp)
-
-- 磁盘读 IO 瓶颈: 热点数据太多,数据库缓存放不下,每次查询时会产生大量的 IO,降低查询速度
-
-    - 分库和垂直分表
-
-- 网络 IO 瓶颈:请求的数据太多,网络带宽不够
-    - 分库
-
-- CPU 瓶颈第一种: SQL 中包含 join,group by,order by,非索引字段条件查询等
-
-    - SQL 优化,建立合适的索引,在业务 Service 层进行业务计算
-
-- CPU 瓶颈第二种: 单表数据量太大,查询时扫描的行太多
-
-    - 水平分表
 
 ## 日志
 
