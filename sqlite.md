@@ -1028,6 +1028,8 @@ https://sqlite.org/src/file/ext/misc/zipfile.c
 gcc -g -fPIC -shared zipfile.c -o zipfile.so
 ```
 
+- [LSM拓展](https://charlesleifer.com/blog/lsm-key-value-storage-in-sqlite3/)
+
 ## python
 
 - [官方文档](https://docs.python.org/3/library/sqlite3.html)

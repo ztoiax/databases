@@ -20,7 +20,7 @@
                 * [UNION(并操作)](#union并操作)
                 * [EXCEPT(差操作)](#except差操作)
                 * [INTERSECT(交操作)](#intersect交操作)
-            * [聚集函数](#聚集函数)
+            * [聚集函数(aggregation)](#聚集函数aggregation)
                 * [基本聚集函数](#基本聚集函数)
                 * [加密函数](#加密函数)
                 * [rank(): 排名](#rank-排名)
@@ -77,6 +77,7 @@
         * [undrop-for-innodb(\*数据恢复)](#undrop-for-innodb数据恢复)
         * [osqueryi](#osqueryi)
         * [mytop](#mytop)
+        * [MyRocks:lsm存储引擎](#myrockslsm存储引擎)
 * [安装 MySql](#安装-mysql)
     * [Centos 7 安装 MySQL](#centos-7-安装-mysql)
     * [docker 安装](#docker-安装)
@@ -516,7 +517,8 @@ GROUP BY color
 
 # WITH ROLLUP 统计每个颜色的销售数量,以及总量
 SELECT name, color, SUM(quantitty) FROM sales
-GROUP BY color, name WITH ROLLUP
+GROUP BY color, name
+WITH ROLLUP
 
 +--------+--------+----------------+
 | name   | color  | SUM(quantitty) |
@@ -538,7 +540,8 @@ GROUP BY color, name WITH ROLLUP
 
 # name 统计每个品类的销售数量, 以及总量
 SELECT name, color, SUM(quantitty) FROM sales
-GROUP BY name, color WITH ROLLUP
+GROUP BY name, color
+WITH ROLLUP
 
 +--------+--------+----------------+
 | name   | color  | SUM(quantitty) |
@@ -727,7 +730,7 @@ SELECT name FROM people1
 +------+
 ```
 
-#### 聚集函数
+#### 聚集函数(aggregation)
 
 **语法**
 
@@ -2911,6 +2914,8 @@ sudo ./sys_parser -uroot -p -d dictionary sakila/actor
 ### [osqueryi](https://github.com/osquery/osquery)
 
 ### [mytop](https://github.com/jzawodn/mytop)
+
+### [MyRocks:lsm存储引擎](http://myrocks.io/docs/getting-started/)
 
 # 安装 MySql
 

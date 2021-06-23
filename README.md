@@ -1,4 +1,5 @@
 # database management systems (DBMS): 数据库管理系统
+
 ## 数据库体系结构
 
 ![image](./Pictures/database_concept/architecture_database.png)
@@ -356,8 +357,6 @@ redis-cli -p 6666
 
 #### [rocksdb: 基于leveldb, 由facebook维护](https://github.com/facebook/rocksdb)
 
-#### [Amazon Dynamo在线论文](https://www.allthingsdistributed.com/2007/10/amazons_dynamo.html)
-
 ### 文档
 
 #### MonogoDB
@@ -384,128 +383,29 @@ redis-cli -p 6666
 
 ### 对象
 
+### timestamp
+
+#### [influxdb](https://github.com/influxdata/influxdb)
+
+- 使用tsm树
+
+```sh
+# 启动server
+influxb
+
+# 初始化
+influx setup
+
+# 写入tzb
+influx write --bucket tzb --precision s "m v=2 $(date +%s)"
+
+# 查询tzb
+influx query 'from(bucket:"tzb") |> range(start:-1h)'
+```
+
 ## DDBS(分布式数据库)
 
-### 基本理论
-
-- 半结构化存储(semi-structure storage systems): 兼顾`Consistency`(一致性)和`Availability`(可用性)
-
-#### shared-nothing 不共享架构
-
-> sharding(网络分片): 将数据划分到多个节点
-
-![image](./Pictures/database_concept/share.webp)
-
-- Shard-everting：共享数据库引擎和数据库存储，无数据存储问题
-
-    - 并行处理能力是最差的
-
-- Shared-storage：引擎集群部署，分摊接入压力，无数据存储问题
-
-- Shard-noting：引擎集群部署，分摊接入压力，存储分布式部署，存在数据存储问题
-
-    - 各个处理单元都有自己私有的 CPU/内存/硬盘等，不存在共享资源，类似于 MPP（大规模并行处理）模式，各处理单元之间通过协议通信
-
-    - 并行处理和扩展能力更好
-
-    - 避免单点故障, 导致系统不能运行
-
-    - 分片机制:
-
-        - 按功能分片: 评论, 用户数据, 商品各为独立节点
-
-        - 按键分片: 26个英文字母, 每个字母为独立节点
-
-#### [CAP理论](https://en.wikipedia.org/wiki/CAP_theorem)
-
-- CAP
-
-    - Consistency(一致性)：每次读取都会收到最新写入
-
-    - Availability(可用性)：每个请求都会收到一个(非错误)响应,但不保证它包含最新的写入
-
-    - Partition tolerance(分区容错)：节点之间的网络丢包或延迟, 不影响系统运行
-
-- 在网络分区存在的情况下, 没有一个分布式系统, 能确保没有网络故障
-
-    - 在网络没有故障的情况下, 能同时满足`Consistency`和`Availability`
-
-    - 在网络存在故障的情况下, 必须在`Consistency`和`Availability`之间做出选择(PC|PA)
-
-        - AP: 则不能保证message是最新, 系统返回错误或超时(DNS)
-
-        - CP: 节点如有错误, 部分数据可能会丢失
-
-        - CA: 分布式事务使用**两阶段**提交, 如出现网络分区会阻塞
-
-- 随着分区恢复技术(P)的发展, 完全有可能同时获得CAP
-
-- 数据库对`CAP`选择
-
-    | 数据库                                                                                     | CAP选择 |
-    |--------------------------------------------------------------------------------------------|---------|
-    | `Amazon Dynamo`以及它衍生出来的数据库: `Cassandra`, `Project Voldemort`, `CouchDB`, `Riak` | CP      |
-    | 图数据库几乎都是                                                                           | AP      |
-    | `Google Bigtable`衍生出来的数据库:  `MongoDB`, `HBase`, `Hypertable`, `Redis`              | AP      |
-    | 传统RDBMS                                                                                  | CA      |
-
-
-    ![image](./Pictures/database_concept/cap.png)
-
-##### [PACELC理论](https://en.wikipedia.org/wiki/PACELC_theorem)
-
-> PACELC是CAP的拓展
-
-- CAP: 有网络分区存在, 必然有网络故障: 因此必须在`Consistency`(一致性)和`Availability`(可用性)之间选择
-
-- 在没有有网络分区存在: 必须在`Consistency`(一致性)和`Latency`(延迟)之间选择
-
-    - high Availability(高可用性)意味着系统必须复制数据. 一旦复制了数据, 就会在`Consistency`和`Latency`之间进行权衡
-
-- AP/EL: 为了较低`Latency`, 放弃`Consistency`
-
-    -  `DynamoDB`, `Cassandra`, `Riak`, `Cosmos DB`
-
-- CP/EC：为了`Consistency`, 放弃 `Availability` 和 `Latency`
-
-    - `VoltDB/H-Store`, `Megastore`, `MySQL Cluster`等ACID系统几乎都是PC/EC
-
-    - BigTable和相关系统(HBase)
-
-    - 为了保证PC的一致性算法
-
-        - Paxos
-
-        - [Raft](https://raft.github.io/raftscope/index.html)
-
-            - , 每个节点从log获取命令, 到达相同的状态和结果
-
-#### HTAP(Hybrid transaction/analytical processing) 混合事务 / 分析处理
-
-- [What is HTAP?](https://en.pingcap.com/blog/how-we-build-an-htap-database-that-simplifies-your-data-platform)
-
--  OLTP(Online Transactional Processing) 在线事务处理
-
-    - 强调快速查询,更可能是行数据库, 每次修改不超过几行, 以事务/s衡量效率
-    - 一般用于交易服务, 如mysql
-
--  OLAP(Online Analytical Processing) 在线分析处理
-
-    - 强调响应时间, 更可能是列数据库, 事务较少, 查询复杂通常涉及aggregating(聚合)历史数据
-
-    - 一般用于数据挖掘, 如hadoop
-
-- OLTP数据库保存数据, 并定期提取数据; 再使用OLAP数据库进行分析, 导出报告或者写回OLTP数据库
-    - 这一过程复杂漫长, 延迟高
-
-- 而HTAP数据库便是兼容两者, 不需要在一个数据库里执行事务, 另一个数据库里分析
-    ![image](./Pictures/database_concept/htap.jpg)
-
-#### [GFS论文pdf](https://research.google.com/archive/gfs-sosp2003.pdf)
-
-#### [Spanner论文pdf](http://research.google.com/archive/spanner-osdi2012.pdf)
-
-#### [MapReduce论文pdf](https://research.google.com/archive/mapreduce-osdi04.pdf)
+### [分布式数据库理论笔记](./ddbs.md)
 
 ### [rqlite: 分布式sqlite](https://github.com/rqlite/rqlite)
 

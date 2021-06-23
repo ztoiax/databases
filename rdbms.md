@@ -92,9 +92,7 @@
 
     - 利用多级索引: 10000个块需要10000个索引项, 也就是100个块, 大大减少磁盘IO
 
-### 索引数据结构
-
-### B+树(平衡数)
+### B+树(平衡树)
 
 - B树只允许搜索码出现一次
 
@@ -166,6 +164,63 @@ WHERE Ai < c2 and Ai > c1
 
     - 顺序索引: 一旦找到c1就可以按顺序读取直到c2
     - 散列索引: 值是随机分布到不同的桶
+
+### lsm(Log Structured Merge)
+
+- lsm树
+
+    ![image](./Pictures/rdbms/lsm.png)
+
+    - 先insert在内存中的L0树
+
+    - L0树满了, 将L1树的记录与L0树合并, 再移动到L1树
+
+        - Li -> Li+1以此类推
+
+    - delete:标记删除的数据项, 返回时屏蔽标记的数据项, 合并时在删除数据项
+
+    - 优点:
+
+        - 顺序IO, 没有随机IO
+
+        - 不修改已经存在的文件,因此不需要加锁
+
+    - 缺点:
+
+        - 查询可能会读取多个树
+
+            - L0找不到就去L1找,以此类推
+
+#### 阶梯式合并索引(Stepped Merge Index)
+
+    ![image](./Pictures/rdbms/stepped-merge-index.png)
+
+    - 每层k个树
+
+        - 一层中的k个树都满了, 就合并到下一层
+
+    - 优点:
+
+        - 减少写的开销
+
+    - 缺点:
+
+        - 查询需要读取更多的树
+
+            - 优化:通过Bloom Filter(布隆过滤器), 快速判断数据是否在树里
+    - update操作使用delete+insert
+
+![image](./Pictures/rdbms/lsm.png)
+
+### Buffer Tree
+
+![image](./Pictures/rdbms/buffer-tree.png)
+
+- 对B+树的优化
+
+    - 为每个B+树结点, 都有buffer存储inserts
+
+    - buffer满了, 就移动到低结点
 
 ### 位图索引
 
@@ -1000,3 +1055,51 @@ Nested-Loop Join(嵌套循环连接)
     - 假设相同的值为i, 则比较ri, si的散列值
 
 ![image](./Pictures/rdbms/join_hash.png)
+
+## HTAP(Hybrid transaction/analytical processing) 混合事务 / 分析处理
+
+- [What is HTAP?](https://en.pingcap.com/blog/how-we-build-an-htap-database-that-simplifies-your-data-platform)
+
+- OLTP(Online Transactional Processing) 在线事务处理
+
+    - 强调快速查询, 更可能是**行数据库**, 每次修改不超过几行, 以事务/s衡量效率
+    - 一般用于交易服务, 如mysql
+
+- OLAP(Online Analytical Processing) 在线分析处理
+
+    - 强调响应时间, 更可能是**列数据库**, 事务较少, 查询复杂通常涉及aggregating(聚合)历史数据
+
+    - 一般用于数据挖掘, 如hadoop
+
+- OLTP数据库保存数据, 并定期提取数据; 再使用OLAP数据库进行分析, 导出报告或者写回OLTP数据库
+
+    - 这一过程复杂漫长, 延迟高
+
+- 而HTAP数据库便是兼容两者, 不需要在一个数据库里执行事务, 另一个数据库里分析
+
+    ![image](./Pictures/database_concept/htap.jpg)
+
+### 列存储
+
+![image](./Pictures/rdbms/column.png)
+
+- 优点:
+
+    - 读取性能更高:
+
+        - 例子:查询过去1年的price(价格)
+
+            - 行存储需要读取过去1年的所有行, 然后聚合price字段
+
+            - 列存储只需读取price字段
+
+    - 压缩性能更高:
+
+        - 相识的数据存储在一起, 压缩性能更高
+
+- 缺点:
+
+    - 更新性能低
+
+        - 更新一行, 需要更新每一列
+
