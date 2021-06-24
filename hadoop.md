@@ -11,10 +11,10 @@
 
         > 算法模型
 
-    - HDFS: Google File System(GFS)
+    - HDFS: Google File System(GFS)的开源实现
         > 文件系统
 
-    - ZooKeeper: Google Chubby
+    - ZooKeeper: Google Chubby(分布式锁)的开源实现
         > 心跳管理
 
 ## HDFS

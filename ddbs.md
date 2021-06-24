@@ -316,8 +316,10 @@
 
 - [awesome-consensus: 一致性算法列表](https://github.com/dgryski/awesome-consensus)
 
+- [腾讯技术工程: 分布式之系统底层原理](https://mp.weixin.qq.com/s?sub=&__biz=MjM5ODYwMjI2MA==&mid=2649756192&idx=1&sn=b3cca59cf43b15a0f15cef97dbb26f0b&chksm=becc815b89bb084dde98d92356e7f0a67ffa7ee2f64d0104d74e5709733e3d560f161a40ab7a&scene=19&subscene=10000&clicktime=1624521004&enterid=1624521004&ascene=0&devicetype=android-30&version=2800063d&nettype=WIFI&abtest_cookie=AAACAA%3D%3D&lang=zh_CN&exportkey=Ax%2FGPgyBCBMZ%2FKC9WGPpRSs%3D&pass_ticket=YZNCdN21ca7%2BXyA%2BktOjD%2FoxrX%2F6Zuc6h0zU71gwRLYcW7tQd7hPplXykEybT2RR&wx_header=1)
 ### Paxos
 ??
+- [the parttime parliament论文pdf](https://lamport.azurewebsites.net/pubs/lamport-paxos.pdf)
 
 - [Paxos Made Simple论文pdf](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf)
 
@@ -339,27 +341,59 @@
 
     - learner: 会选择投票多(Majority)的值
 
-- 两阶段
+    - 一个节点可以是Proposer + Acceptor + Learner
 
-    - 1.协调器发送值n给所有结点
+- 流程:
 
-        - 结点收到的n
+    ![image](./Pictures/ddbs/paxos.png)
 
-            - 如果小于之前收到的n, 则会忽视
+    - 1.proposer发送编号n给所有结点
 
-            - 否则就记住n, 并响应(数n, 值v)
+        - acceptor结点收到的n, 记住n为max_n, 并响应proposer
 
-    - 2.如果协调器收到的编号大多数是n, 就接受(n, v)
+    - 2.如果proposer收到的编号n超过半数, 就发送(n, v)给所有acceptor结点
+
+    - 3.acceptor结点接受响应后, 根据n的值作出判断:
+
+        - n 小于max_n: 忽视
+
+        - n 大于max_n: 响应proposer
+
+    - 4.acceptor结点发送给所有learner
+
+#### Multi-Paxos
+
+- 活锁:假设有两个proposer, 并且收到各一半的acceptor的响应
+
+    - 由于无法超过半数, 需要重来
+
+- 系统只有一个proposer为leader proposer
+
+- Multi-Paxos的实际应用
+
+    - Google Chubby 分布式锁管理器
+
+    - X-DB、OceanBase、Spanner
+
+    - [MySQL Group Replication的xcom](http://mysql.taobao.org/monthly/2017/08/01/)
+
+        - 解决异步, 半同步的主从复制
 
 ### [Raft](https://raft.github.io/raftscope/index.html)
 
-- 两种角色:
+- 思想来自Multi-Paxos
 
-    - leader: 一般是协调器(coordinator), 与paxos不同的是, 在raft是一种优化
+- [raft可视化](http://thesecretlivesofdata.com/raft/)
 
-        - 不同的时间段会有一个不同leader
+- 三种状态:
 
-    - follwer: 其他结点
+    - leader: 与client通信, 所有对系统的更改都需要经过leader, 一个网络分区一个leader
+
+        - 一般是协调器(coordinator), 与paxos不同的是, 在raft是一种优化
+
+    - follower: leader外的其他结点
+
+    - Candidate: follower选举leader时的状态
 
 - 基于日志的协议:
 
@@ -367,44 +401,94 @@
 
         - 日志副本可能存在暂时不一致的状态, 之后会恢复一致
 
-- 1.Leader发送日志追加请求AppendEntries, 给所有follower
+- leader选举流程:
 
-    | AppendEntries参数        | 内容                             |
-    |--------------------------|----------------------------------|
-    | term                     |                                  |
-    | previousLogEntryPosition |                                  |
-    | previousLogEntryTerm     |                                  |
-    | logEntries               | 数组, 多条日志记录               |
-    | leaderCommitIndex        | 提交索引之前的所有日志记录的索引 |
+    - 1.一开始全是follower, 其中一些follower结点, 变为candidate
 
-- 2.follower接受AppendEntries消息后, 根据参数进行返回
+        - 如果leader故障了`election timeout`超时后follower变为candidate. `election timeout`大概在150ms - 300ms
 
-    - 1.`term`小于follower的 `currentTerm`: 返回false
+    - 3.candidate发送投票请求给其他follower, 说投我为leader
 
-    - 2.`previousLogEntryTerm` 不匹配 `previousLogEntryPosition`: 返回false
+    - 4.candidate如果收到大多数follower的响应: 则变为leader
 
-    - 3.`previousLogEntryPosition` 与第一次日志记录不一样: 删除之前和之后的日志
+        - 如果出现split vote(有两个candidate), 并且得票一样: 则回到第一步重新选举
 
-    - 4.追加 `logEntries` 中的的日志记录
+    - 5.leader定期(heartbeat timeout)发送`Append Entries` 消息给follower
 
-    - 5.如果 `leaderCommitIndex` > `local commitIndex`: 设置`local commitIndex` 为 `min(leaderCommitIndex, last log entry index)`
+    - 6.follower响应并返回`Append Entries`消息
 
-    - 6.返回true
+        - 如果follower超时(heartbeat timeout)收不到消息, 则leader故障了, 回到第一步重新选举
 
-- 3.如果大多数follower响应为true: leader成功追加日志
+- 追加日志流程:
 
-- 4.如果leader收到follower响应为false:
+    - 1.client发送命令给leader
 
-    - follower的`currentTerm`更高: leader变成follower
+    - 2.再下一次heartbeat timeout时, leader发送`Append Entries`请求给所有follower, 说要追加日志
 
-        - 新leader结点必须提交所有日志记录
+        | AppendEntries参数        | 内容                             |
+        |--------------------------|----------------------------------|
+        | term                     |                                  |
+        | previousLogEntryPosition |                                  |
+        | previousLogEntryTerm     |                                  |
+        | logEntries               | 数组, 多条日志记录               |
+        | leaderCommitIndex        | 提交索引之前的所有日志记录的索引 |
 
-    - 如果follower的日志过期: 则需要更新
+    - 3.follower接受`Append Entries`消息后, 根据参数进行返回
 
-        - 可能会返回多次false, 日志也会不断发送, 直到匹配日志的条目
+        - 1.`term`小于follower的 `currentTerm`: 返回false
 
-    ![image](./Pictures/ddbs/raft-log.png)
+        - 2.`previousLogEntryTerm` 不匹配 `previousLogEntryPosition`: 返回false
 
+        - 3.`previousLogEntryPosition` 与第一次日志记录不一样: 删除之前和之后的日志
+
+        - 4.追加 `logEntries` 中的的日志记录
+
+        - 5.如果 `leaderCommitIndex` > `local commitIndex`: 设置`local commitIndex` 为 `min(leaderCommitIndex, last log entry index)`
+
+        - 6.返回true
+
+    - 4.如果大多数follower响应为true:
+
+        - 1.leader成功追加日志
+
+        - 2.leader返回追加日志的消息给client
+
+        - 3.再下一次heartbeat timeout, 发送消息给follower, 让follower追加日志
+
+            - 如果此时follower故障了:
+
+                - ??
+
+    - 4.如果leader收到follower响应为false:
+
+        - follower的`currentTerm`更高: leader变成follower
+
+            - 新leader结点必须提交所有日志记录
+
+        - 如果follower的日志过期: 则需要更新
+
+            - 可能会返回多次false, 日志也会不断发送, 直到匹配日志的条目
+
+        ![image](./Pictures/ddbs/raft-log.png)
+
+    - 4.如果出现网络分区
+
+        - 1.另一个网络分区, 会选举leader. 即有两个分区, 两个leader
+
+        - 2.如果此时新出现的client发送命令给新分区的leader; 原来网络分区的leader收到原来client的新命令
+
+            ![image](./Pictures/ddbs/raft-partition.png)
+
+            - 新leader**得到**大多数follower的true: 因此提交日志
+
+            - 原leader**得不到**大多数follower的true: 因此无法提交日志
+
+
+        - 3.如果此时网络分区消失了
+
+            ![image](./Pictures/ddbs/raft-partition1.png)
+
+            - 原leader会变为follower, 并同步新leader的日志
 
 #### Replicated State Machine(复制状态机)
 
@@ -423,6 +507,8 @@
         - Google Spanner通过State Machine实现key-value存储
 
 ### ZooKeeper使用的Zab
+
+- 思想来自Multi-Paxos
 
 ## 分布式查询
 
