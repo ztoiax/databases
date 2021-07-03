@@ -47,6 +47,7 @@
     * [Stored Procedure and Function (自定义存储过程 和 函数)](#stored-procedure-and-function-自定义存储过程-和-函数)
         * [Stored Procedure (自定义存储过程)](#stored-procedure-自定义存储过程)
         * [ALTER](#alter)
+            * [ALTER优化](#alter优化)
     * [Multiple-Column Indexes (多行索引)](#multiple-column-indexes-多行索引)
         * [explain](#explain)
         * [索引速度测试](#索引速度测试)
@@ -72,7 +73,6 @@
         * [binlog2sql](#binlog2sql)
         * [percona-toolkit 运维监控工具](#percona-toolkit-运维监控工具)
         * [innotop](#innotop)
-        * [sysbench](#sysbench)
         * [dbatool](#dbatool)
         * [undrop-for-innodb(\*数据恢复)](#undrop-for-innodb数据恢复)
         * [osqueryi](#osqueryi)
@@ -108,7 +108,8 @@
             * [informantion_schema](#informantion_schema)
             * [performance_schema](#performance_schema)
     * [极限值测试](#极限值测试)
-    * [benchmark](#benchmark)
+    * [benchmark(基准测试)](#benchmark基准测试)
+        * [sysbench](#sysbench)
     * [日志](#日志)
     * [设计规范](#设计规范)
         * [基本规范](#基本规范)
@@ -913,6 +914,24 @@ FROM class;
 | 80    | 2012 | 450       |
 | 90    | 2013 | 450       |
 +-------+------+-----------+
+
+# FIELD() 指定score列值, 不进行ORDER BY
+SELECT * FROM class
+ORDER BY FIELD (score, 90, 70)
+
++----+-------+------+
+| id | score | year |
++----+-------+------+
+| 29 | 80    | 2012 |
+| 31 | 60    | 2010 |
+| 32 | 50    | 2009 |
+| 33 | 40    | 2008 |
+| 34 | 30    | 2007 |
+| 35 | 20    | 2006 |
+| 36 | 10    | 2005 |
+| 28 | 90    | 2013 |
+| 30 | 70    | 2011 |
++----+-------+------+
 ```
 
 ### JOIN(关联查询): 改变表关系
@@ -947,9 +966,9 @@ select * from j;
 +------+------+------------+
 | id   | name | date       |
 +------+------+------------+
-|    1 | tz1  | 2020-10-24 |
-|   10 | tz2  | 2020-10-24 |
-|  100 | tz3  | 2020-10-24 |
+| 1   | tz1 | 2020-10-24 |
+| 10  | tz2 | 2020-10-24 |
+| 100 | tz3 | 2020-10-24 |
 +------+------+------------+
 ```
 
@@ -1112,7 +1131,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 **索引:** 列(字段)相当于一本书,创建 **索引** 就相当于建立 **书目录**,可提高查询速度. [跳转至索引部分](#index)
 
 - 拓展知识: [Clusered Index](https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html) and [Secondary Indexes](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_secondary_index)
-  > - 主健在 InnoDB 中也叫做 **Clusered Index**(聚焦索引) 除了它以外的主健索引叫 Secondary Indexes(二级索引 或 辅助索引)
+  > - 主健在 InnoDB 中也叫做 **Clusered Index**(聚焦索引)按顺序保存所有数据文件, 除了它以外的主健索引叫 Secondary Indexes(二级索引 或 辅助索引)不按顺序保存索引数据文件
   >
   > - 如果表定义了主键: InnoDB将其作为**Clusered Index**(聚焦索引)
   > - 如果没有主键: InnoDB会使用第一个UNIQUE not NULL作为Clusered Index
@@ -1151,44 +1170,298 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
 #### 数据类型
 
+![image](./Pictures/mysql/MySQL-Data-Types.jpg)
+
 - 不同的存储引擎,有不同的实现
 
 - mysql不支持自定义数据类型
 
+- 最好指定为`NOT NULL`, 除非真需要存储 `NULL`
+
 - 选择存储最小的数据类型
 
-  - 注意 INT(1) 和 INT(20) 的存储和计算是一样的
+- INT(整数):
 
-    - 但更长的列会消耗更多内存
+    | 类型      | 位数 |
+    |-----------|------|
+    | TINYINT   | 8位  |
+    | SMALLINT  | 16位 |
+    | MEDIUMINT | 24位 |
+    | INT       | 32位 |
+    | BIGINT    | 64位 |
 
-  - 整型比字符串的 CPU 操作更低
+    - 宽度 `INT(1)` 和 `INT(20)` 的存储和计算是一样的
 
-  - TIMEMESTAMP 比 DATATIME 的存储小一半
+    - 整型比字符串的 CPU 操作更低
 
-    - TIMEMESTAMP 和 unix 时间相同,从 1970 - 2038 年
+    - 使用整数保存ip地址
 
-    - DATATIME 从 1001 - 9999 年
+        - ipv4通过`INET_ATON()`, `INET_NTOA()` 函数进行转换. `IS_IPV4()`判断是否为ipv4地址
 
-- VARCHAR
+        - ipv6通过`INET6_ATON()`, `INET6_NTOA()` 函数进行转换. `IS_IPV6()`判断是否为ipv6地址
 
-  - 可变长度,需要额外记录长度
+        ```sql
+        CREATE TABLE ipv4_test(
+            ipv4 TINYINT UNSIGNED
+        );
 
-    - 当长度 <= 255 时,需要 1 个字节
+        INSERT INTO ipv4_test VALUES
+        (INET_ATON('192.168.1.1'));
 
-    - 当长度 > 255 时,需要 2 个字节
+        SELECT INET_NTOA(ipv4) FROM ipv4_test;
 
-    - varchar(1),需要 2 个字节
+        SELECT IS_IPV4(ipv4) FROM ipv4_test;
+        ```
 
-    - varchar(256),需要 258 个字节
+- FLOAT(浮点):
 
-- CHAR
+    | 类型    | 位数     |
+    |---------|----------|
+    | FLOAT   | 32位     |
+    | DOUBLE  | 64位     |
+    | DECIMAL | 存储格式 |
 
-  - 定长字符串,不容易产生碎片
+    - `FLOAT` 和 `DOUBLE` 并不精确, 在财务数据里像0.01的值, 并不能精确表示
 
-    - 适合存储 MD5 这些定长值
+    - 使用`DECIMAL(m, d)` m为总位数(范围:1到65位), d为小数点右边的位数
 
-![image](./Pictures/mysql/MySQL-Data-Types.jpg)
+        - 计算时会转换为`DOUBLE` 类型
 
+        ```sql
+        CREATE TABLE decimal_test(
+            data DECIMAL(6, 4) NOT NULL
+        );
+
+        INSERT INTO decimal_test VALUES
+        (0.99999);
+        ```
+
+        - 超过d的位数, 会四舍五入.以下为0.0600
+
+            ```sql
+            INSERT INTO decimal_test VALUES
+            (0.059999);
+            ```
+
+- TIMEMESTAMP, DATATIME(日期时间)
+
+    | 类型    | 位数     |
+    |---------|----------|
+    | TIMESTAMP   | 32位     |
+    | DATATIME  | 64位     |
+
+    - `TIMEMESTAMP` 和 unix 时间相同,从 '1970-01-01 00:00:01' UTC -> '2038-01-19 03:14:07' UTC
+
+    - `DATATIME` 从 1001 - 9999 年
+
+    - 因尽量使用`TIMEMESTAMP`类型
+
+        ```sql
+        CREATE TABLE time_test(
+            ts TIMESTAMP,
+            dt DATETIME
+        );
+
+        INSERT INTO time_test VALUES
+        ('2021-7-3 13:40:30', '2021-7-3 13:40:30'),
+        (NOW(), NOW());
+        ```
+
+    - 如果超过unix时间就会报错
+
+        ```sql
+        INSERT INTO time_test(ts) VALUES
+        ('2038-7-3 13:40:30');
+        ```
+
+        ![image](./Pictures/mysql/time_test.png)
+
+- BIT(位):
+
+    - BIT(1): 一个位; 最大BIT(64): 64个位
+
+    - BIT()的存储需要最小整数类型
+
+        - BIT(17) 需要存储在24个位的MEDIUMINT类型
+
+    - 插入57的二进制数, 由于57的ASCII码为字符9, 因此显示为字符9
+
+        ```sql
+        CREATE TABLE bit_test(
+            b bit(8)
+        );
+
+        INSERT INTO bit_test VALUES
+        (b'00111001');
+
+        SELECT b, b+0 FROM bit_test
+        ```
+
+        ![image](./Pictures/mysql/bit_test.png)
+
+        - 因此应该谨慎使用BIT类型
+
+    - 如果需要存储true/false值, 可以使用`char(0)`类型, 值为`NULL`, `''`(长度为0的空字符串)
+
+        ```sql
+        CREATE TABLE tf_test(
+            tf char(0)
+        );
+
+        - ''为空字符串
+        INSERT INTO tf_test VALUES
+        (NULL),
+        ('');
+
+        SELECT * FROM tf_test
+        ```
+        ![image](./Pictures/mysql/tf_test.png)
+
+- SET:
+
+    - 可以存储多个true/false值
+
+    - set添加或删除字符串需要执行`ALTER TABLE` 操作
+
+        - [快速ALTER TABLE](#alter_frm)
+
+    ```sql
+    CREATE TABLE set_test(
+        acl SET('READ', 'WRITE', 'DELETE')
+    );
+
+    - 注意:中间不能有空格'READ, WRITE'
+    INSERT INTO set_test VALUES
+    ('READ,WRITE'),
+    ('WRITE,DELETE');
+
+    - FIND_IN_SET() 查找带有'WRITE'行
+    SELECT * FROM set_test
+    WHERE FIND_IN_SET('WRITE',acl)
+    ```
+
+    - 使用整数存储
+
+        ```sql
+        SET @READ   := 1<<0,
+            @WRITE  := 1<<1,
+            @DELETE := 1<<2;
+
+        CREATE TABLE set_int_test(
+            acl TINYINT DEFAULT 0
+        );
+
+        INSERT INTO set_int_test VALUES
+        (@READ + @WRITE),
+        (@WRITE + @DELETE);
+
+        SELECT * FROM set_int_test WHERE acl & @READ;
+        ```
+        ![image](./Pictures/mysql/set_int_test.png)
+
+- 字符串:
+
+    - VARCHAR:
+
+      - 可变长度,需要额外记录长度
+
+        - 当长度 <= 255 时,需要 1 个字节
+
+        - 当长度 > 255 时,需要 2 个字节
+
+        - `varchar(1)`,需要 2 个字节
+
+        - `varchar(256)`,需要 258 个字节
+
+        - 如果update字符串, 页不能容纳update后的大小, innodb就会分裂页
+
+    - CHAR:
+
+      - 定长字符串,不容易产生碎片
+
+        - 适合存储 MD5 这些定长值
+
+    - char类型会删除末尾的空格, 而varchar则不会
+
+        ```sql
+        CREATE TABLE char_test(
+            char_col CHAR(10),
+            varchar_col VARCHAR(10)
+        );
+
+        INSERT INTO char_test(char_col, varchar_col) VALUES
+            (' string', ' string1'),
+            (' string ', ' string1 ');
+
+        - CONCAT()函数连接字符串, 以下命令为连接单引号''
+        SELECT CONCAT("'", char_col, varchar_col, "'")
+        FROM char_test;
+        ```
+
+        ![image](./Pictures/mysql/char_test.png)
+
+
+    - BINARY, VARBINARY类似于CHAR, VARCHAR
+
+        - 使用BINARY(16)保存uuid
+
+            - 通过`UNHEX()`, `HEX()` 函数进行转换
+
+            ```sql
+            CREATE TABLE uuid_test(
+                uuid BINARY(16)
+            );
+
+            INSERT INTO uuid_test VALUES
+            (UNHEX('FDFE0000000000005A55CAFFFEFA9089'));
+
+            SELECT HEX(uuid) FROM uuid_test;
+            ```
+
+    - TEXT(字符串), BLOB(二进制字符串):
+
+        - TEXT使用两个字节存储字符串大小
+
+        - 一个字符大小为一个字节
+
+        | TEXT类型     | BLOB类型     | 大小                     |
+        | ------------ | ------------ | ------------------------ |
+        | TINYTEXT     | TINYBLOB     | 255字节                  |
+        | TEXT         | BLOB         | 65536字节(64K)           |
+        | MEDIUMTEXT   | MEDIUMBLOB   | 16,777,215字节(16M)      |
+        | LONGTEXT     | LONGBLOB     | 4,294,967,295 字节(4G)   |
+
+        - BLOB:没有排序规则和字符集, 用于图片, 视频存储
+
+        - 尽量避免使用TEXT, BLOB类型
+
+        - 不能把全部字符用作索引, 只能索引字符的部分前缀
+
+    - EMUM(枚举):
+
+        ```sql
+        CREATE TABLE emum_test(
+            emum_col ENUM('xiaomi', 'huawei', 'meizu')
+        );
+
+        INSERT INTO emum_test(emum_col) VALUES
+            ('huawei'),
+            ('meizu'),
+            ('xiaomi');
+
+        SELECT emum_col FROM emum_test;
+        SELECT emum_col + 0 FROM emum_test;
+        ```
+
+        - 实际存储的是整数, 而不是字符串, 因此查询需要进行字符串转换, 有额外开销
+
+            - 与varchar连接varchar相比: emum连接emum要快很多, 而emum连接varchar要慢很多
+
+        - emum添加或删除字符串需要执行`ALTER TABLE` 操作
+
+            - [快速ALTER TABLE](#alter_frm)
+
+        ![image](./Pictures/mysql/emum_test.png)
 
 #### 列字段完整性约束
 
@@ -1233,9 +1506,9 @@ desc new;
 +-------+-------------+------+-----+------------+----------------+
 | Field | Type        | Null | Key | Default    | Extra          |
 +-------+-------------+------+-----+------------+----------------+
-| id    | int(8)      | NO   | PRI | <null>     | auto_increment |
-| name  | varchar(50) | NO   | UNI | <null>     |                |
-| date  | date        | YES  | MUL | 2020-10-24 |                |
+| id   | int(8)      | NO  | PRI | <null>     | auto_increment |
+| name | varchar(50) | NO  | UNI | <null>     |                |
+| date | date        | YES | MUL | 2020-10-24 |                |
 +-------+-------------+------+-----+------------+----------------+
 
 # 查看 new 表详细信息
@@ -1985,6 +2258,70 @@ ALTER TABLE ca DROP index id;
 # 修改 ca 表的存储引擎
 ALTER TABLE ca ENGINE = MYISAM;
 ```
+
+#### ALTER优化
+
+- mysql大部分修改表结构的操作是:新建一个空表, 将旧表数据插入新表, 再删除旧表
+
+- 所有`MODIFY COLUMN` 都会导致表的重建
+
+    ```sql
+    ALTER TABLE table_name
+    MODIFY COLUMN col INT DEFAULT 5
+    ```
+
+    - 使用`ALTER COLUMN`代替, 此命令直接修改frm文件, 而不是重建表
+
+    ```sql
+    ALTER TABLE table_name
+    ALTER COLUMN col SET DEFAULT 5
+    ```
+
+<span id="alter_frm"></span>
+- 手动修改frm文件, 避免重建表
+
+    - **注意:此方法不受官方支持, 要自己承担风险, 执行前请先备份好数据**
+
+    - 此方法适用于:
+
+        - 移除(不是添加) `AUTO_INCREMENT`
+
+        - 增加, 移除, 修改EMUM, SET类型
+
+    ![image](./Pictures/mysql/alter_frm.png)
+    ```sql
+    -- 创建新表
+    CREATE TABLE emum_test_new LIKE emum_test;
+
+    -- 修改表结构
+    ALTER TABLE emum_test_new
+    MODIFY COLUMN emum_col ENUM('xiaomi','huawei','meizu','oppo', 'vivo') DEFAULT 'meizu';
+
+    -- 关闭所有正在使用的表
+    flush tables with read lock;
+    ```
+
+    ```sh
+    # 进入表所在的数据库目录
+    cd /var/lib/mysql/database_name
+
+    # 交换新表和旧表
+    mv emum_test.frm emum_test_tmp.frm
+    mv emum_test_new.frm emum_test.frm
+    mv emum_test_tmp.frm emum_test_new.frm
+    ```
+
+    ```sql
+    -- 释放锁
+    UNLOCK TABLES;
+
+    -- 查看表结构是否更改
+    DESC emum_test
+
+    -- 查看数据
+    SELECT * FROM emum_test
+    ```
+    ![image](./Pictures/mysql/alter_frm1.png)
 
 <span id="index"></span>
 
@@ -2875,12 +3212,6 @@ cat /tmp/pt_general.log
 ![image](./Pictures/mysql/innotop.png)
 ![image](./Pictures/mysql/mysqlslap.png)
 
-### [sysbench](https://github.com/akopytov/sysbench)
-
-- [sysbench 安装、使用和测试](https://www.cnblogs.com/zhoujinyi/archive/2013/04/19/3029134.html)
-
-<span id="install"></span>
-
 ### [dbatool](https://github.com/xiepaup/dbatools)
 
 监控以及查询工具
@@ -3334,7 +3665,7 @@ commit;
 
 在 Mysql 保存目录下:
 
-- frm: 表格式
+- frm: 表格式(innodb也有此文件)
 
 - MYD: 数据文件
 
@@ -3875,14 +4206,74 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 
 ![image](./Pictures/mysql/1018.png)
 
-## benchmark
+## benchmark(基准测试)
 
-```sql
-set @input := 'hello world';
-select benchmark(10000, MD5(@input));
-select benchmark(10000, SHA1(@input));
-```
+- 测试原则:
 
+    - 基准测试应该运行足够长的时间(8 - 12小时), 因为系统可能需要3, 4个小时的io预热, 如果没有时间去完成, 那么已经花费的时间都是浪费
+
+    - 测试结果保证可重复:每次测试都重启系统, 以及对测试的磁盘分区进行格式化, 数据的碎片度会导致测试结果不能重复
+
+    - 不能用cpu密集性的标准去测试io密集性的应用
+
+- 测试指标:
+
+    - 并发度:是一个测试属性, 而不是一个测试结果. 在并发度增加时需要观察**吞吐量**, **响应时间**
+
+        - 注意:web站点有50000个用户同时访问时, mysql可能只有10 - 15个访问
+
+- 通过md5(), sha1()函数快速测试(不能用作基准测试):
+
+    ```sql
+    set @input := 'hello world';
+    select benchmark(10000, MD5(@input));
+    select benchmark(10000, SHA1(@input));
+    ```
+
+- 在性能下跌时可以使用以下命令:
+
+    ```sql
+    show engine innodb status\G;
+
+    # 查看线程状态
+    show full processlist;
+    ```
+
+### [sysbench](https://github.com/akopytov/sysbench)
+
+- 优点:
+
+    - sysbench的io测试与innodb的io非常相识
+
+    - 支持lua语言
+
+- cpu测试:
+
+    ```sql
+    sysbench --test=cpu --cpu-max-prime=20000 run
+    ```
+
+- io测试:
+
+    | mode(测试模式) | 测试内容 |
+    |----------------|----------|
+    | seqwr          | 顺序写入 |
+    | seqrewr        | 顺序重写 |
+    | seqrd          | 顺序读取 |
+    | rndrd          | 随机写入 |
+    | rndwr          | 随机读取 |
+    | rndrw          | 随机读写 |
+
+    ```sql
+    # 生成数据文件, 注意文件必须比内存大
+    sysbench --test=fileio --file-total-size=100G prepare
+
+    # rndrw:随机读写io测试
+    sysbench --test=fileio --file-total-size=100G prepare --file-test-mode=rndrw/ --init-rng=on --max-time=300 --max-requests=0
+
+    # 删除数据文件
+    sysbench --test=fileio --file-total-size=100G cleanup
+    ```
 ## 日志
 
 [关于日志](/mysql-log.md)

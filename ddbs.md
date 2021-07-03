@@ -385,6 +385,8 @@
 
 - [raft可视化](http://thesecretlivesofdata.com/raft/)
 
+- [腾讯技术工程: 分布式一致性算法 Raft](https://zhuanlan.zhihu.com/p/383555591)
+
 - 三种状态:
 
     - leader: 与client通信, 所有对系统的更改都需要经过leader, 一个网络分区一个leader
@@ -405,7 +407,7 @@
 
     - 1.一开始全是follower, 其中一些follower结点, 变为candidate
 
-        - 如果leader故障了`election timeout`超时后follower变为candidate. `election timeout`大概在150ms - 300ms
+        - 如果leader故障, 并且`election timeout`超时后, follower变为candidate. `election timeout`大概在150ms - 300ms
 
     - 3.candidate发送投票请求给其他follower, 说投我为leader
 
@@ -417,7 +419,7 @@
 
     - 6.follower响应并返回`Append Entries`消息
 
-        - 如果follower超时(heartbeat timeout)收不到消息, 则leader故障了, 回到第一步重新选举
+        - 如果follower超时(heartbeat timeout)收不到消息, 则leader故障了, 回到第一步重新选举. follower 强制复制 leader 的日志
 
 - 追加日志流程:
 
@@ -465,9 +467,9 @@
 
             - 新leader结点必须提交所有日志记录
 
-        - 如果follower的日志过期: 则需要更新
+        - 如果`previousLogEntryTerm` 不匹配: follower的日志过期需要更新
 
-            - 可能会返回多次false, 日志也会不断发送, 直到匹配日志的条目
+            - 带上前一个日志任期号和索引, 继续发送日志复制请求, 直到匹配
 
         ![image](./Pictures/ddbs/raft-log.png)
 
@@ -568,9 +570,13 @@
 
 - PA/EL的kv数据库
 
+- 对延迟有很高的要求
+
+- 没有ACID的I隔离性, 只提供单key的permits更新
+
 - 系统不知道数据的值, 不像Bigtable, PNUTS, Megastore
 
-- 一致性级别: QR, QW , S
+- 一致性级别: QR, QW, S
 
 - 协调器(coordinator)处理get, put调用
 

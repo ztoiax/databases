@@ -13,15 +13,15 @@
 
 ## 普通日志
 
-查看日志目录
+- 默认情况下，MYSQL 中不启用日志文件。所有错误都会显示在 `syslog (/var/log/syslog)` 中。
 
-默认情况下，MYSQL 中不启用日志文件。所有错误都会显示在 `syslog (/var/log/syslog)` 中。
+| 日志类型          | 记录内容                                                       |
+|-------------------|----------------------------------------------------------------|
+| error log         | 它包含有关服务器运行时发生的错误的信息(也包括服务器启动和停止) |
+| general query log | 记录(连接、断开连接、查询)                                     |
+| Slow Query log    | 慢查询日志                                                     |
 
-- error log:它包含有关服务器运行时发生的错误的信息(也包括服务器启动和停止)
-
-- general query log:记录(连接、断开连接、查询)
-
-- Slow Query log
+- 查看日志大小, 保存路径
 
 ```sql
 show variables like '%log%file%';
@@ -29,59 +29,57 @@ show variables like '%log%file%';
 
 修改`/etc/mysql/my.cnf` 配置文件下启用日志
 
-开启 error log
+- 开启 error log:
 
-```sh
-[mysqld_safe]
-log_error=/var/log/mysql/mysql_error.log
+    ```sh
+    [mysqld_safe]
+    log_error=/var/log/mysql/mysql_error.log
 
-[mysqld]
-log_error=/var/log/mysql/mysql_error.log
-```
+    [mysqld]
+    log_error=/var/log/mysql/mysql_error.log
+    ```
 
-开启 general query log
+- 开启 general query log:
 
-```sh
-general_log_file = /var/log/mysql/mysql_general.log
-general_log = 1
-```
+    ```sh
+    general_log_file = /var/log/mysql/mysql_general.log
+    general_log = 1
+    ```
 
-开启 Slow Query log
+- 开启 Slow Query log:
 
-```sh
-slow_query_log_file = /var/log/mysql/mysql_slow.log
-slow_query_log = 1
+    ```sh
+    slow_query_log_file = /var/log/mysql/mysql_slow.log
+    slow_query_log = 1
 
-# 超过两秒
-long_query_time = 2
-log-queries-not-using_indexes
-```
+    # 超过两秒, 可以设置0秒捕捉所有查询
+    long_query_time = 2
+    log-queries-not-using_indexes
+    ```
 
-```sh
-# 创建文件
-mkdir /var/log/mysql
+    ```sh
+    # 创建文件
+    mkdir /var/log/mysql
 
-touch /var/log/mysql/mysql_error.log
-touch /var/log/mysql/mysql_general.log
-touch /var/log/mysql/mysql_slow.log
+    touch /var/log/mysql/mysql_error.log
+    touch /var/log/mysql/mysql_general.log
+    touch /var/log/mysql/mysql_slow.log
 
-# 授予权限
-chown mysql:mysql /var/log/mysql/mysql_error.log
-chown mysql:mysql /var/log/mysql/mysql_general.log
-chown mysql:mysql /var/log/mysql/mysql_slow.log
-```
+    # 授予权限
+    chown mysql:mysql /var/log/mysql/mysql_error.log
+    chown mysql:mysql /var/log/mysql/mysql_general.log
+    chown mysql:mysql /var/log/mysql/mysql_slow.log
 
-重启 mysql
-`systemctl restart mysqld`
+    # 重启 mysql
+    systemctl restart mysqld
+    ```
 
----
+- 在运行时启用日志:
 
-在运行时启用日志
-
-```sh
-SET GLOBAL general_log = 'ON';
-SET GLOBAL slow_query_log = 'ON';
-```
+    ```sh
+    SET GLOBAL general_log = 'ON';
+    SET GLOBAL slow_query_log = 'ON';
+    ```
 
 ## BINLOG (二进制日志)
 
@@ -177,18 +175,76 @@ pugre master logs before current_date - interval 1 day;
 mysqlbinlog /var/lib/mysql/bin.000001
 ```
 
-## 慢查询优化
+## [canal](https://github.com/alibaba/canal)
+
+- canal 模拟 slave 的方式，获取 binlog 日志数据. binlog 设置为 row 模式以后，不仅能获取到执行的每一个增删改的脚本，同时还能获取到修改前和修改后的数据.
+
+- 支持高性能,实时数据同步
+
+- 支持 docker
+
+[canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
+
+[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
+
+# 性能优化
+
+- 如果无法测量就无法优化, 测量需要分析大量的数据, 大多数系统无法完整的测量, 而且测量的结果也可能是错误的
+
+- 判断是服务器问题还是查询问题:
+
+    - 如果是每一条查询都变慢, 则可能是服务器问题
+
+    - 如果是只有某条查询变慢, 则可能是查询问题
+
+## profile 记录查询响应时间
 
 ```sql
-查看慢查询相关配置
-show variables like "%slow%";
+# 开启profile
+set profile = 1
 
-show status like "%slow%";
+# 查看所有查询的响应时间
+show profiles
+
+# 查看上一次查询每个步骤的响应时间
+show profile
 ```
 
-### mysqldumpslow 自带慢查询命令
+## 记录计数器
 
-```sql
+```sh
+# 查看线程状态, 如果注意是否有大量的freeing item
+mysql -e 'show processlist\G' | grep -i "state:" | sort | uniq -c | sort -rn
+```
+
+## 慢查询优化
+
+- 设置0秒.记录所有查询:
+
+    - 慢查询日志开销很低, 不需要担心额外的开销, 但会消耗磁盘空间
+
+    ```sh
+    [mysqld]
+    long_query_time = 0
+    ```
+
+- 查看慢查询相关配置:
+
+    ```sql
+    show variables like "%slow%";
+
+    show status like "%slow%";
+    ```
+
+### [pt-query-digest(percona-toolkit)](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
+
+```sh
+pt-query-digest /var/log/mysql/mysql_slow.log
+```
+
+### mysqldumpslow
+
+```sh
 # 取出使用最多的10条慢查询
 mysqldumpslow -s c -t 10 /var/log/mysql/mysql_slow.log
 
@@ -213,19 +269,6 @@ mysqlsla --log-type slow /var/log/mysql/mysql_slow.log
 mysqlsla --log-type general /var/log/mysql/mysql_general.log
 mysqlsla --log-type error /var/log/mysql/mysql_error.log
 ```
-
-## [canal](https://github.com/alibaba/canal)
-
-- canal 模拟 slave 的方式，获取 binlog 日志数据. binlog 设置为 row 模式以后，不仅能获取到执行的每一个增删改的脚本，同时还能获取到修改前和修改后的数据.
-
-- 支持高性能,实时数据同步
-
-- 支持 docker
-
-[canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
-
-[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
-
 # reference
 
 - [How and When To Enable MySQL Logs](https://www.pontikis.net/blog/how-and-when-to-enable-mysql-logs)
