@@ -93,17 +93,25 @@
 
         - 不需要查询原始数据, 因此比缓存表效率更高
 
-## SQL index(索引)
+## index(索引)
 
 - 搜索码:查找记录的属性(列)或者属性集
 
-- clustering index(聚集索引或primary index主索引): 搜索码按指定顺序排序
+- clustering index(聚簇索引或primary index主索引): 搜索码按指定顺序排序, 并且在同一结构下保存索引和数据行的物理位置
 
-- no clustering index(非聚集索引或secondary index辅助索引): 搜索码按指定顺序排序
+- no clustering index(非聚簇索引或secondary index二级索引): 搜索码**不**按顺序排序,叶结点保存的不是数据行的物理位置, 而是行指针, 因此需要2次查找:
+
+    - 1.获取数据行在二级索引的行指针
+
+    - 2.再从聚簇索引找数据行对应的物理位置
+
+    - innodb使用主键值代替行指针:
+
+        - 优点:移动行时无需更新这个指针
 
 - 无论任何形式的索引, 面对插入和删除操作, 都需要更新
 
-- dense index(稀疏索引): 按顺序存储部分搜索码, 因此**只有clusteriing index才能使用dense index**
+- dense index(稀疏索引): 按顺序存储部分搜索码, 因此**只有clustering index才能使用dense index**
 
    - 插入和删除
 

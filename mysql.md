@@ -36,10 +36,13 @@
             * [数据类型](#数据类型)
             * [列字段完整性约束](#列字段完整性约束)
             * [基本使用](#基本使用)
-        * [FOREIGN KEY(外键)](#foreign-key外键)
-            * [Insert](#insert)
-            * [选取另一个表的数据,导入进新表](#选取另一个表的数据导入进新表)
-            * [Update](#update)
+            * [FOREIGN KEY(外键)](#foreign-key外键)
+        * [Insert](#insert)
+            * [INSERT... SELECT...](#insert-select)
+            * [INSERT ... ON DUPLICATE KEY UPDATE ...](#insert--on-duplicate-key-update-)
+            * [LOAD DATA](#load-data)
+        * [REPLACE](#replace)
+        * [UPDATE](#update)
             * [case结构](#case结构)
         * [Delete and Drop (删除)](#delete-and-drop-删除)
             * [删除重复的数据](#删除重复的数据)
@@ -48,15 +51,23 @@
         * [Stored Procedure (自定义存储过程)](#stored-procedure-自定义存储过程)
         * [ALTER](#alter)
             * [ALTER优化](#alter优化)
-    * [Multiple-Column Indexes (多行索引)](#multiple-column-indexes-多行索引)
-        * [explain](#explain)
-        * [索引速度测试](#索引速度测试)
+    * [INDEX(索引)](#index索引)
+        * [EXPLAIN](#explain)
+        * [B+树匹配原则](#b树匹配原则)
+            * [前缀索引](#前缀索引)
+        * [HASH INDEX](#hash-index)
+            * [自适应哈希(adaptive hash index)](#自适应哈希adaptive-hash-index)
+        * [覆盖索引](#覆盖索引)
+        * [Multiple-Column Indexes (多列索引)](#multiple-column-indexes-多列索引)
+        * [SQL语法索引](#sql语法索引)
+            * [索引状态](#索引状态)
     * [DCL](#dcl)
         * [帮助文档](#帮助文档)
         * [用户权限设置](#用户权限设置)
             * [revoke (撤销):](#revoke-撤销)
             * [授予权限,远程登陆](#授予权限远程登陆)
         * [配置(varibles)操作](#配置varibles操作)
+    * [表损坏](#表损坏)
     * [mysqldump 备份和恢复](#mysqldump-备份和恢复)
         * [主从同步 (Master Slave Replication )](#主从同步-master-slave-replication-)
             * [主服务器配置](#主服务器配置)
@@ -114,7 +125,6 @@
     * [设计规范](#设计规范)
         * [基本规范](#基本规范)
         * [列字段规范](#列字段规范)
-        * [索引规范](#索引规范)
         * [查询规范](#查询规范)
     * [语句优化](#语句优化)
 * [reference](#reference)
@@ -320,6 +330,14 @@ limit 2;
 # limit 选取所有列,但只显示100到70000行
 select * from cnarea_2019
 limit 100,70000;
+
+# LEFT() 选取name列, 但只显示前2字符
+SELECT LEFT(name, 2)
+FROM cnarea_2019
+
+# RIGHT() 选取name列, 但只显示后3字符
+SELECT RIGHT(name, 3)
+FROM cnarea_2019
 ```
 
 #### where: 行(元组)条件判断
@@ -371,18 +389,6 @@ where id in (10,20);
 select * from ca
 where id is not null
 and id < 10;
-```
-
-有个说法是: where 加 limit 查询比 limit 更快.但我的测试结果不是这样
-[测试结果](/mysql-problem.md)
-
-```sql
-select * from cnarea_2019
-where id > 100
-limit 70000;
-
-select * from cnarea_2019
-limit 100,70000;
 ```
 
 #### Order by (排序)
@@ -1128,46 +1134,6 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 > )
 > ```
 
-**索引:** 列(字段)相当于一本书,创建 **索引** 就相当于建立 **书目录**,可提高查询速度. [跳转至索引部分](#index)
-
-- 拓展知识: [Clusered Index](https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html) and [Secondary Indexes](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_secondary_index)
-  > - 主健在 InnoDB 中也叫做 **Clusered Index**(聚焦索引)按顺序保存所有数据文件, 除了它以外的主健索引叫 Secondary Indexes(二级索引 或 辅助索引)不按顺序保存索引数据文件
-  >
-  > - 如果表定义了主键: InnoDB将其作为**Clusered Index**(聚焦索引)
-  > - 如果没有主键: InnoDB会使用第一个UNIQUE not NULL作为Clusered Index
-  > - 如果表没有 Primary key 和 Unique not NULL: InnoDB 会生成 GEN_CLUST_INDEX (隐藏聚集索引)
-  >
-  > - Secondary Indexes 可以有 0 个或多个,只满足索引列中的值的查询
-- 拓展知识 2:[Fast Index Creation](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_fast_index_creation) 它通过避免重写表, 加速 Secondary Indexes 的创建和删除
-
-  > [先创建 Clustered Index 表,然后在创建 Secondary Indexes:](https://docs.huihoo.com/mysql/innodb-plugin-1.0-en/innodb-create-index.html)
-  >
-  > ```sql
-  > CREATE TABLE T1(
-  >    A INT PRIMARY KEY,
-  >    B INT,
-  >    C CHAR(1)
-  > );
-  >
-  > INSERT INTO T1 VALUES
-  > (1,2,'a'), (2,3,'b'), (3,2,'c'), (4,3,'d'), (5,2,'e');
-  >
-  > COMMIT;
-  >
-  > ALTER TABLE T1 ADD INDEX (B),
-  >                ADD UNIQUE INDEX (C);
-  > ```
-  >
-  > 而不是直接创建 Clustered Index 和 Secondary Indexes 表:
-  >
-  > ```sql
-  > CREATE TABLE T1(
-  >     A INT PRIMARY KEY,
-  >     B INT unique,
-  >     C CHAR(1) unique
-  > );
-  > ```
-
 #### 数据类型
 
 ![image](./Pictures/mysql/MySQL-Data-Types.jpg)
@@ -1532,7 +1498,7 @@ show index from new
 CREATE TEMPORARY TABLE temp (`id` int);
 ```
 
-### [FOREIGN KEY(外键)](https://www.mysqltutorial.org/mysql-foreign-key/)
+#### [FOREIGN KEY(外键)](https://www.mysqltutorial.org/mysql-foreign-key/)
 
 - 1.父表和子表必须使用相同的存储引擎
 
@@ -1555,7 +1521,7 @@ CREATE TABLE foreign_test(
 
 - `NO ACTION`: 不允许对父表外键对应值进行操作
 
-#### Insert
+### Insert
 
 **语法**
 
@@ -1592,7 +1558,7 @@ MariaDB [china]> select * from new;
 +-----+------+------------+
 ```
 
-#### 选取另一个表的数据,导入进新表
+#### INSERT... SELECT...
 
 - 把 cnarea_2019 表里的字段,导入进 newcn 表.
   **语法:**
@@ -1641,7 +1607,108 @@ select id,name from cnarea_2019
 where name regexp '广州.*';
 ```
 
-#### Update
+#### [INSERT ... ON DUPLICATE KEY UPDATE ...](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)
+
+```sql
+CREATE TABLE duplicate_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  a INT UNIQUE, -- 唯一性
+  PRIMARY KEY (id)
+);
+
+INSERT INTO duplicate_test(a) VALUES
+(1),
+(2);
+
++----+---+
+| id | a |
++----+---+
+| 1  | 1 |
+| 2  | 2 |
++----+---+
+```
+
+```sql
+-- 由于c有唯一属性, 因此会报错
+INSERT INTO duplicate_test(a) VALUES
+(1);
+
+-- ON DUPLICATE KEY UPDATE, 如果字段是UNIQUE, 并且已经值已经存在, 则修改
+INSERT INTO duplicate_test (a) VALUES (1)
+  ON DUPLICATE KEY UPDATE a=a+2;
+
++----+---+
+| id | a |
++----+---+
+| 2  | 2 |
+| 1  | 3 |
++----+---+
+
+-- 如果修改后的值也已经存在, 则会报错
+INSERT INTO duplicate_test (a) VALUES (1)
+  ON DUPLICATE KEY UPDATE a=a+1;
+```
+
+#### [LOAD DATA](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
+
+```sql
+-- 创建源数据表
+CREATE TABLE load_data_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  data VARCHAR(64) DEFAULT NULL,
+  ts TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
+INSERT INTO load_data_test VALUES
+(1, 'one', '2014-08-20 18:47:00'),
+(2, 'two', '2015-08-20 18:47:00'),
+(3, 'three', '2016-08-20 18:47:00');
+
+-- 将表数据输出/tmp/test文件
+SELECT * INTO OUTFILE '/tmp/test'
+  FIELDS TERMINATED BY ','
+  FROM load_data_test;
+
+-- 创建导入数据的表
+CREATE TABLE load_data1_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  data VARCHAR(64) DEFAULT NULL,
+  ts TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
+-- 导入数据
+LOAD DATA INFILE '/tmp/test' INTO TABLE load_data1_test
+  FIELDS TERMINATED BY ',';
+```
+
+### [REPLACE](https://dev.mysql.com/doc/refman/5.6/en/replace.html)
+
+- 与INSERT语句不同之处是, 可以插入主键,唯一性索引相同的值, 即修改
+
+```sql
+CREATE TABLE replace_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  data VARCHAR(64) DEFAULT NULL,
+  ts TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
+-- 初始插入.使用REPLACE也一样
+INSERT INTO replace_test
+VALUES (1, 'Old', '2014-08-20 18:47:00');
+
+-- 此语句会报错
+INSERT INTO replace_test
+VALUES (1, 'New', '2014-08-20 18:47:42');
+
+-- 使用REPLACE成功修改
+REPLACE INTO replace_test
+VALUES (1, 'New', '2014-08-20 18:47:42');
+```
+
+### UPDATE
 
 **语法:**
 
@@ -2323,17 +2390,607 @@ ALTER TABLE ca ENGINE = MYISAM;
     ```
     ![image](./Pictures/mysql/alter_frm1.png)
 
-<span id="index"></span>
+## INDEX(索引)
 
-## [Multiple-Column Indexes (多行索引)](https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html)
+**索引:** 列(字段)相当于一本书,创建 **索引** 就相当于建立 **书目录**,可提高查询速度
+
+- [Clusered Index](https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html)(聚簇索引):按顺序保存所有数据文件
+
+    - 如果表定义了主键InnoDB将其作为**Clusered Index**
+
+    - 每一个叶结点上包含主键值, 事务ID, MVCC的回滚指针, 剩余列(col2...)
+
+    - InnoDB每个表都有一个聚簇索引:
+
+        - 如果表没有主键:
+
+            - InnoDB会使用第一个UNIQUE not NULL作为Clusered Index
+
+        - 如果表没有 Primary key 和 Unique not NULL:
+
+            - InnoDB 会生成一个名为GEN_CLUST_INDEX 包含id值的隐藏列(隐藏聚簇索引)
+
+        - 如果聚簇索引的值是非顺序的. 如`UUID`, 则会导致索引的插入完全随机:
+
+            - 顺序的主键:每一条记录都存储在上一条记录的后面
+
+                - 顺序写入会造成锁的竞争, 可通过variable [`innodb autoinc_lock_mode`](https://dev.mysql.com/doc/refman/8.0/en/innodb-auto-increment-handling.html)设置锁的并发度
+
+                    - 只能在auto-increment的索引上使用
+
+                    - 如果没有relication复制, 设置2
+
+                        - 最大并发度, 但副本的auto-increment值未必不一致
+
+                        - mysql 8.0:默认为2
+
+                    - 如果有relication复制, 设置0, 1
+
+                        - mariadb 10.5.11-1:默认为1
+
+            - 非顺序的主键:
+
+                - 乱序写入, 有可能会在中间的页写入:
+
+                    - 写入的页可能已被移除缓存, 这需要从磁盘加载到内存, 会导致大量的随机io
+
+                    - 页分裂(page split):如果写入的页已满, 就会分裂成两个页
+
+                - 可以使用以下命令优化表数据和索引数据, 避免随机io
+                    ```sql
+                    OPTIMIZE TABLE table_name
+                    ```
+
+- [Secondary Indexes](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_secondary_index)(二级索引 或 辅助索引):不按顺序保存索引数据文件
+
+- innodb 会在二级索引上使用共享锁, 而在聚簇索引上使用排他锁
+
+- [Fast Index Creation](https://docs.huihoo.com/mysql/innodb-plugin-1.0-en/innodb-create-index.html):
+
+    - `CREATE INDEX`会扫描并排序主键的聚簇索引:
+
+        ```sql
+        -- 扫描排序两次主键
+        CREATE INDEX B ON T1 (B);
+        CREATE UNIQUE INDEX C ON T1 (C);
+        ```
+
+    - `ALTER TABLE`只扫描排序1次主键的聚簇索引:
+
+        1.创建表时指定聚簇索引A
+
+        2.插入数据后
+
+        3.再使用`ALTER TABLE`创建创建索引B和C
+
+        ```sql
+        CREATE TABLE T1(
+           A INT PRIMARY KEY,
+           B INT,
+           C CHAR(1)
+        );
+
+        INSERT INTO T1 VALUES
+        (1,2,'a'), (2,3,'b'), (3,2,'c'), (4,3,'d'), (5,2,'e');
+
+        COMMIT;
+
+        -- 只扫描一次主键
+        ALTER TABLE T1 ADD INDEX (B),
+                       ADD UNIQUE INDEX (C);
+        ```
+
+- 对于非常小的表全表扫描, 比索引更有效
+
+- 限制每张表上的索引数量,建议单张表索引不超过 5 个
+
+    - 禁止给表中的每一列都建立单独的索引
+
+- 建立索引的意义:索引查询,可以减少随机 IO,索引能过滤出越少的数据,则从磁盘中读入的数据也就越少
+
+- 把使用最频繁的列, 放到联合索引的左侧
+
+- 尽可能把范围查询, 放在索引最右边
+
+- 把字段长度小的列, 放在联合索引的最左侧
+
+    - 列的字段越大,建立索引时所需要的空间也就越大,一页中所能存储的索引节点也就越少,在遍历时IO 次数也就越多
+
+- 无法使用索引的语句
+
+    - `WHERE age + 1 = 25`
+        ```sql
+        SELECT * FROM table_name
+        WHERE age + 1 = 25
+        ```
+
+### EXPLAIN
+
+- [全网最全 | MySQL EXPLAIN 完全解读](https://mp.weixin.qq.com/s?src=11&timestamp=1621488329&ver=3079&signature=ce2PbaAILLUHmAka2fam5y4WUCX0tluEl*UJDpwnLsXFeoNumM9EUWThCCqEGNXQS8Sjer-ghHhvyajC8tO7jw8doi0ZlK0kdtqj3iQcbUgk1L3iyuAjNS-zusjAbJP0&new=1)
+
+### B+树匹配原则
+
+```sql
+CREATE table index_test (
+    last_name varchar(50),
+    first_name varchar(50),
+    date DATE
+);
+
+INSERT INTO index_test VALUES
+('Jobs', 'Steve', '1955-2-24'),
+('王', '小二', '2021-7-10');
+
+-- 创建二级索引
+ALTER TABLE index_test
+ADD KEY(last_name, first_name, date);
+```
+
+- 重复索引:如果有索引(A, B), 就没有必要再创建(A)索引, 如发现重复索引可以立即删除
+
+- 最左匹配:
+
+    - 1.只匹配第一列`(last_name)`
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name='Jobs'
+        ```
+
+    - 2.只匹配last_name前缀以'J'开头的
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name LIKE 'J%'
+        ```
+
+    - 3.按顺序从左到右匹配如:`(last_name, first_name)`, `(last_name, first_name, date)`
+
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name='Jobs'
+        AND first_name = 'Steve'
+        AND date = '1955-2-24'
+        ```
+
+        - 不能跨过中间的列进行匹配如:`(last_name, date)`
+        ??不按顺序, 跨过中间的列也可以
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE date = '1955-2-24'
+        AND last_name='Jobs'
+        ```
+
+- 范围匹配:
+
+    - 某列使用范围匹配, 那么后面的列则无法使用索引
+
+        - 尽可能使用`IN()` 代替范围查询, `IN()` 是多个等值查询依然可以使用索引
+
+        ??可以
+
+        - 以下只能匹配last_name, first_name
+            ```sql
+            EXPLAIN SELECT * FROM index_test
+            WHERE last_name='Jobs'
+            AND first_name LIKE 'S%'
+            AND date = '1955-2-24'
+            ```
+- 排序匹配:
+
+    - 1.和上面例子一样适用于最左匹配和范围匹配原则:
+
+        ```sql
+        EXPLAIN SELECT last_name FROM index_test
+        ORDER BY last_name, first_name, date\G;
+
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index_test
+        type          | index
+        possible_keys | <null>
+        key           | last_name
+        key_len       | 410
+        ref           | <null>
+        rows          | 2
+        Extra         | Using index
+        ```
+
+        - 列的顺序可以从where子句开始:
+            ```sql
+            EXPLAIN SELECT last_name FROM index_test
+            WHERE last_name = 'Jobs'
+            ORDER BY first_name, date\G;
+
+            ***************************[ 1. row ]***************************
+            id            | 1
+            select_type   | SIMPLE
+            table         | index_test
+            type          | ref
+            possible_keys | last_name
+            key           | last_name
+            key_len       | 203
+            ref           | const
+            rows          | 1
+            Extra         | Using where; Using index
+            ```
+
+    - 2.降序`desc`, 依然能使用索引:
+        ```sql
+        EXPLAIN SELECT last_name from index_test
+        ORDER BY last_name DESC, first_name DESC, date DESC\G;
+
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index_test
+        type          | index
+        possible_keys | <null>
+        key           | last_name
+        key_len       | 410
+        ref           | <null>
+        rows          | 2
+        Extra         | Using index
+        ```
+
+        - 但如果有两种不同排序方向, 则不能使用索引:
+
+            - Extra字段为`Using filesort`:表示出现文件排序操作
+
+            ```sql
+            EXPLAIN SELECT last_name FROM index_test
+            ORDER BY last_name ASC, first_name ASC, date DESC\G;
+            -- 两条语句一样
+            EXPLAIN SELECT last_name FROM index_test
+            ORDER BY last_name, first_name, date DESC\G;
+
+            ***************************[ 1. row ]***************************
+            id            | 1
+            select_type   | SIMPLE
+            table         | index_test
+            type          | index
+            possible_keys | <null>
+            key           | last_name
+            key_len       | 410
+            ref           | <null>
+            rows          | 2
+            Extra         | Using index; Using filesort
+            ```
+
+#### 前缀索引
+
+- 对于过长的值, 可以建立前缀索引
+
+    - 一个数据表的 x_name 值都是类似 23213223.434323.4543.4543.34324.可以只取前7位`alter table table1 add key (x_name(7))`
+
+- 无法使用`ORDER BY`, `GROUP BY`, 以及覆盖查询
+
+- 后缀索引(suffix index):像电子邮件这类值比较有效. 但mysql不支持后缀, 可以把字符串反转后, 再建立前缀索引
+
+- 索引选择性:不重复的索引值,和表总数的比例. 唯一性索引的选择性是1, 性能最好
+
+- 假设要建立cnarea_2019表的name列索引:
+
+    - 查看选择性:
+    ```sql
+    SELECT COUNT(DISTINCT name) / COUNT(*) FROM cnarea_2019;
+
+    +---------------------------------+
+    | COUNT(DISTINCT name) / COUNT(*) |
+    +---------------------------------+
+    | 0.6138 |
+    +---------------------------------+
+    ```
+
+    - 查看不同前缀长度的选择性
+    ```sql
+    SELECT
+    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel3,
+    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel4,
+    COUNT(DISTINCT LEFT(name, 5)) / COUNT(*) AS sel5,
+    COUNT(DISTINCT LEFT(name, 6)) / COUNT(*) AS sel6,
+    COUNT(DISTINCT LEFT(name, 7)) / COUNT(*) AS sel7,
+    COUNT(DISTINCT LEFT(name, 8)) / COUNT(*) AS sel8,
+    COUNT(DISTINCT LEFT(name, 9)) / COUNT(*) AS sel9,
+    COUNT(DISTINCT LEFT(name, 10)) / COUNT(*) AS sel10,
+    COUNT(DISTINCT LEFT(name, 11)) / COUNT(*) AS sel11,
+    COUNT(DISTINCT LEFT(name, 12)) / COUNT(*) AS sel12
+    FROM cnarea_2019;
+
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    | sel3 | sel4 | sel5 | sel6 | sel7 | sel8 | sel9 | sel10 | sel11 | sel12 |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    | 0.5271 | 0.5271 | 0.5662 | 0.5866 | 0.5981 | 0.6057 | 0.6095 | 0.6119 | 0.6128 | 0.6133 |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    ```
+
+    - 查看当前缀为8时, 最频繁出现的次数
+    ```sql
+    SELECT COUNT(*) AS cnt, LEFT(name, 8) FROM cnarea_2019
+    GROUP BY name
+    ORDER BY cnt DESC
+    LIMIT 10;
+
+    +-----+---------------+
+    | cnt | LEFT(name, 8) |
+    +-----+---------------+
+    | 358 | 和平村委会 |
+    | 333 | 张庄村委会 |
+    | 328 | 团结村委会 |
+    | 321 | 王庄村委会 |
+    | 305 | 太平村委会 |
+    | 281 | 市辖区     |
+    | 274 | 胜利村委会 |
+    | 265 | 新民村委会 |
+    | 264 | 新庄村委会 |
+    | 261 | 红星村委会 |
+    +-----+---------------+
+    ```
+
+    - 到达8后选择性的提升已经很小了, 因此建立长度为8的索引
+
+        ```sql
+        ALTER TABLE cnarea_2019 ADD KEY (name(8));
+        ```
+
+### HASH INDEX
+
+- 只有所有列全匹配才有效:
+
+  - 假设索引为`key(last_name, first_name, date)`, 那么查询时如果只有last_name, 则无法使用索引
+
+- 支持比较查询`=, IN(), <=>`.注意<>和<=>是不同操作
+
+  - 不支持范围查询`where price > 100`
+
+- hash index只包含哈希值, 行指针, 不存储字段值
+
+- hash冲突很多的话, 需要遍历链表, 更高的操作代价
+
+- 假设索引为`key(last_name)`. hash函数f(), 返回以下值:
+
+    ```
+    f('Jobs') = 2333
+    f('王') = 6666
+    ```
+
+    | slot(桶) | value(值)     |
+    |----------|---------------|
+    | 2333     | 指向第1行指针 |
+    | 6666     | 指向第2行指针 |
+
+    - 假设查询last_name为'Jobs':
+        ```sql
+        SELECT * FROM index_test
+        WHERE last_name = 'Jobs'
+        ```
+
+        - 1.先计算Jobs的hash
+
+        - 2.查找hash对应的桶2333, 找到指向第1行指针
+
+        - 3.判断第1行指针是否为Jobs, 防止hash冲突
+
+#### 自适应哈希(adaptive hash index)
+
+- innodb的一个特殊功能, 但某些索引值操作比较频繁时, 会在内存中基于B+树之上创建hash索引
+
+- 如果存储引擎不支持自适应哈希, 也可以自己模拟:
+
+    - 创建一个在B+树上的伪哈希索引. 依然是在B+树上查询, 但使用hash代替值查询:
+        ```sql
+        CREATE table hash_test (
+            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            url varchar(255) NOT NULL,
+            url_crc INT UNSIGNED NOT NULL DEFAULT 0, --哈希为int类型
+            PRIMARY KEY(id)
+        );
+        ```
+    - 创建INSERT, UPDATE的触发器, 使用`CRC32()`函数:
+
+        - 注意:不要使用SHA1(), MD5(), 这类hash是强加密函数, 生成非常长字符串, 会浪费大量空间, 比较时也慢
+
+        ```sql
+        DELIMITER //
+
+        CREATE TRIGGER hash_test_crc_in BEFORE INSERT ON hash_test FOR EACH ROW BEGIN SET NEW.url_crc=crc32(NEW.url);
+        END;
+        //
+
+        CREATE TRIGGER hash_test_crc_up BEFORE UPDATE ON hash_test FOR EACH ROW BEGIN SET NEW.url_crc=crc32(NEW.url);
+        END;
+        //
+
+        DELIMITER ;
+        ```
+
+    - 测试:
+        ```sql
+        INSERT INTO hash_test(url) VALUES
+        ('http://www.mysql.com');
+
+        INSERT INTO hash_test(url) VALUES
+        ('http://www.mariadb.com');
+
+        SELECT * FROM hash_test
+        ```
+        ![image](./Pictures/mysql/hash_test.png)
+
+    - 防止hash值冲突, 需要加上`AND url = `:
+        ```sql
+        SELECT * FROM hash_test
+        WHERE url_crc = CRC32('http://www.mysql.com')
+        AND url = 'http://www.mysql.com'
+        ```
+
+    - `CRC32()`是32位的, 可以自定义一个64位hash函数:
+        ```sql
+        SELECT CONV(RIGHT(MD5('http://www.mysql.com/'), 16), 16, 10) AS HASH64
+        ```
+### 覆盖索引
+
+- 覆盖索引:索引包含查询所需的字段值
+
+    - 能提升性能, 无需回表
+
+        - 如果索引不能覆盖查询所有列, 需要每扫描一条索引记录后, 回表查询对应的行, 基本是随机io
+
+    - 因此必须存储字段值, 想hash, 空间, 全文索引都不能存储字段值
+
+- 通过`EXPLAIN`命令Extra字段为`Using index` 就是覆盖索引:
+
+    - 注意:type字段的`index` , 说明使用了索引扫描排序
+
+    ```sql
+    CREATE table index1_test (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(10)
+    );
+
+    INSERT INTO index1_test(name) VALUES ('one'), ('two');
+
+    EXPLAIN SELECT id FROM index1_test\G;
+    ***************************[ 1. row ]***************************
+    id            | 1
+    select_type   | SIMPLE
+    table         | index1_test
+    type          | index
+    possible_keys | <null>
+    key           | PRIMARY
+    key_len       | 4
+    ref           | <null>
+    rows          | 2
+    Extra         | Using index
+    ```
+
+- 通过`EXPLAIN`命令Extra字段为`Using where`表示没有使用索引:
+
+    ```sql
+    EXPLAIN SELECT name FROM index1_test
+    WHERE name = 'one'\G;
+    ***************************[ 1. row ]***************************
+    id            | 1
+    select_type   | SIMPLE
+    table         | index1_test
+    type          | ALL
+    possible_keys | <null>
+    key           | <null>
+    key_len       | <null>
+    ref           | <null>
+    rows          | 2
+    Extra         | Using where
+    ```
+
+    - 通过子查询查找id, 即第一阶段使用覆盖索引.这叫作延迟关联(deferred join)
+        ```sql
+        SELECT * FROM index1_test
+        JOIN (SELECT id FROM index1_test) as id
+        ON (index1_test.id = id.id);
+
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | index
+        possible_keys | PRIMARY
+        key           | PRIMARY
+        key_len       | 4
+        ref           | <null>
+        rows          | 2
+        Extra         | Using index
+        ***************************[ 2. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | ALL
+        possible_keys | PRIMARY
+        key           | <null>
+        key_len       | <null>
+        ref           | <null>
+        rows          | 2
+        Extra         | Using where; Using join buffer (flat, BNL join)
+        ```
+
+    - 创建二级索引后在查询:
+        ```sql
+        ALTER TABLE index1_test ADD INDEX name(name);
+
+        EXPLAIN SELECT name FROM index1_test
+        WHERE name = 'one'\G;
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | ref
+        possible_keys | name
+        key           | name
+        key_len       | 43
+        ref           | const
+        rows          | 1
+        Extra         | Using where; Using index
+        ```
+        ```sql
+MariaDB root@(none):china> explain select id from index1_test order by name,id
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+| id | select_type | table       | type  | possible_keys | key  | key_len | ref    | rows | Extra       |
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+| 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index |
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+
+1 row in set
+Time: 0.005s
+MariaDB root@(none):china> explain select id from index1_test order by id,name
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+| id | select_type | table       | type  | possible_keys | key  | key_len | ref    | rows | Extra
+              |
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+| 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index; Using filesort |
++----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+
+        ```
+
+### [Multiple-Column Indexes (多列索引)](https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html)
 
 - Multiple-Column Indexes 最多可以**16**个列
 
-- 如果 col1 和 col2 上有单独的单列索引,那么优化器将尝试使用[索引合并优化](https://dev.mysql.com/doc/refman/8.0/en/index-merge-optimization.html)
+- 如果 col1 和 col2 上有单独的索引时,那么优化器将尝试使用[索引合并优化](https://dev.mysql.com/doc/refman/8.0/en/index-merge-optimization.html)
 
-- 如果表有多列索引,则索引搜索只包含最左边的列.例如,索引 3 列(col1、col2、col3),那么在(col1)、(col1、col2)和(col1、col2、col3)上就有索引搜索功能, 而(col2) and (col2, col3)是没有索引搜索的.
+```sql
+explain select * from index_test
+where last_name = 'Jobs'
+or date = '2021-07-10'
 
-**语法:**
+explain select * from index_test
+where date = '2021-07-10'
+or last_name = 'Jobs'
+
++----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+| id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra
+             |
++----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+| 1 | SIMPLE | index_test | ref | last_name | last_name | 203 | const | 1 | Using where; Using index |
++----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+
+create index last_name on index_test(last_name)
+
+create index date on index_test(date)
+
+explain select date, last_name from index_test
+where date = '2021-07-10'
+union
+select date, last_name from index_test
+where last_name = 'Jobs'
+```
+
+| 存储引擎   | B+树   | hash哈希   | full-text(全文索引)   | 分形树索引(fractal tree)  | LSM树 |
+| ---------- | ------ | ---------- | --------------------- | ------------------------- | ----- |
+| Innodb     | 支持   | 支持       |                       |                           |
+| MyISAM     | 支持   | 支持       |                       |                           |
+| Memory     | 支持   | 支持       |                       |                           |
+| TokuDB     |        |            |                       | 支持                      |
+| InfiniDB   |        |            |                       |                           | 支持  |
+| RocksDB    |
+
+### SQL语法索引
 
 > ```sql
 > CREATE INDEX 索引名
@@ -2341,6 +2998,9 @@ ALTER TABLE ca ENGINE = MYISAM;
 > # 降序
 > CREATE INDEX 索引名
 > ON 表名 (列1, 列2,... DESC)
+>
+> ALTER table 表名
+> ADD INDEX 索引名(列1, 列2);
 > ```
 
 ```sql
@@ -2363,7 +3023,12 @@ DROP INDEX name ON ca;
 ALTER table ca ADD INDEX name(id);
 # 删除索引
 ALTER table ca DROP INDEX name;
+
+# 优化表数据和索引数据
+OPTIMIZE TABLE ca
 ```
+
+#### 索引状态
 
 [handler_read:](https://dev.mysql.com/doc/refman/8.0/en/server-status-variables.html#statvar_Handler_read_next)
 
@@ -2397,38 +3062,6 @@ SHOW STATUS LIKE 'handler_read%';
 ```
 
 ![image](./Pictures/mysql/handler_read2.png)
-
-- 避免使用 % 放在开头的查询条件
-
-```sql
-应该这样:
-SELECT * FROM tbl_name WHERE key_col LIKE 'Patrick%';
-
-不应该这样:
-SELECT * FROM tbl_name WHERE key_col LIKE '%Patrick%';
-```
-
-### explain
-
-- [全网最全 | MySQL EXPLAIN 完全解读](https://mp.weixin.qq.com/s?src=11&timestamp=1621488329&ver=3079&signature=ce2PbaAILLUHmAka2fam5y4WUCX0tluEl*UJDpwnLsXFeoNumM9EUWThCCqEGNXQS8Sjer-ghHhvyajC8tO7jw8doi0ZlK0kdtqj3iQcbUgk1L3iyuAjNS-zusjAbJP0&new=1)
-
-### 索引速度测试
-
-```sql
-# 测试效果
-select name,pinyin,short_name,merger_name from  cnarea_2019;
-```
-
-> **结果:** `783562 rows in set (0.264 sec)`
-
-```sql
-# 添加索引
-CREATE INDEX short_name_index ON cnarea_2019 (short_name);
-CREATE INDEX name_index ON cnarea_2019 (name);
-CREATE INDEX merger_name_index ON cnarea_2019 (merger_name);
-```
-
-> **结果:** `783562 rows in set (0.223 sec)`
 
 ## DCL
 
@@ -2634,6 +3267,25 @@ echo "max_connect_errors=1000" >> /etc/my.cnf
 ```
 
 [mysql 的 sql_mode 合理设置](http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html)
+
+## 表损坏
+
+- INNODB一般不会损坏, 不存在什么查询会导致表损坏
+
+    - 1.硬件问题(内存, 硬盘)
+
+    - 2.使用 `rsync` 命令备份
+
+```sql
+-- 检测表是否损坏.注意并不是所有存储引擎都支持该命令
+CHECK TABLE table_name;
+
+-- 修复表
+REPAIR TABLE table_name;
+
+-- 也可以使用ALTER TABLE重建表
+ALTER TABLE table_name ENGINE=INNODB;
+```
 
 ## mysqldump 备份和恢复
 
@@ -4308,32 +4960,6 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 - 避免使用 TEXT、BLOB 数据类型,最常见的 TEXT 类型可以存储 64k 的数据
 
 - 尽可能把所有列定义为 `NOT NULL`
-
-### 索引规范
-
-
-- 限制每张表上的索引数量,建议单张表索引不超过 5 个
-
-    - 禁止给表中的每一列都建立单独的索引
-
-- 每个 InnoDB 表必须有个主键
-
-- 建立索引的意义:索引查询,可以减少随机 IO,索引能过滤出越少的数据,则从磁盘中读入的数据也就越少
-
-- 把使用最频繁的列, 放到联合索引的左侧
-
-- 把字段长度小的列, 放在联合索引的最左侧
-
-    - 列的字段越大,建立索引时所需要的空间也就越大,一页中所能存储的索引节点也就越少,在遍历时IO 次数也就越多
-
-    - 一个数据表的 x_name 值都是类似 23213223.434323.4543.4543.34324.可以只取前7位`alter table table1 add key (x_name(7))`
-
-- 范围查询: 只能利用联合索引中的一列
-
-    - 在 a,b,c 列的联合索引中,如有 a 列的范围查询,则 b,c 列上的索引将不会被用到
-
-    - 如果使用 a 列的范围查找,应该把 a 列放到联合索引的右侧
-
 
 ### 查询规范
 
