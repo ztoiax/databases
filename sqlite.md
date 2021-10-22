@@ -24,7 +24,11 @@
         * [INSTEAD OF 让view(视图)可写入](#instead-of-让view视图可写入)
     * [VACUUM(整理碎片)](#vacuum整理碎片)
     * [Extensions(拓展)](#extensions拓展)
+        * [LSM拓展](#lsm拓展)
+        * [查询json](#查询json)
+        * [全文搜索(full-text search):fts5](#全文搜索full-text-searchfts5)
     * [python](#python)
+    * [优化](#优化)
 * [优秀文章](#优秀文章)
 * [第三方软件资源](#第三方软件资源)
 
@@ -302,6 +306,8 @@ SELECT * FROM test ORDER BY id DESC;
 
 -- DISTINCT 取消重复行
 SELECT DISTINCT * FROM test;
+-- COUNT 统计不重复行数
+SELECT COUNT(DISTINCT *) FROM test;
 
 -- GROUP BY 取消重复行并排序.两者相等
 SELECT DISTINCT * FROM test ORDER BY name;
@@ -1018,17 +1024,30 @@ VACUUM main INTO '/tmp/backup.db';
 ## Extensions(拓展)
 
 ```sh
--- 加载拓展
-.load /path
-
 -- zipfile下载连接
 https://sqlite.org/src/file/ext/misc/zipfile.c
 
 -- 编译
 gcc -g -fPIC -shared zipfile.c -o zipfile.so
+
+-- 加载拓展
+.load ./zipfile
 ```
 
-- [LSM拓展](https://charlesleifer.com/blog/lsm-key-value-storage-in-sqlite3/)
+### [LSM拓展](https://charlesleifer.com/blog/lsm-key-value-storage-in-sqlite3/)
+
+### [查询json](https://www.sqlite.org/json1.html)
+
+### [全文搜索(full-text search):fts5](https://sqlite.org/fts5.html)
+    ```sh
+    wget -c http://www.sqlite.org/src/tarball/SQLite-trunk.tgz?uuid=trunk -O SQLite-trunk.tgz
+    tar -xzf SQLite-trunk.tgz
+    cd SQLite-trunk
+    ./configure && make fts5.c
+    gcc -g -fPIC -shared fts5.c -o fts5.so
+
+    .load ./fts5
+    ```
 
 ## python
 
@@ -1064,6 +1083,35 @@ cur.execute("SELECT writefile('new_image.png',img) FROM python_test WHERE name='
 -- commit()后, 之前的insert才会生效
 con.commit()
 con.close()
+```
+
+## 优化
+
+- [sqlite-performance-tuning](https://phiresky.github.io/blog/2020/sqlite-performance-tuning/)
+
+```sql
+-- 先写日志
+pragma journal_mode = WAL;
+
+-- 默认是'full', 每次更新都写入
+pragma synchronous = normal;
+
+-- 临时索引文件存储在内存
+pragma temp_store = memory;
+
+-- 虚拟内存映射大小, 减少读/写系统调用
+pragma mmap_size = 30000000000;
+
+-- 页面大小, 适合存储大blob
+pragma page_size = 32768;
+```
+
+```sql
+-- 重写数据库, 如果数据库很大, 代价会很大
+pragma vacuum;
+
+-- 分析数据库, 提高查询性能, 建议关闭程序时运行; 长时间运行的程序, 则几小时运行一次
+pragma optimize;
 ```
 
 # 优秀文章

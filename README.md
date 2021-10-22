@@ -345,6 +345,16 @@ docker run -it -p 6666:6666 bitleak/kvrocks
 redis-cli -p 6666
 ```
 
+#### IndexedDB
+
+- [浏览器数据库 IndexedDB 入门教程](http://www.ruanyifeng.com/blog/2018/07/indexeddb.html)
+
+- 存储JavaScript 对象
+
+- 每一个数据库对应创建它的域名
+
+    - 网页只能访问自身域名下的数据库，而不能访问跨域的数据库
+
 #### [leveldb](https://github.com/google/leveldb)
 
 - LevelDB 只是一个 C/C++ 编程语言的库, 不包含网络服务封装, 所以无法像一般意义的存储服务器(如 MySQL)那样, 用客户端来连接它. LevelDB 自己也声明, 使用者应该封装自己的网络服务器.
@@ -355,11 +365,37 @@ redis-cli -p 6666
 
 - 单进程
 
+- [leveldb-cli](https://github.com/liderman/leveldb-cli)
+
+- [python库:plyvel](https://plyvel.readthedocs.io/en/latest/user.html#getting-started)
+    ```py
+    import plyvel
+
+    # 打开数据库
+    db = plyvel.DB('/tmp/testdb/', create_if_missing=True)
+
+    # 创建key
+    db.put(b'a', b'1')
+    db.get(b'a')
+
+    # 遍历kv
+    for key, value in db:
+         print(key)
+         print(value)
+
+    # 删除key
+    db.delete(b'a')
+    ```
+
+
 #### [rocksdb: 基于leveldb, 由facebook维护](https://github.com/facebook/rocksdb)
 
 #### [boltdb](https://github.com/boltdb/bolt)
 
 - 纯go语言写的kv数据库
+##### [absurd-sql](https://github.com/jlongster/absurd-sql)
+
+- 在浏览器与IndexedDB之间, 添加一层sqlite
 
 ### 文档
 
@@ -568,6 +604,22 @@ http://127.0.0.1:3000
 - [awesome-db](https://github.com/numetriclabz/awesome-db#readme)
 
 - [sqlfluff: sql语句语法检查](https://github.com/sqlfluff/sqlfluff)
+
+- [FastoNoSQL](https://github.com/fastogt/fastonosql)
+
+    | 支持数据库                          |
+    |-------------------------------------|
+    | Redis                               |
+    | Memcached                           |
+    | SSDB                                |
+    | LevelDB                             |
+    | RocksDB                             |
+    | UnQLite                             |
+    | LMDB                                |
+    | ForestDB (Available in PRO version) |
+    | Pika (Available in PRO version)     |
+    | Dynomite (Available in PRO version) |
+    | KeyDB                               |
 
 # 新闻
 
