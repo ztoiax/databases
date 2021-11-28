@@ -28,9 +28,11 @@
         * [查询json](#查询json)
         * [全文搜索(full-text search):fts5](#全文搜索full-text-searchfts5)
     * [python](#python)
+        * [内存模式](#内存模式)
     * [优化](#优化)
 * [优秀文章](#优秀文章)
 * [第三方软件资源](#第三方软件资源)
+* [在线工具](#在线工具)
 
 <!-- vim-markdown-toc -->
 
@@ -1074,8 +1076,10 @@ cur.execute('''CREATE TABLE IF NOT EXISTS python_test
 cur.execute('''INSERT INTO python_test VALUES
         ('image','png','image.png')''')
 
--- 返回的对象是元组
-istuple = cur.execute('SELECT * FROM python_test')
+-- 返回生成器
+v = cur.execute('SELECT * FROM python_test')
+-- or 生成列表
+list(cur.execute('SELECT * FROM python_test'))
 
 -- 将数据写入新文件.SELECT writefile需要安装插件
 cur.execute("SELECT writefile('new_image.png',img) FROM python_test WHERE name='image'")
@@ -1083,6 +1087,33 @@ cur.execute("SELECT writefile('new_image.png',img) FROM python_test WHERE name='
 -- commit()后, 之前的insert才会生效
 con.commit()
 con.close()
+```
+
+### 内存模式
+
+
+- `:memory:` 开启私有的内存模式, 只对最初的数据库连接可见
+
+- `?cache=shared` 开启共享内存
+
+    - 共享内存中数据库的所有数据库连接都需要处于同一进程中。当最后一次与数据库的连接关闭时，数据库将自动删除，并回收内存
+
+```py
+-- c1
+import sqlite3
+c1 = sqlite3.connect("file::memory:?cache=shared", uri=True)
+c1.execute('CREATE TABLE foo (bar, baz)')
+c1.execute("INSERT INTO foo VALUES ('spam', 'ham')")
+c1.execute("select * from foo")
+
+-- c2
+c2 = sqlite3.connect("file::memory:?cache=shared", uri=True)
+list(c2.execute('SELECT * FROM foo'))
+
+-- c3
+c3 = sqlite3.connect('/tmp/sqlite3.db', uri=True)
+c3.execute("ATTACH DATABASE 'file::memory:?cache=shared' AS inmem")
+list(c3.execute('SELECT * FROM inmem.foo'))
 ```
 
 ## 优化
@@ -1138,6 +1169,19 @@ pragma optimize;
 
 - [sqlite-web: 网页版sqlite](https://github.com/coleifer/sqlite-web)
 
+- [termdbms: sqlite-tui](https://github.com/mathaou/termdbms)
+    ```sh
+    termdbms -q test.db
+    ```
+
+- [visidata: 支持查看sqlite的文件管理器](https://github.com/saulpw/visidata)
+
 - [dqlite: 分布式sqlite的c库](https://github.com/canonical/dqlite)
 
 - [rqlite: go语言实现raft, 分布式sqlite](https://github.com/rqlite/rqlite)
+
+# 在线工具
+
+- [在线使用sqlite](https://sqlime.org/)
+
+    ![image](./Pictures/sqlite/sqlime.png)

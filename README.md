@@ -192,6 +192,10 @@
 
 ## RDBMS (关系性数据库)
 
+- [SQLite vs MySQL vs PostgreSQL: A Comparison Of Relational Database Management Systems](https://www.digitalocean.com/community/tutorials/sqlite-vs-mysql-vs-postgresql-a-comparison-of-relational-database-management-systems)
+
+    > 数据类型, 优缺点等对比
+
 ### [关系数据库理论笔记](./rdbms.md)
 
 ### MySQL
@@ -235,9 +239,27 @@ Port:3306
 
 数据类型丰富,可以自定义类型的关系型数据库:
 
+- 比sqlite, mysql更符合sql标准
+
+- 除了关系性, 还有对象数据库的功能
+
+- 并发性:mvcc不需要读锁, 比mysql要好
+
 - 提供外围数据库的接口连接
 
+- 缺点:
+
+    - 内存: 每个客户端的连接, 都需要创建一个10M左右的进程
+
 - [PostgreSQL 详细配置参数](https://postgresqlco.nf/en/doc/param/)
+
+#### [babelfish(亚马逊的postgresql)](https://babelfishpg.org/)
+
+- 取代SQL Server
+
+    - 支持 `SQL Server wire-protocol`: 非windows平台的驱动程序
+
+    - 支持 `Transact-SQL (T-SQL)`: [微软专有的拓展sql语言](https://en.wikipedia.org/wiki/Transact-SQL)
 
 ### sqlite
 
@@ -250,6 +272,8 @@ Port:3306
 - self-contained(少量的外部库)
 
 - 支持Transactional(事务),符合ACID:
+
+- 有内存模式
 
 - 数据类型:
 
@@ -304,6 +328,14 @@ Port:3306
     - 查询只是函数调用,而不是消息往返
 
         - `client/server` 架构的数据库,每条sql语句都需要应用程序与数据库之间来回往返
+
+- 缺点:
+
+    - 低并发: 只能有一个进程访问
+
+    - 没有用户权限管理
+
+    - 由于不是`client/server`, 在服务器上, 可能会出现更多的bug
 
 #### [sqlite个人笔记](./sqlite.md)
 
@@ -419,7 +451,13 @@ redis-cli -p 6666
 
 ### 图
 
+- [Neo4j vs Nebula Graph vs JanusGraph](https://nebula-graph.io/posts/performance-comparison-neo4j-janusgraph-nebula-graph/)
+
 #### [neo4j](https://github.com/neo4j/neo4j)
+
+#### [HugeGraph: 百度基于JanusGraph开发的分布式图数据库](https://github.com/hugegraph/hugegraph)
+
+#### [nebula graph: 分布式图数据库](https://github.com/vesoft-inc/nebula)
 
 ### 对象
 
