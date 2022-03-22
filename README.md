@@ -345,19 +345,30 @@ Port:3306
 
 ### 基本理论
 
-- 非结构化存储(no-structed storage systems): 强调`Availability`(可用性)
+- [Michael Stonebraker: SQL Databases v. NoSQL Databases](https://cacm.acm.org/magazines/2010/4/81482-sql-databases-v-nosql-databases/fulltext)
 
-  - 不存在行字段的数据结构
+    - nosql的性能和灵活性, 是通过牺牲acid实现的, 与sql本身无关
 
-  - 优点
+        - nosql设计之初就考虑分布式环境, 通过多个结点分摊了一些瓶颈, sql也可以实现
 
-    - 可扩展性
+            - 但涉及磁盘写入,缓存管理也难以回避以下的1个或多个瓶颈
 
-    - kv (key/value),分布式等结构
+    - 主要瓶颈:
 
-  - 缺点:
+        - `client/server` 之间的通信开销
 
-    - 缺乏事务支持,因此也没有 ACID
+            - 解决方法: 存储过程或者嵌入式
+
+        - logging(日志): 为了实现持久性, 需要两次写入磁盘, 第二次为写入日志
+
+        - locking: 事务锁
+
+        - latching(内存锁): 对b+树等数据结构访问时需要加锁
+
+        - Buffer Management(缓存管理): 数据库需要管理内存, 磁盘
+
+- [Michael Stonebraker: Errors in Database Systems, Eventual Consistency, and the CAP Theorem](https://cacm.acm.org/blogs/blog-cacm/83396-errors-in-database-systems-eventual-consistency-and-the-cap-theorem/fulltext)
+    - 对cap理论, 提出意见
 
 ### key-value
 
@@ -386,6 +397,10 @@ redis-cli -p 6666
 - 每一个数据库对应创建它的域名
 
     - 网页只能访问自身域名下的数据库，而不能访问跨域的数据库
+
+- [Why IndexedDB is slow and what to use instead](https://rxdb.info/slow-indexeddb.html)
+
+    - 事务太多
 
 #### [leveldb](https://github.com/google/leveldb)
 
@@ -633,7 +648,11 @@ http://127.0.0.1:3000
 
 # reference
 
-- [《数据库系统概念第7版》课件](https://www.db-book.com/db7/slides-dir/index.html)
+- [《数据库系统概念第7版》课件(英文)](https://www.db-book.com/slides-dir/index.html)
+
+- [《Readings in Database Systems》 第五版](http://www.redbook.io/)
+
+- [db-tutorial 是一个数据库教程](https://github.com/dunwu/db-tutorial)
 
 - [db-engines](https://db-engines.com/en/)
 
@@ -658,6 +677,11 @@ http://127.0.0.1:3000
     | Pika (Available in PRO version)     |
     | Dynomite (Available in PRO version) |
     | KeyDB                               |
+
+# 类似项目
+
+- [db-tutorial 是一个数据库教程](https://github.com/dunwu/db-tutorial)
+    > 包含分布式, mysql, redis, mongodb, hbase, elasticsearch
 
 # 新闻
 

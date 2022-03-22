@@ -1,29 +1,45 @@
 <!-- vim-markdown-toc GFM -->
 
-* [Redis 入门教程](#redis-入门教程)
-    * [值和对象](#值和对象)
+* [Redis](#redis)
+    * [软件架构](#软件架构)
+    * [基本命令](#基本命令)
+        * [使用unix sock连接](#使用unix-sock连接)
+    * [数据类型](#数据类型)
         * [string (字符串)](#string-字符串)
+            * [Bitmaps(位图)](#bitmaps位图)
         * [hash (哈希散列)](#hash-哈希散列)
         * [list (列表)](#list-列表)
         * [set (集合)](#set-集合)
             * [交集,并集,补集](#交集并集补集)
-        * [sorted set (有序集合)](#sorted-set-有序集合)
+        * [zset(有序集合)](#zset有序集合)
             * [交集,并集](#交集并集)
-    * [hyper log](#hyper-log)
+            * [geo(地理信息定位)](#geo地理信息定位)
+        * [streams(消息队列)](#streams消息队列)
+    * [Module(模块)](#module模块)
+        * [RedisJSON](#redisjson)
+        * [RediSearch](#redisearch)
+    * [HyperLogLog](#hyperloglog)
     * [transaction (事务)](#transaction-事务)
+    * [pipelining(流水线执行命令)](#pipelining流水线执行命令)
     * [Lua 脚本](#lua-脚本)
+            * [脚本示例](#脚本示例)
     * [python](#python)
+        * [redis-py](#redis-py)
+        * [redis-om-python: 对象模板](#redis-om-python-对象模板)
+        * [pottery:以python的语法访问redis](#pottery以python的语法访问redis)
     * [配置](#配置)
         * [config](#config)
         * [info](#info)
         * [用户密码](#用户密码)
-        * [调试](#调试)
-            * [slowlog](#slowlog)
-            * [monitor](#monitor)
-            * [migrate (迁移)](#migrate-迁移)
+        * [slowlog(慢查询日志)](#slowlog慢查询日志)
         * [client](#client)
+            * [monitor](#monitor)
         * [远程登陆](#远程登陆)
     * [persistence (持久化) RDB AOF](#persistence-持久化-rdb-aof)
+        * [RDB](#rdb)
+        * [AOF(append only log)](#aofappend-only-log)
+            * [AOF重写](#aof重写)
+            * [恢复](#恢复)
     * [master slave replication (主从复制)](#master-slave-replication-主从复制)
     * [sentinel (哨兵模式)](#sentinel-哨兵模式)
         * [开启 sentinal](#开启-sentinal)
@@ -31,18 +47,23 @@
     * [cluster (集群)](#cluster-集群)
     * [publish subscribe (发布和订阅)](#publish-subscribe-发布和订阅)
         * [键空间通知](#键空间通知)
+    * [redis-benchmark性能测试](#redis-benchmark性能测试)
+    * [优化](#优化)
+* [docker](#docker)
+    * [Grafana监控](#grafana监控)
 * [redis 如何做到和 mysql 数据库的同步](#redis-如何做到和-mysql-数据库的同步)
 * [redis 安装](#redis-安装)
     * [centos7 安装 redis6.0.9](#centos7-安装-redis609)
     * [docker install](#docker-install)
 * [常见错误](#常见错误)
     * [vm.overcommit_memory = 1](#vmovercommit_memory--1)
-    * [高效强大的第三方 redis 软件](#高效强大的第三方-redis-软件)
-        * [iredis](#iredis)
+* [第三方 redis 软件](#第三方-redis-软件)
+        * [iredis: 比redis-cli更强大](#iredis-比redis-cli更强大)
         * [redis-tui](#redis-tui)
         * [redis-memory-analyzer](#redis-memory-analyzer)
-        * [AnotherRedisDesktopManager](#anotherredisdesktopmanager)
-        * [RedisLive](#redislive)
+        * [RedisInsight: 官方推出的gui, 并且带有补全的cli](#redisinsight-官方推出的gui-并且带有补全的cli)
+        * [AnotherRedisDesktopManager: gui](#anotherredisdesktopmanager-gui)
+        * [RedisLive: 可视化](#redislive-可视化)
         * [redis-rdb-tools](#redis-rdb-tools)
         * [redis-shake](#redis-shake)
         * [dbatools](#dbatools)
@@ -51,24 +72,268 @@
 
 <!-- vim-markdown-toc -->
 
-# Redis 入门教程
+# Redis
 
-Redis 的优点：
+## 软件架构
+
+- [腾讯技术工程: Redis 多线程网络模型全面揭秘](https://segmentfault.com/a/1190000039223696)
+
+- [深入学习Redis（1）：Redis内存模型](https://www.cnblogs.com/kismetv/p/8654978.html)
+
+    > 内存, 数据类型
 
 - 数据保存在内存里: 因此 Redis 也常常被用作缓存数据库,实现高性能、高并发
 
-- 单进程，单线程: 减少多线程之间的切换和竞争带来的性能开销(Redis 6.0 版本之前)
-- Redis 的多线程部分只是用来处理网络数据的读写和协议解析，执行命令仍然是单线程
+- 单线程: 因此客户端发送的命令, 只会进入1条队列
 
-- 多路 I/O 复用: 非阻塞 I/O [具体可看这个解答](https://www.zhihu.com/question/28594409)
+    - Redis 的多线程部分只是用来处理网络数据的读写和协议解析，执行命令仍然是单线程
+
+    - 优点:
+
+        - 没有并发问题, 因此没有锁
+
+        - 减少上下文切换
+
+    - 缺点:
+
+        - 只有1条队列, 可能会造成其他命令阻塞
+
+    - Redis4.0 加入多线程处理异步任务
+
+        - 问题: 非常耗时的命令如 `DEL`, 在删除上百个对象时, 会阻塞
+
+        - 解决方法: 加入一些非阻塞命令如 `UNLINK`(DEL的异步版), `FLUSHALL ASYNC`, `FLUSHDB ASYNC`
+
+            - `UNLINK` 并不会同步删除key, 只是从keyspace移除key, 将任务放入一个异步队列, 再由后台线程删除
+
+                - 如果是小key, 异步删除反而开销更大, 因此只有元素大于64才会使用异步删除
+
+    - Redis6.0 在网络模型中实现I/O多线程
+
+        - 问题: 网络I/O瓶颈
+
+        - 解决方法:
+
+            - 1.每个客户端的连接都会初始化一个`client` 的对象, 并维护有一条命令队列
+
+            - 2.I/O线程读取命令队列, 并解析第一条命令, **但不执行命令**
+
+            - 3.等所有I/O线程完成读取后, 命令交由主线程处理, 将结果写入每个`client` 对象的buf
+
+            - 4.I/O线程把`client`里的buf, 写回客户端
+
+
+    - Redis 会设置cpu affinity, 也就是把进程/线程, 子进程/线程绑定到不同的cpu, 从而防止上下文切换的缓存失效
+
+- 使用`epoll`多路 I/O 复用: 非阻塞 I/O [具体可看这个解答](https://www.zhihu.com/question/28594409)
+
+    - redis会将epoll的连接, 读写, 关闭转换为事件
 
 - Redis 相比 Memcached 来说，拥有更多的数据结构，能支持更丰富的数据操作,此外单个 value 的最大限制是 1GB，不像 memcached 只能保存 1MB 的数据
 
-Redis 的缺点:
+## 基本命令
 
-- 数据库容量受到物理内存的限制，不能用作海量数据的高性能读写，因此 Redis 适合的场景主要局限在较小数据量的高性能操作和运算上。
+- [Redis 命令参考](http://doc.redisfans.com/)
 
-## 值和对象
+- 客户端:
+
+    ```sh
+    # 默认以ip127.0.0.1, port6379连接
+    redis-cli
+
+    # 等同于上
+    redis-cli -h 127.0.0.1 -p 6379
+
+    # 执行命令. key1值为1
+    redis-cli set key1 1
+
+    # -x 表示读取最后一个参数. key2值为2\n
+    echo 2 | redis-cli -x set key2
+
+    # 获取大key(内部采用scan)
+    redis-cli --bigkeys
+
+    # 每隔1秒获取内存占用, 一共获取100次. -r: 执行多次, -i: 每隔几秒执行一次
+    redis-cli -r 100 -i 1 info | grep used_memory_human
+
+    # 每隔一秒获取info的统计信息
+    redis-cli --stat
+
+    # 关闭redis服务器
+    redis-cli shutdown
+    # 关闭服务前进行持久化
+    redis-cli shutdown save
+
+    # 测试于服务器的网络延迟
+    redis-cli --latency
+
+    # 测试于服务器的网络延迟
+    redis-cli --latency
+
+    # --eval 执行lua
+    redis-cli --eval file.lua arg
+    ```
+
+- 常用命令(对单个key)
+```redis
+# 创建一个 key 为字符串对象, 值也为字符串对象的 key 值对
+SET msg "hello world !!!"
+
+# 对同一个 key 设置,会覆盖值以及存活时间
+SET msg "hello world"
+
+# 查看msg
+get msg
+
+# 返回原来的值, 并设置新的值
+getset msg "hw"
+
+# EX 设置 key 的存活时间, 单位秒
+SET msg "hello world" EX 100
+# 或者
+expire msg 100
+
+# 输入负数等同于DEL命令
+expire msg -1
+
+# timestamp(时间戳)后过期
+expireat msg timestamp
+
+# 毫秒后过期
+pexpire msg 10000
+
+# 毫秒timestamp(时间戳)后过期
+expireat msg timestamp
+
+# persist 可以移除存活时间
+persist msg
+
+# ttl 查看 key 存活时间, 单位秒. -1表示key没有设置过期时间, -2表示key不存在(已经过期)
+ttl msg
+
+# pttl 查看 key 存活时间, 单位毫秒
+pttl msg
+
+# strlen 查看 key 长度
+strlen msg
+
+# exists 查看 key 是否存在
+exists msg
+
+# type 查看 key 类型. 对应源代码里的RedisObject结构里的type
+type msg
+
+# object 查看 key 的编码. 对应源代码里的RedisObject结构里的encoding
+object encoding msg
+
+# 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的lru
+object IDLETIME msg
+
+# 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的refcount
+object refcount msg
+
+# 随机返回一个key
+randomkey
+
+# 改名, 会覆盖a
+rename msg a
+
+# renamenx 改名,如果a存在,那么改名失败
+renamenx msg a
+```
+
+- 遍历所有key
+
+    - `keys` 命令: 遍历所有key(阻塞命令, 不建议在生成环境下使用)
+
+    - `scan` 命令: 渐进式遍历key. 以0为游标开始, 默认搜索10个key. 然后返回一个游标,如果游标的结果为0,表示所有key已经遍历过了(非阻塞. 时间复杂度O(1))
+
+        - 问题: 如果执行过程中key发生变化, 那么可能无法遍历到新的key, 也可能会遍历重复的key
+
+    | 阻塞     | 非阻塞 |
+    |----------|--------|
+    | keys     | scan   |
+    | hgetall  | hscan  |
+    | smembers | sscan  |
+    | zrange   | zscan  |
+
+    ```redis
+    # 搜索包含 s 的key
+    keys *s*
+
+    # 从0游标开始
+    scan 0
+
+    # 以0为游标开始搜索,count指定搜索100个key(默认值是10)
+    scan 0 count 100
+
+    # match 搜索包含 s 的key
+    scan 0 match *s* count 100
+
+    # type 搜索不同对象的key
+    scan 0 count 100 type list
+    ```
+
+- `migrate` 命令: 将 **key** 移动到另一个 **redis-server**
+
+    ```redis
+    set a 0
+
+    # 将a 迁移到127.0.0.1:7777(对docker启动的redis无效)
+    MIGRATE 127.0.0.1 7777 a 0 1000
+    ```
+
+    ![avatar](./Pictures/redis/migrate.gif)
+
+- 常用命令(对多个key)
+```redis
+# move 将当前数据库的的 key ,移动到数据库1
+move msg 1
+
+# select 选择数据库1(默认使用0号数据库, 一共有16个数据库0-15)
+select 1
+
+# dbsize 统计当前数据库的 key 数量
+dbsize
+
+# swapdb 交换不同数据库的key
+swapdb 0 1
+
+# flushdb 删除当前数据库的所有key(阻塞命令)
+flushdb
+
+# flushall 删除所有数据库的所有key(阻塞命令)
+flushall
+
+# shutdown 关闭redis-server,所有客户端也会被关闭
+shutdown
+
+# 导出 csv 文件
+hset n a 1 b 2 c 3
+redis-cli --csv hgetall n > stdout.csv 2> stderr.txt
+```
+
+### 使用unix sock连接
+
+- unix socket 性能要更快
+
+- 修改配置文件
+```
+# create a unix domain socket to listen on
+unixsocket /var/run/redis/redis.sock
+
+# set permissions for the socket
+unixsocketperm 775
+```
+
+- [docker 上使用unix socket](https://medium.com/@jonbaldie/how-to-connect-to-redis-with-unix-sockets-in-docker-9e94e01b7acd)
+
+```sh
+# 使用unxi socket连接
+redis-cli -s /var/run/redis/redis.sock
+```
+
+## 数据类型
 
 Redis 数据库里面的每个键值对（key-value pair）都是由对象（object）组成的：
 
@@ -87,107 +352,74 @@ Redis 数据库里面的每个键值对（key-value pair）都是由对象（obj
 
 ### string (字符串)
 
+- 应用:
+    - 计数
+    - 计时器
+        - 手机验证码
+        - ip在规定时间范围内的访问次数
+
 字符串对象的编码: [**详情**](http://redisbook.com/preview/object/string.html)
 
-| 编码   | 作用                                                            |
-| ------ | --------------------------------------------------------------- |
-| int    | 整数                                                            |
-| raw    | 长度>=39 的字符串:使用动态字符串（SDS）                         |
-| embstr | 长度<=39 的字符串:所需的内存分配次数从 raw 编码的两次降低为一次 |
+| 编码   | 作用                         |
+|--------|------------------------------|
+| int    | 8个字节的整型                |
+| embstr | <=39 字节: 分配1次内存. 只读 |
+| raw    | >=39 字节: 分配2次内存       |
 
-**动态字符串**（simple dynamic string,**SDS**）:
+- C 字符串 vs SDS(动态字符串)：
 
-     除了用来保存数据库中的字符串值之外, SDS 还被用作缓冲区（buffer）： AOF 模块中的 AOF 缓冲区, 以及客户端状态中的输入缓冲区, 都是由 SDS 实现的
+    - 获取字符串长度的时间复杂度: C为O(n), SDS为O(1)
 
-- 比起 C 字符串, SDS 具有以下优点：
-- 常数复杂度获取字符串长度.
-- 杜绝缓冲区溢出.
-- 减少修改字符串长度时所需的内存重分配次数.
-- 二进制安全.
-- 兼容部分 C 字符串函数.
+    - 杜绝缓冲区溢出, SDS缓冲区溢出时会重新分配内存
 
-```sql
-# 创建一个 key 为字符串对象, 值也为字符串对象的 key 值对
-SET msg "hello world !!!"
+    - 修改字符串长度: C每次都需要重新分配内存, SDS记录free(剩余空间)可以减少分配内存的次数
 
-# 对同一个 key 设置,会覆盖值以及存活时间
-SET msg "hello world"
+    - 存储二进制数据: C以`0` 结尾, SDS以len记录为结尾
 
-# EX 设置 key 的存活时间
-SET msg "hello world" EX 100
-# 或者
-expire msg 100
+    - 使用SDS存储文本时, 可以兼容 C 字符串函数.
 
-# persist 可以移除存活时间
-persist msg
+- refcount(RedisObject结构里的字段)和共享对象
 
-# ttl 查看 key 存活时间
-ttl msg
+    - 只支持整数值的字符串类型
 
-# strlen 查看 key 长度
-strlen msg
+        - redis启动时会创建0-9999的整数值, 用作共享对象
 
-# type 查看 key 类型
-type msg
+        - 因为判断整数的时间复杂度为O(1); 字符串为O(n); list, hash, set, 有序集合为O(n^2)
 
-# exists 查看 key 是否存在
-exists msg
+    - refcount为0时, 就会从内存删除
 
-# keys 搜索key(有些情况下会系统会使用scan命令来代替keys命令)
-# 搜索包含 s 的key
-keys *s*
+    - refcount大于1时, 表示共享对象
 
-# scan 搜索key .以0为游标开始搜索,默认搜索10个key.然后返回一个游标,如果游标的结果为0,那么就结束
+    - 创建新对象时refcount为1, 有新程序使用时加1, 不再被新程序使用时减1
 
-# 在开始一个新的迭代时, 游标必须为 0
-scan 0
+| 命令        | 时间复杂度       |
+|-------------|------------------|
+| msetnx      | O(k) k是健的个数 |
+| mget        | O(k) k是健的个数 |
+| mset        | O(k) k是健的个数 |
+| getrange    | O(N)             |
+| bitpos      | O(N)             |
+| bitop       | O(N)             |
+| bitcount    | O(N)             |
+| append      | O(1)             |
+| strlen      | O(1)             |
+| setex       | O(1)             |
+| setrange    | O(1)             |
+| setnx       | O(1)             |
+| setbit      | O(1)             |
+| psetex      | O(1)             |
+| incrby      | O(1)             |
+| incrbyfloat | O(1)             |
+| incr        | O(1)             |
+| getbit      | O(1)             |
+| get         | O(1)             |
+| getset      | O(1)             |
+| set         | O(1)             |
+| decrby      | O(1)             |
+| decr        | O(1)             |
+| bitfield    | O(1)             |
 
-# 以0为游标开始搜索,count指定搜索100个key
-scan 0 count 100
-
-# match 搜索包含 s 的key
-scan 0 match *s* count 100
-
-# type 搜索不同对象的key
-scan 0 count 100 type list
-
-# renamenx 改名,如果a存在,那么改名失败
-renamenx msg a
-
-# move 将当前数据库的的 key ,移动到其他数据库
-move msg 1
-# select 选择数据库1
-select 1
-# 查看msg
-get msg
-
-# dbsize 统计当前数据库的 key 数量
-dbsize
-
-# swapdb 交换不同数据库的key
-swapdb 0 1
-
-# flushdb 删除当前数据库的所有key
-flushdb
-
-# flushall 删除所有数据库的所有key
-flushall
-
-# shutdown 关闭redis-server,所有客户端也会被关闭
-shutdown
-
-# 导出 csv 文件
-hset n a 1 b 2 c 3
-redis-cli --csv hgetall n > stdout.csv 2> stderr.txt
-```
-
-在 `iredis` 下的显示[跳转至 iredis 的介绍](#iredis)
-![avatar](/Pictures/redis/string1.png)
-
-在 `gui` 下的显示[跳转至 gui 的介绍](#gui)
-![avatar](/Pictures/redis/string.png)
-
-```sql
+```redis
 # setnx 如果健不存在,才创建
 # 因为msg健已经存在,所以创建失败
 setnx msg "test exists"
@@ -209,11 +441,9 @@ setrange msg 6 WORLD
 append msg " tz"
 ```
 
-![avatar](/Pictures/redis/string2.png)
+- `Mset`创建多个健. 可以减少rtt(网络往返时间)
 
-创建多个健
-
-```sql
+```redis
 # 对多个健进行赋值(我这里是a,msg)
 mset a 1 msg tz
 
@@ -227,9 +457,8 @@ mget a b msg
 del a msg
 ```
 
-对健的值进行加减
-
-```sql
+- num(数), 依然是string(字符串)类型
+```redis
 set a 1
 
 # incr 对a加1(只能对 64位 的unsigned操作)
@@ -249,57 +478,84 @@ decr a
 
 # decrby 对a减10(只能对 64位 的unsigned操作)
 decrby a 10
+```
 
+#### Bitmaps(位图)
+
+- 本质上是string类型
+
+- 记录用户是否活跃
+
+```redis
+# 2022-3-19. id为5, 10, 15用户活跃
+setbit 2022-3-19 5 1
+setbit 2022-3-19 10 1
+setbit 2022-3-19 15 1
+
+# 2022-3-20
+setbit 2022-3-20 5 1
+setbit 2022-3-20 15 1
+
+# 查看id10的用户是否活跃
+getbit 2022-3-19 10
+
+# 查看活跃用户的总数
+bitcount 2022-3-19
+
+# 查看活跃当中, 最小的用户id
+bitpos 2022-3-19 1
+
+# 查看不活跃当中, 最小的用户id
+bitpos 2022-3-19 0
+```
+
+- 复合运算: `bitop <op> key key`
+
+    - `and`(交集), `or`(并集), `not`(非), `xor`(异或)
+
+```redis
+# 交集. 查看这两天都活跃的用户总数, 并保存2022-3-19:and:2022-3-20
+bitop and 2022-3-19:and:2022-3-20 2022-3-19 2022-3-20
+bitop or 2022-3-19:or:2022-3-20 2022-3-19 2022-3-20
 ```
 
 ### hash (哈希散列)
 
+- 应用:
+
+    - 相比于关系性数据库, hash是稀疏结构的(不需要修改表结构), 更灵活
+    - 电商app的购物车
+
 哈希对象的编码: [**详情**](http://redisbook.com/preview/object/hash.html)
 
-| 编码      | 作用                                                                                    |
-| --------- | --------------------------------------------------------------------------------------- |
-| ziplist   | 压缩列表：先添加到哈希对象中的键值对会在压缩列表的表头, 后添加对象中的键值对会在的表尾. |
-| hashtable | 字典:字典的每个键都是一个字符串对象, 对象中保存了键值对的键和值                         |
+| 编码      | 作用                                                                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------                                                            |
+| ziplist   | 压缩列表：元素个数小于`hash-max-ziplist-entries`(默认512个) 和 元素字节小于`hash-max-ziplist-value`(默认64字节) . 该编码更节约内存. 时间复杂度O(n) |
+| hashtable | 字典: 无法ziplist条件时使用该编码. 时间复杂度为O(1)                                                                                                |
 
-只是把 set,get...命令,换成 hset,hget
+| 命令         | 时间复杂度          |
+|--------------|---------------------|
+| hkeys        | O(k) k是filed的总数 |
+| hvals        | O(k) k是filed的总数 |
+| hgetall      | O(k) k是filed的总数 |
+| hmset        | O(k) k是filed的个数 |
+| hmget        | O(k) k是filed的个数 |
+| hdel         | O(k) k是filed的个数 |
+| hscan        | O(1)                |
+| hstrlen      | O(1)                |
+| hsetnx       | O(1)                |
+| hlen         | O(1)                |
+| hexists      | O(1)                |
+| hincrby      | O(1)                |
+| hget         | O(1)                |
+| hincrbyfloat | O(1)                |
+| hset         | O(1)                |
 
-> ```sql
+> ```redis
 > HSET 表名 域名1 域值1 域名2 域值2 ...
 > ```
 
-```sql
-# 创建表名为table,并设置名为a的域(field),它的值为1
-hset table a 1
-
-# 查看表table
-hgetall table
-```
-
-![avatar](/Pictures/redis/hash.png)
-
-```sql
-# 继续添加表table 的b域为2,c域为3
-hset table b 2
-hset table c 3
-
-hgetall table
-```
-
-![avatar](/Pictures/redis/hash1.png)
-
-```sql
-# 删除表table的a域
-hdel table a
-
-hgetall table
-
-# 删除整个table表
-del table
-```
-
-![avatar](/Pictures/redis/hash2.png)
-
-```sql
+```redis
 # 一次创建多个域
 hset n a 1 b 2 c 3
 
@@ -309,6 +565,15 @@ hset n a -1
 
 # hsetnx 如果a域存在,则不修改值
 hsetnx n a 0
+
+# 获取a域
+hget n a
+
+# hgetall 获取n的所有域和值(阻塞命令, 类似keys命令)
+hgetall n
+
+# 渐进式遍历(非阻塞, 类似于scan命令)
+hscan n 0
 
 # hkeys 查看n表里的所有域名
 hkeys n
@@ -329,11 +594,17 @@ hmget n a b
 hlen n
 # 查看a域的长度
 hstrlen n a
+
+# 删除指定域
+hdel table a
+
+# 删除整个table表
+del table
 ```
 
 对域的值进行加减
 
-```sql
+```redis
 # a域的值加10(只能对 64位 的unsigned操作)
 hincrby n a 10
 
@@ -349,98 +620,119 @@ hincrbyfloat n a -1.1
 
 ### list (列表)
 
-键值对的值是一个列表对象, 列表对象包含了 字符串对象, 字符串对象由 SDS 实现.
+- 应用:
 
-链表被广泛用于实现 Redis 的各种功能, 比如列表键, 发布与订阅, 慢查询, 监视器, 等等.
-integers 列表键的底层实现就是一个链表, 链表中的每个节点都保存了一个整数值.
+    - stack(栈): lpush + lpop
+
+    - queue(队列): lpush + rpop
+
+    - 环形队列: lpush + ltrim
+
+    - mq(消息队列): lpush + brpop实现阻塞队列
+
+    - 文章列表:
+
+        - 文章使用hash实现
+
+            ```redis
+            hmset acticle:1 title xx timestamp 1476536196 content xxxx
+            ```
+
+            - 问题: 获取多个文章都需要执行多次`hgetall`
+
+                - 解决方法1: 使用pipeline(流水线执行命令)
+
+                - 解决方法2: 文章序列化为string类型, 获取时使用`mget`
+
+        - 使用列表把文章组合起来
+
+            ```redis
+            lpush user:1:acticles article:1 article:2
+            ```
 
 列表对象的编码: [**详情**](http://redisbook.com/preview/object/list.html)
 
-| 编码         | 作用                                                                                                                                                                                                           |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ziplist      | 每个压缩列表节点（entry）保存了一个列表元素                                                                                                                                                                    |
-| linkedlist   | 每个双端链表节点（node）都保存了一个字符串对象,而每个字符串对象都保存了一个列表元素.                                                                                                                           |
-| 　 quickList | zipList 和 linkedList 的混合体,它将 linkedList 按段切分,每一段使用 zipList 来紧凑存储,多个 zipList 之间使用双向指针串接起来.默认的压缩深度是 0,也就是不压缩.压缩的实际深度由配置参数 list-compress-depth 决定. |
+| 编码         | 作用                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  |
+| ziplist      | 等同于hash的ziplist                                                                                                                                                                                             |
+| linkedlist   | 每个双端链表节点（node）都保存了一个字符串对象,而每个字符串对象都保存了一个列表元素.                                                                                                                            |
+| 　 quickList | zipList 和 linkedList 的混合体,它将 linkedList 按段切分,每一段使用 zipList 来紧凑存储,多个 zipList 之间使用双向指针串接起来.默认的压缩深度是 0,也就是不压缩.压缩的实际深度由配置参数 `list-compress-depth` 决定 |
 
-![avatar](/Pictures/redis/list5.png)
+![avatar](./Pictures/redis/list5.png)
 
-> ```sql
-> # 反向插入
-> LPUSH 列表名 值1 值2 ...
-> # 正向插入
-> RPUSH 列表名 值1 值2 ...
-> ```
+| 命令       | 时间复杂度                           |
+|------------|--------------------------------------|
+| lrange     | O(S+N) S是start, N是start到end的范围 |
+| ltrim      | O(N) N是裁剪的元素总数               |
+| lset       | O(N) N是索引偏移量                   |
+| linsert    | O(N) N是索引偏移量                   |
+| lindex     | O(N)                                 |
+| lrem       | O(N) N是列表长度                     |
+| rpushx     | O(1)                                 |
+| rpush      | O(k) k是健的个数                     |
+| rpop       | O(1)                                 |
+| rpoplpush  | O(1)                                 |
+| lpushx     | O(1)                                 |
+| lpush      | O(k) k是健的个数                     |
+| lpop       | O(1)                                 |
+| llen       | O(1)                                 |
+| brpoplpush | O(1)                                 |
+| brpop      | O(1)                                 |
+| blpop      | O(1)                                 |
 
-创建 名为 list 的列表
-
-```sql
-# 反向插入
-lpush list 1
+```redis
+# 左插入
 lpush list 2
-
-# 列表允许重复元素
-lpush list 2
 lpush list 1
+
+# 右插入
+rpush list 3
+rpush list 4
 
 # 查看列表list
 lrange list 0 -1
-```
 
-![avatar](/Pictures/redis/list.png)
-
-```sql
-# 一次性插入多个值,反向插入
-lpush l a a b b c c
-```
-
-![avatar](/Pictures/redis/list1.png)
-
-```sql
-# 正向插入
-rpush ll a a b b c c
-```
-
-![avatar](/Pictures/redis/list2.png)
-
-```sql
 # 查看长度
-llen ll
+llen list
 
-# lpushx,rpushx不能对空的表进行插入
-lpushx null a a b b c c
-rpushx null a a b b c c
+# 左弹出
+lpop list
 
-# lpop 移除第一个值
-lpop ll
+# 右弹出
+rpop list
 
-# rpop 移除最后一个值
-rpop ll
+# lpushx,rpushx不能对不存在的表进行插入
+lpushxlist-null a a b b c c
+rpushx list-null a a b b c c
 ```
 
-![avatar](/Pictures/redis/list3.png)
+```redis
+lpush list1 a
 
-```sql
-# RPOPLPUSH 把 l 最后一个值,放到 ll 第一位
-rpoplpush l ll
+# 右弹出list, 左插入到list1
+rpoplpush list list1
 
-# RPOPLPUSH 把自己的最后一个值,放到第一位
-rpoplpush ll ll
+# 弹出自己的最后一个值, 插入到第一位
+rpoplpush list list
 ```
 
-![avatar](/Pictures/redis/list4.png)
+- brpop
 
-```sql
-
-# brpop 在阻塞时间内(0表示无限等待),对空 key 移除第一个值
-# blpop 在阻塞时间内(0表示无限等待),对空 key 移除最后一个值
+```redis
 # brpoplpush 是 rpoplpush 的阻塞版本
-# 在 MULTI / EXEC 块当中没有意义
-brpop l 100
+# 在 MULTI / EXEC 块(事务)中没有意义
+
+# ll列表元素为空则阻塞, 如不为空则等同于rpop. 以下是阻塞时间3秒, 3秒后没有其它客户端插入就返回nil
+brpop ll 3
+
+# 0秒表示一直阻塞下去, 直到有客户端插入
+brpop ll 0
+
+# 阻塞多个列表, 只要其中有一个列表插入, 就返回
+brpop ll ll1 ll2 0
 ```
 
-![avatar](/Pictures/redis/list.gif)
-
-```sql
+```redis
 # 查看ll的第1个值(注意:0表示第1个值)
 lindex ll 0
 
@@ -468,7 +760,7 @@ lrem ll 2 b
 
 **sort 排序**: 只能对 _数字_ 或者 _字符串_ 进行排序(默认会按数字排序,如果有数字和字符串会报错)
 
-```sql
+```redis
 # 新建两个列表
 lpush gid 1 3 5 2 0
 lpush name apple joe john
@@ -487,7 +779,7 @@ sort gid limit 2 4 desc
 
 `by` 通过**字符串对象的值**来对 list 进行排序:
 
-```sql
+```redis
 # 新建 uid 列表
 lpush uid 1 2 3
 
@@ -502,11 +794,10 @@ sort uid
 sort uid by level*
 ```
 
-![avatar](/Pictures/redis/list6.png)
 
 `get` 通过 list 的顺序对 字符串 进行排序(反过来的 by)：
 
-```sql
+```redis
 # 新建三个字符串
 set name1 joe
 set name2 john
@@ -526,20 +817,54 @@ sort uid get name* get level* store name-level
 
 ### set (集合)
 
+- 应用:
+
+    - 标签
+        ```redis
+        # 给用户加标签
+        sadd user:1 tag1 tag2
+        ```
+        ```redis
+        # 给标签加用户
+        sadd tag:1 user1 user2
+        ```
+
 集合对象的编码: [**详情**](http://redisbook.com/preview/object/set.html)
 
 | 编码      | 作用       |
 | --------- | ---------- |
-| intset    | 整数       |
-| hashtable | 包含字符串 |
+| intset    | 整数. 节省内存, O(n)       |
+| hashtable | 字典: 无法intset条件时使用该编码. 时间复杂度为O(1) |
 
-```sql
+
+| 命令        | 时间复杂度                                      |
+|-------------|-------------------------------------------------|
+| sinterstore | O(N*M) n是多个集合中元素最少的个数, m是健的个数 |
+| sinter      | O(N*M) n是多个集合中元素最少的个数, m是健的个数 |
+| sunion      | O(N) n是多个集合的个数和                        |
+| sunionstore | O(N)n是多个集合的个数和                         |
+| sdiff       | O(N) n是多个集合的个数和                        |
+| sdiffstore  | O(N)n是多个集合的个数和                         |
+| srem        | O(k) k是元素的个数                              |
+| smembers    | O(N) n是元素的总数                              |
+| sscan       | O(1)                                            |
+| spop        | O(1)                                            |
+| sismember   | O(1)                                            |
+| srandmember | O(count)                                        |
+| sadd        | O(k) k是元素的个数                              |
+| scard       | O(1)                                            |
+| smove       | O(1)                                            |
+
+```redis
 # 新建一个集合,名为jihe .字符串的集合编码为hashtable
 sadd jihe 'test'
 sadd jihe 'test1' 'test2' 'test3' 123
 
-# 查看集合jihe
+# 查看集合jihe所有元素, 返回结果是无序的(阻塞命令, 类似keys命令)
 smembers jihe
+
+# 渐进式遍历(非阻塞, 类似于scan命令)
+sscan jihe 0
 
 # 数字的集合编码为intset
 sadd s 123
@@ -554,34 +879,28 @@ sadd s test
 object encoding s
 ```
 
-![avatar](/Pictures/redis/set.png)
-
 那如果一个集合,包含数和字符串,把字符串的值删除后.**编码**会变吗？
 
-```sql
+```redis
 # 新建ss集合,包含数和字符串
 sadd ss 123 'test'
 
-# 查看编码
+# 查看编码为hashtable
 object encoding ss
 
 # 删除 ss 集合里的test字符串值
 srem ss test
 
-# 再次查看编码
+# 再次查看编码为hashtable. 没有变
 object encoding ss
 ```
 
-答案是没有变,还是 `hashtable`
-
-![avatar](/Pictures/redis/set1.png)
-
-```sql
+```redis
 # 查看集合个数
 scard jihe
 
 # 查看集合是否有test值.有返回1,无返回0
-sismember jieh "test"
+sismember jiehe "test"
 
 # 搜索jihe包含 t 的字符
 sscan jihe 0 match *t*
@@ -592,16 +911,22 @@ srem jihe test test1
 # 将jihe里的值123,移到jihe1
 smove jihe jihe1 123
 
-# 删除随机一个数
+# 弹出随机一个数
 spop jihe
+
+# 弹出随机2个数
+spop jihe 2
 
 # 查看随机一个数
 srandmember jihe
+
+# 查看随机2个数
+srandmember jihe 2
 ```
 
 #### 交集,并集,补集
 
-```sql
+```redis
 # 新建两个集合
 sadd sss 123 test test1
 sadd ssss 123 test abc cba
@@ -621,18 +946,27 @@ sdiff ssss sss
 sinterstore sss ssss
 sunionstore sss ssss
 sdiffstore sss ssss
+
+# 保存集合运算的结果
+sinterstore s-inter sss ssss
+sunionstore s-union sss ssss
+sdiffstore s-diff sss ssss
 ```
 
-![avatar](/Pictures/redis/set2.png)
+![avatar](./Pictures/redis/set2.png)
 
-### sorted set (有序集合)
+### zset(有序集合)
+
+- 应用
+
+    - 排行榜
 
 有序集合对象的编码: [**详情**](http://redisbook.com/preview/object/sorted_set.html)
 
-| 编码     | 作用                                                                                                                                                                            |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 编码     | 作用                                                                                                                                                                             |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  |
 | ziplist  | 每个集合是两个节点来保存, 第一个节点保存元素的成员（member）, 而第二个元素则保存元素的分值（score）.集合按分值从小到大进行排序, 分值较小的元素放在表头, 而分值较大的元素在表尾. |
-| skiplist | 使用 zset 结构作为底层实现, 一个 zset 结构同时包含一个字典和一个跳跃表                                                                                                          |
+| skiplist | 跳跃表: 平均O(logN)、最坏O(N) |
 
 **ziplist:** (其余情况使用 skiplist)
 
@@ -642,18 +976,67 @@ sdiffstore sss ssss
 - 成员(member)的长度都小于 64 字节.
   配置参数:(zset-max-ziplist-value)
 
-```sql
-# 新建有序集合名为z
+| 命令             | 时间复杂度                                                                 |
+|------------------|----------------------------------------------------------------------------|
+| zinterstore      | O(N*K)+O(M*log(M)) n是成员数最小的集合, k是集合的个数, m是结果集合中的个数 |
+| zunionstore      | O(N)+O(M*log(M)) n是所有集合成员的个数和, m是结果集合中的个数              |
+| zrem             | O(M*log(N)) m是删除成员的个数, n是当前集合的个数                           |
+| zrevrange        | O(log(N)+M)                                                                |
+| zremrangebyrank  | O(log(N)+M)                                                                |
+| zremrangebyscore | O(log(N)+M)                                                                |
+| zrevrangebylex   | O(log(N)+M)                                                                |
+| zrangebyscore    | O(log(N)+M)                                                                |
+| zremrangebylex   | O(log(N)+M)                                                                |
+| zrevrangebyscore | O(log(N)+M)                                                                |
+| zrangebylex      | O(log(N)+M)                                                                |
+| zrange           | O(log(N)+M)                                                                |
+| zpopmin          | O(log(N)*M)                                                                |
+| zpopmax          | O(log(N)*M)                                                                |
+| zrevrank         | O(log(N)) n是当前有序集合的个数                                            |
+| zrank            | O(log(N)) n是当前有序集合的个数                                            |
+| zlexcount        | O(log(N))                                                                  |
+| zincrby          | O(log(N))                                                                  |
+| zadd             | O(log(N)*M) m是添加成员的个数, n是当前有序集合的个数                       |
+| zcount           | O(log(N))                                                                  |
+| bzpopmax         | O(log(N))                                                                  |
+| bzpopmin         | O(log(N))                                                                  |
+| zscan            | O(1)                                                                       |
+| zscore           | O(1)                                                                       |
+| zcard            | O(1)                                                                       |
+
+```redis
+# 新建有序集合名为z, 按score(分数)排序
 zadd z 1 a 1 b 2 c 3 d
 zadd z 1 100
 
-# 查看z
+# 查看z (阻塞命令, 类似keys命令)
+zrange z 0 -1
+
+# 包含score. 渐进式遍历(非阻塞, 类似于scan命令)
+zscan z 0
+
+# 查看z的第3个到第4个元素
+zrange z 2 3
+
+# 查看z, 包含score
 zrange z 0 -1 withscores
 
 # 倒序查看z
 zrevrange z 0 -1 withscores
 
-# 查看z的score总数
+# 查看socre值是1到100的成员
+zrangebyscore z 1 100
+# 查看所有socre值的成员
+zrangebyscore z -inf inf
+
+# 查看所有socre值的成员, 包含socre
+zrangebyscore z -inf inf withscores
+
+# 倒序
+zrevrangebyscore z 100 1
+zrevrangebyscore z inf -inf
+
+# 查看元素的个数
 zcard z
 
 # 查看a值是那个score值
@@ -674,15 +1057,6 @@ zincrby z 1000 100
 # 统计score值是1到100的个数
 zcount z 1 100
 
-# 查看socre值是1到100的成员
-ZRANGEBYSCORE z 1 100
-# 查看所有socre值的成员
-ZRANGEBYSCORE z -inf inf
-
-# 倒序
-ZREVRANGEBYSCORE z 100 1
-ZREVRANGEBYSCORE z inf -inf
-
 # 删除成员
 zrem z a
 
@@ -700,21 +1074,23 @@ zremrangebylex zz - [c
 zadd zzz 1 a 1 b 2 c 3 d
 zremrangebylex zzz - (c
 
-
 # 删除从a开头到c的成员(不包括c)
 zadd zzzz 1 a 1 b 2 c 3 d
 zremrangebylex zzzz [aaa (c
+
+# 删除从score大于2的成员(不包含)
+zremrangebyscore zzzz (2 +inf
 ```
 
 #### 交集,并集
 
 **ZUNIONSTORE (并集)**
 
-> ```sql
+> ```redis
 > ZUNIONSTORE 新建的有序集合名 合并的数量 有序集合1 有序集合2... WEGHTS 有序集合1的乘法因子 有序集合2的乘法因子...
 > ```
 
-```sql
+```redis
 # 新建三个有序集合
 zadd z1 1 a1 2 b1 3 c1 4 d1 5 e1
 zadd z2 1 a2 2 b2 3 c2 4 d2 5 e2
@@ -724,34 +1100,34 @@ zadd z3 1 a3 3 b3 3 c3 4 d3 5 e3
 zunionstore unionz 3 z1 z2 z3
 ```
 
-![avatar](/Pictures/redis/sortset.png)
+![avatar](./Pictures/redis/sortset.png)
 
 使用 WIGHTS 给 不同的有序集合 分别 指定一个乘法因子来改变排序 (默认设置为 1 )
 
-```sql
+```redis
 # z1的值乘1,z2乘10,z3乘100
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 10 100
 ```
 
-![avatar](/Pictures/redis/sortset1.png)
+![avatar](./Pictures/redis/sortset1.png)
 
-```sql
+```redis
 # 这次是z2乘10,z3乘100
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 100 10
 ```
 
-![avatar](/Pictures/redis/sortset2.png)
+![avatar](./Pictures/redis/sortset2.png)
 
-```sql
+```redis
 # z1,z2乘10,z3乘10
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 1 10
 ```
 
-![avatar](/Pictures/redis/sortset3.png)
+![avatar](./Pictures/redis/sortset3.png)
 
 **ZINTERSTORE (交集)**
 
-```sql
+```redis
 # 新建math(数学分数表) 小明100分,小红60分
 zadd math 100 xiaoming 60 xiaohong
 
@@ -762,25 +1138,462 @@ zadd history 50 xiaoming 90 xiaohong
 zinterstore sum 2 math history
 ```
 
-![avatar](/Pictures/redis/sortset4.png)
+![avatar](./Pictures/redis/sortset4.png)
 
-## hyper log
+#### geo(地理信息定位)
 
-```sql
-# 新建pf1,pf2
-pfadd pf1 1 2
-pfadd pf2 a b
+- 实际上是zset(有序集合)类型
 
-# 查看pf1的数量
-pfcount pf1
+    - 通过`geohash`命令 和 `zset` 类型, 实现geo的命令
 
-# 合并为一个pfs
-pfmerge pfs pf1 pf2
+```redis
+# 新建北京和广州的经纬度
+geoadd china 116.28 39.55 beijing
+geoadd china 113.26 23.12 guangzhou
+
+# 查看广州的经纬度
+geopos china guangzhou
+
+# 查看广州和北京之间的距离, 单位km
+geodist china guangzhou beijing km
+
+# 查看以北京为圆心, 半径为2000km内的城市
+georadiusbymember china beijing 2000 km
+
+# 生成北京的经纬度的hash(两个字符串越相似, 距离越短)
+geohash china beijing
+
+# 删除成员
+zrem china beijing
+```
+
+### streams(消息队列)
+
+- [官方文档](https://redis.io/topics/streams-intro)
+
+- append-only数据结构
+
+| 命令       | 时间复杂度 |
+|------------|------------|
+| xpending   | O(N)       |
+| xread      | O(N)       |
+| xrange     | O(N)       |
+| xtrim      | O(N)       |
+| xrevrange  | O(N)       |
+| xinfo      | O(N)       |
+| xreadgroup | O(M)       |
+| xclaim     | O(log N)   |
+| xack       | O(1)       |
+| xlen       | O(1)       |
+| xadd       | O(1)       |
+| xdel       | O(1)       |
+| xgroup     | O(1)       |
+
+```redis
+# 添加队列(返回id值), *表示自动生成id(毫秒 + 偏移量))
+XADD mystream * key0 0
+XADD mystream * key1 1 key2 2
+
+# 指定id值
+XADD mystream1 0-1 key0 0
+XADD mystream1 0-2 key1 1 key2 2
+XADD mystream1 10-1 key0 0
+XADD mystream1 11-1 key0 0
+XADD mystream1 100-1 key0 0
+
+# 先插入entry, 并且只保留最新2条entry
+XADD mystream MAXLEN 2 * value 1
+# 或者
+XTRIM mystream MAXLEN 1
+XADD mystream * value 1
+
+# 删除entry
+XDEL mystream <id值>
+
+# 查看长度. 返回2
+XLEN mystream
+
+# 查看队列
+XRANGE mystream - +
+# 查看队列, 顺序相反显示
+XREVRANGE mystream + -
+
+# 查看队列的详细信息
+XINFO STREAM mystream
+
+# 查看队列, 通过id值
+XRANGE mystream1 <start:id值> <end:id值>
+
+# 查看前2条entry
+XRANGE mystream - + COUNT 2
+
+# 查看指定id值后的2条entry
+XRANGE mystream <id值> + COUNT 2
+
+
+# XREAD(非阻塞), 查看mystream队列
+XREAD STREAMS mystream 0
+
+# 查看前2条entry
+XREAD COUNT 2 STREAMS mystream 0
+
+# 阻塞获取最新的entry, 获取后返回
+XREAD BLOCK 0 STREAMS mystream $
+```
+
+- Consumer groups(消费者组)
+
+    > 多个消费者获取单个stream. entry被哪个消费者获取? 取决于哪个消费者更快(竞争)
+
+```redis
+# 为mystream创建消费者组
+XGROUP CREATE mystream mygroup $
+
+# 查看组内的指定队列
+XINFO GROUPS mystream
+
+# MKSTREAM: 可以创建一个不存在的流
+XGROUP CREATE newstream mygroup $ MKSTREAM
+
+# 创建user0, 并获取最新的1条entry
+XREADGROUP GROUP mygroup user0 COUNT 1 STREAMS mystream >
+
+# 创建user1, 并获取最新的1条entry(最新的entry, 被user0还是user1获取? 取决于谁更快执行这条命令)
+XREADGROUP GROUP mygroup user1 COUNT 1 STREAMS mystream >
+
+# 查看user0, 已经获取的entry
+XREADGROUP GROUP mygroup user0 STREAMS mystream 0
+
+# 确认已经获取的entry, 确认后的entry无法从XREADGROUP获取
+XACK mystream mygroup <id值>
+
+# 查看指定队列的entry的处理情况
+XPENDING mystream mygroup
+
+# 查看所有entry的users获取情况(第三个参数为: entry从XADD到user XREADGROUP的时间(毫秒))
+XPENDING mystream mygroup - + 2
+
+# 查看每个user的entry的处理情况
+XINFO CONSUMERS mystream mygroup
+
+# 1小时后修改指定entry的ack用户为user1
+XCLAIM mystream mygroup user1 3600000 <id值>
+
+# 1小时后修改指定entry在内的后10条entry的, ack用户为user1
+XAUTOCLAIM mystream mygroup user1 3600000 <id值> COUNT 10
+```
+
+- 三种查询模式
+
+## Module(模块)
+
+- docker安装
+
+    ```sh
+    # 包含所有模块
+    docker run -d -p 6379:6379 redislabs/redismod
+    ```
+
+### [RedisJSON](https://oss.redis.com/redisjson/)
+
+- [RedisJson 横空出世，性能碾压ES和Mongo！](https://cloud.tencent.com/developer/article/1922607)
+
+    > 性能对比
+
+- 编译安装
+
+    ```sh
+    # 进入redisjson的github仓库, 下载Releases里的source.zip文件
+    curl -LO https://github.com/RedisJSON/RedisJSON/archive/refs/tags/v2.0.7.zip
+
+    # 解压, 进入目录后
+
+    # 编译
+    cargo build --release
+    ```
+
+    - 加载模块启动
+    ```
+    redis-server --loadmodule /home/tz/v2.0.7/RedisJSON-2.0.7/target/release/librejson.so
+    ```
+
+    - 写入配置文件, 再启动
+    ```
+    # 配置文件/var/lib/redis/redis.conf加入以下行
+    loadmodule /home/tz/v2.0.7/RedisJSON-2.0.7/target/release/librejson.so
+
+    # 启动
+    redis-server /var/lib/redis/redis.conf
+    ```
+
+    - 客户端连接后, 查看加载的模块
+    ```
+    info modules
+    ```
+
+- 基础命令
+
+```redis
+# 设置key
+JSON.SET js $ '"bar"'
+
+# 获取key
+JSON.GET js
+# 输出: "\"bar\""
+
+# 获取key, 友好的输出
+JSON.RESP js
+# 输出: "bar"
+
+# 删除key
+JSON.DEL js
+
+# 查看key类型
+JSON.TYPE js
+
+# 查看key的内存占用, 单位为bytes
+JSON.DEBUG MEMORY js
+```
+
+- 字符串
+
+```redis
+JSON.SET js-str $ '"bar"'
+
+# 查看长度
+JSON.STRLEN js-str
+
+# 在尾部添加字符串
+JSON.STRAPPEND js-str '"baz"'
+```
+
+- 数(包含整数, 小数)
+
+```redis
+JSON.SET js-num $ 0
+
+# 加1
+JSON.NUMINCRBY js-num $ 1
+
+# 减-0.75
+JSON.NUMINCRBY js-num $ -0.75
+
+# 乘2
+JSON.NUMMULTBY js-num $ 2
+
+JSON.GET js-num
+# 输出: 0.5
+```
+
+- 数组
+
+```redis
+JSON.SET js-arr $ []
+
+# 在末尾添加元素0
+JSON.ARRAPPEND js-arr $ 0
+
+# 0表示在头部添加元素 -2 1
+JSON.ARRINSERT js-arr $ 0 -2 -1
+
+JSON.GET js-arr $
+# 输出: "[[-2,-1,0]]"
+
+# 删除第1个元素外的其他元素
+JSON.ARRTRIM js-arr $ 1 1
+
+JSON.GET js-arr $
+# 输出: "[[-1]]"
+
+# pop最后一个元素
+JSON.ARRPOP js-arr $
+```
+
+- object
+
+```redis
+JSON.SET js-obj $ '{"name":"tz","age":24,"married": false}'
+
+# 修改key
+JSON.SET js-obj $.age 25
+
+# 操作json内的字符串类型
+JSON.STRLEN js-obj $.name
+
+# 操作json内的数类型
+JSON.NUMINCRBY js-obj $.age 1
+
+# 查看长度
+JSON.OBJLEN js-obj $
+
+JSON.GET js-obj $
+# 输出: "[{\"name\":\"tz\",\"age\":26,\"married\":false}]"
+
+JSON.RESP js-obj $
+# 输出:以下
+1) 1) "{"
+   2) "name"
+   3) "tz"
+   4) "age"
+   5) "26"
+   6) "married"
+   7) "false"
+
+# 查看key
+JSON.OBJKEYS js-obj $
+# 输出以下
+1) 1) "name"
+   2) "age"
+   3) "married"
+```
+
+```redis
+JSON.SET js-obj1 $ '{"f1": {"a":1}, "f2":{"a":2}}'
+
+# 修改a值
+JSON.SET js-obj1 $..a 3
+
+JSON.GET js-obj1
+# 输出: "{\"f1\":{\"a\":3},\"f2\":{\"a\":3}}"
+
+JSON.GET js-obj1 $.f1
+# 输出: "[{\"a\":3}]"
+
+JSON.GET js-obj1 $..a
+# 输出: "[3,3]"
+```
+
+### [RediSearch](https://oss.redis.com/redisearch/)
+
+- 编译安装
+    ```sh
+    git clone https://github.com/RediSearch/RediSearch.git
+    cd RediSearch
+    sudo make setup
+    make build
+    make run
+    ```
+
+    ```sh
+    redis-server --loadmodule /path/to/module/src/redisearch.so
+    ```
+
+> FT.CREATE {index_name} ON JSON SCHEMA {json_path} AS {attribute} {type}
+
+```redis
+# 创建name索引
+FT.CREATE userIdx ON JSON SCHEMA $.user.name AS name TEXT
+
+# 创建json
+JSON.SET myDoc $ '{"user":{"name":"tz","tag":"look book","hp":1000, "age":24}}'
+
+# 搜索name
+FT.SEARCH userIdx '@name:(tz)'
+
+    1) "1"
+    2) "myDoc"
+    3) 1) "$"
+       2) "{\"user\":{\"name\":\"tz\",\"tag\":\"look book\",\"hp\":1000,\"age\":24}}"
+
+# 返回指定Field
+FT.SEARCH userIdx '@name:(tz)' RETURN 1 name
+
+    1) "1"
+    2) "myDoc"
+    3) 1) "name"
+       2) "tz"
+
+# 高亮
+FT.SEARCH userIdx '@name:(tz)' RETURN 1 name HIGHLIGHT FIELDS 1 name TAGS '<b>' '</b>'
+
+    1) "1"
+    2) "myDoc"
+    3) 1) "name"
+       2) "<b>tz</b>"
+
+# 聚合
+FT.AGGREGATE userIdx '*' LOAD 6 $.user.hp AS hp $.user.age AS age APPLY '@hp-@age' AS hp-age
+
+    1) "1"
+    2) 1) "hp"
+       2) "1000"
+       3) "age"
+       4) "24"
+       5) "hp-age"
+       6) "976"
+
+# 删除索引
+FT.DROPINDEX userIdx
+
+# 添加自动补全
+FT.SUGADD autocomplete "tz" 100
+
+# GET
+FT.SUGGET autocomplete "t"
+
+    "tz"
+```
+
+- 数组索引
+```redis
+JSON.SET types:1 . '{"title":"fileltype1", "tags":["json","ini","yaml"]}'
+JSON.SET types:2 . '{"title":"fileltype2", "tags":["json","yaml"]}'
+
+# 创建索引
+FT.CREATE types-idx ON JSON PREFIX 1 types: SCHEMA $.tags.* AS tags TAG
+
+FT.SEARCH types-idx "@tags:{json}"
+
+    1) "2"
+    2) "types:1"
+    3) 1) "$"
+       2) "{\"title\":\"fileltype1\",\"tags\":[\"json\",\"ini\",\"yaml\"]}"
+    4) "types:2"
+    5) 1) "$"
+       2) "{\"title\":\"fileltype2\",\"tags\":[\"json\",\"yaml\"]}"
+
+FT.SEARCH types-idx "@tags:{ini}"
+
+    1) "1"
+    2) "types:1"
+    3) 1) "$"
+       2) "{\"title\":\"fileltype1\",\"tags\":[\"json\",\"ini\",\"yaml\"]}"
+```
+
+## HyperLogLog
+
+- 实际上是string类型, 通过一种基数算法实现set(集合)的效果
+
+    - 算法论文: [Hyperloglog: the analysis of a near-optimal cardinality estimation algorithm](http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf)
+
+    - 优点: 比set(集合)占用的内存小的多的多
+
+    - 缺点: 存在误差率(官方数据是0.81%)
+
+```redis
+# 新建两个key
+pfadd 2022-3-19 'id1' 'id2'
+pfadd 2022-3-20 'id1' 'id2' 'id3' 'id4'
+
+# 查看2022-3-19的数量
+pfcount 2022-3-19
+
+# 合并为一个2022-3-19:merge:2022-3-20
+pfmerge 2022-3-19:merge:2022-3-20 2022-3-19 2022-3-20
+pfcount 2022-3-19:merge:2022-3-20
 ```
 
 ## transaction (事务)
 
-```sql
+- transaction是原子操作, 保证执行多条命令的原子性
+
+- 如果命令出现错误, 事务当同于未执行
+
+- 不支持回滚
+
+    - 因此要小心打错字
+
+```redis
 # 新建一个key
 set t 100
 
@@ -795,16 +1608,73 @@ exec
 discard
 ```
 
-watch 监视一个(或多个) key ,如果在事务执行之前这个(或这些) key 被其他命令所改动,那么事务将被打断.
+- `watch`(乐观锁) 监视一个(或多个) key ,如果在事务执行之前这个(或这些) key 被其他命令所改动,那么事务将被打断
 
-这里我开启了两个客户端,右边在事务过程中 `incr t` 后,被左边执行 `set t 100` 修改了 t 的值.所以右边在 `exec` 保存事务后,返回(nil).事务对 t 值的操作被取消
-![avatar](/Pictures/redis/t.gif)
+    - 两个客户端:
+
+        - 右客户端开启事务后, 执行 `incr t` 后
+
+        - 被左边执行 `set t 100` 修改了 t 的值
+
+        - 所以右边在 `exec` 保存事务后,返回(nil).事务对 t 值的操作被取消
+
+    | 左边客户端   | 右边客户端   |
+    | ------------ | ------------ |
+    |              | set t 100    |
+    |              | watch t      |
+    |              | multi        |
+    |              | incr t       |
+    |              | incr t       |
+    | set t 100    |              |
+    |              | exec         |
+
+    ![avatar](./Pictures/redis/t.gif)
+
+## [pipelining(流水线执行命令)](https://redis.io/topics/pipelining)
+
+- 事务 vs pipelining:
+
+    - 事务是原子的, pipelining不是原子的.因此事务不能同时运行, 而pipelining可以交替运行
+
+    ![avatar](./Pictures/redis/redis-pipeline-vs-transaction.png)
+
+- 普通timeline vs pipelining:
+
+    - 网络的优势:
+
+        - 普通情况: 客户端向服务器发送命令, 然后等待响应. 每条命令的花费1次rtt(往返时间)
+
+        - pipelining: 客户端向服务器一次发送多条命令. 多条命令花费1次rtt(往返时间)
+
+    - io的优势:
+
+        - 每次执行都需要read(), write()的系统调用
+
+            - 因此pipelining让多条命令只使用1次read(), write(), 从而可以减少上下文调用
+
+- 问题: redis cluster分布式方案下, 不能使用pipeline
+
+    - 解决方法1: 客户端保存slot(哈希槽)和redis结点的关系
+
+        - 支持的客户端有: go-redis
+
+    - 解决方法2: [codis: 在服务器与客户端之间加入一层代理, 通过分槽实现pipeline](https://github.com/CodisLabs/codis)
+
+```sh
+# 发送一条PING命令
+echo "PING" | nc localhost 6379
+
+# 发送多条PING命令. \r\n结尾是redis客户端协议(RESP)
+echo "PING\r\nPING\r\nPING" | nc localhost 6379
+```
 
 ## Lua 脚本
 
-eval 命令 执行 lua 脚本 [Lua 教程](https://www.runoob.com/lua/lua-tutorial.html)
+- lua是原子操作, 保证执行多条命令的原子性
 
-```sql
+- `eval` 命令: 执行lua语句
+
+```redis
 # return 1 (0表示传递参数的数量)
 eval "return 1" 0
 
@@ -816,83 +1686,82 @@ eval "return {KEYS[1],ARGV[1]}" 1 a 123
 eval "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 a b 123 321
 ```
 
-```sql
+- `evalsha` 命令: 执行已经加载进redis内存的lua脚本
+
+```redis
 # script load 会把脚本缓存进服务器,并返回hash(SHA1)值
 script load "return {1,2,3}"
 
-# evalsha 执行哈希值的脚本(一般情况下执行eval命令,底层会转换为执行evalsha)
+# evalsha 执行哈希值的脚本, 0表示传递参数的数量 (一般情况下执行eval命令,底层会转换为执行evalsha)
 evalsha <hash> 0
 
-# 查看脚步是否在缓存
+# 查看脚本是否已经加载到redis内存当中
 script exists "<hash>"
 
-# 清空脚本缓存
+# 清空redis内存中的脚本
 SCRIPT FLUSH
 
-# 杀死目前正在执行的脚本
+# 杀死目前正在执行的脚本(如果lua脚本正在执行写入操作, 则script kill不会生效)
 SCRIPT KILL
 ```
 
-![avatar](/Pictures/redis/lua.png)
+- `redis.call` or `redis.pcall()`
 
-redis.call or pcall()过程中 Redis 类型转换为 Lua 类型，然后结果再转换回 Redis 类型，结果与初始值相同
+    - 两个函数执行时: Redis 类型转换为 Lua 类型，然后结果再转换回 Redis 类型，结果与初始值相同
 
-```sql
+    - `redis.call`: 报错就返回
+
+    - `redis.pcall`: 忽略报错继续执行
+
+```redis
 # set a 123
-eval "return redis.call('set','KEYS[1]','123')" 1 a
+eval "return redis.call('set', KEYS[1],'123')" 1 a
 
 # get a
-eval "return redis.call('get','a')" 0
+eval "return redis.pcall('get', KEYS[1])" 1 a
 ```
 
-**for 语句:**
+#### 脚本示例
 
-> ```lua
-> for i=1,10 do
->   print(i)
-> end
-> ```
+```redis
+# 设置3个用户, 并分配值
+mset user1 1 user2 2 user3 3
 
-```sql
-# 循环512次，插入列表
-EVAL "for i=1,512 do
-    redis.call('RPUSH', KEYS[1], i)
-    return 1
-end" 1 integers
-
-EVAL "for i=1,512 do
-    redis.call('ECHO', i)
-    return 1
-end"
-
-EVAL "for i=1,512 do
-    redis.call('RPUSH', KEYS[1], i)
-    redis.call('RPUSH', KEYS[2], i)
-    return 1
-end" 2 integers integers2
+# 将3个用户, push进列表
+lpush list1 user1 user2 user3
 ```
 
-if 语句:
+- lua脚本文件`test.lua`
 
-> ```lua
-> if(布尔表达式)
-> then
-> --[ 布尔表达式为 true 时执行该语句块 --]
-> else
-> --[ 布尔表达式为 false 时执行该语句块 --]
-> end
-> ```
+```lua
+-- test.lua
 
-```sql
-# 判断key1是否存在，不存在则执行循环赋值
-EVAL "if redis.call('EXISTS', KEYS[1]) == 0 then
-    for i=1,512 do redis.call('RPUSH', KEYS[1], i) end
-end" 1 integers
+-- 获取list1
+local list1 = redis.call("lrange", KEYS[1], 0, -1)
+local count = 0
+
+for k, v in ipairs(list1)
+do
+    -- 自增1
+    redis.call("incr", v)
+    count = count + 1
+end
+-- 返回个数
+return count
+```
+
+- 执行脚本
+```sh
+redis-cli --eval test.lua list
 ```
 
 ## python
 
-- [官方文档](https://pypi.org/project/redis/)
+- [python的redis客户端列表](https://redis.io/clients#python)
+
+### redis-py
+
+- [官方文档](https://redis.readthedocs.io/en/stable/)
 
 - `hash`类型对应python的`dict字典`类型
 
@@ -910,16 +1779,37 @@ except redis.exceptions.ConnectionError:
 # set
 r.mset({'1': 'google', '2': 'baidu'})
 r.get('1')
+```
 
-# pipe缓冲区队列.当execute()才会执行
-pipe = r.pipeline()
-# 关闭事务
+- transaction(事务), pipeline(流水线执行命令)
+
+```py
+import redis
+
+r = redis.Redis()
+
+# 默认transaction=True表示事务执行, 而不是流水线执行
 pipe = r.pipeline(transaction=False)
 pipe.set('foo', 'bar')
 pipe.get('foo')
+
+# pipe缓冲区队列.当execute()才会执行
 pipe.execute()
 # 或者
 pipe.set('foo', 'bar').get('foo').execute()
+```
+
+### [redis-om-python: 对象模板](https://github.com/redis/redis-om-python)
+
+### [pottery:以python的语法访问redis](https://github.com/brainix/pottery)
+
+```py
+import pottery
+
+# 列表
+list1 = pottery.RedisList([1, 4, 9, 16, 25], key='list1')
+for i in list1:
+    print(i)
 ```
 
 ## 配置
@@ -928,7 +1818,7 @@ pipe.set('foo', 'bar').get('foo').execute()
 
 配置文件在 `/etc/redis.conf` 目录
 
-```sql
+```redis
 # config get 查看所有配置
 config get *
 
@@ -955,7 +1845,7 @@ config rewrite
 
 [info 详情](http://redisdoc.com/client_and_server/info.html)
 
-```sql
+```redis
 # 查看信息
 info
 
@@ -964,11 +1854,11 @@ info cpu
 
 # 重置 info 命令中的某些统计数据
 config resetstat
-```
 
-查看 `memory` 信息:
+# 查看加载的模块
+info modules
 
-```sql
+# 查看 memory
 info memory
 ```
 
@@ -981,7 +1871,7 @@ redis 6.0 以上的版本
 
 [**ACL:**](https://redis.io/topics/acl)
 
-```sql
+```redis
 # 查看用户列表
 acl list
 
@@ -1007,70 +1897,37 @@ acl setuser tz off
 auth tz 123
 ```
 
-### 调试
+### slowlog(慢查询日志)
 
-```sql
-# 测试客户端与服务器的连接
-ping
+- 如果出现周期性超时
 
-# 打印信息
-echo "print message"
+- redis通过一个列表(FIFO)存储慢查询日志
 
-# 查看key的编码
-set a 1
-object encoding a
+    - 日志长度为: `slowlog-max-len` 参数(默认128), 建议设置1000
 
-# 查看key的空闲时间(set和get都会刷新空闲时间)
-object idletime a
+- 慢查询时间为: `slowlog-log-slower-than` 参数(默认10000微妙, 也就是10毫秒), 建议设置1000
 
-# 查看引用次数(值如果是字符串那么为1,如果是数字为2147483647)
-object REFCOUNT a
-
-# 查看key的编码,idle等信息
-debug object a
+```redis
+config set slowlog-log-slower-than 1000
+config set slowlog-max-len 1000
+# 将修改写入配置文件
+config rewrite
 ```
 
-#### slowlog
+```redis
+# 获取日志, n为日志的条数. 有3个值分别为: 标识id, 发生时间戳, 命令耗时
+slowlog get <n>
 
-```sql
-# 查看 slowlog 配置
-config get slow*
-```
-
-- `slowlog-max-len`: 最多能保存多少条日志
-- `slowlog-log-slower-than`: 执行时间大于多少微秒(microsecond,1 秒 = 1,000,000 微秒)的查询进行记录
-
-![avatar](/Pictures/redis/slow.png)
-
-```sql
-# 查看 slowlog
-slowlog get
-
-# 查看当前 slowlog 的数量(一个是当前日志的数量,slower-max-len 是允许记录的最大日志的数量)
+# 获取日志条数
 slowlog len
 
-# 清空 slowlog
+# 删除所有日志
 slowlog reset
 ```
 
-#### monitor
-
-```sql
-monitor
-```
-
-![avatar](/Pictures/redis/monitor.gif)
-
-#### migrate (迁移)
-
-将 **key** 移动到另一个 **redis-server**
-
-我这里左边是 `127.0.0.1:6379`,右边是 `127.0.0.1:7777`
-![avatar](/Pictures/redis/migrate.gif)
-
 ### client
 
-```sql
+```redis
 # 查看当前客户端名字
 client getname
 
@@ -1085,13 +1942,91 @@ client list
 
 # 关闭客户端(不过即使关闭了,一般会自动重新连接)
 client kill 127.0.0.1:56352
+
+# 阻塞客户端(slave客户端除外)
+client pause <time(毫秒)>
 ```
+
+- `client list` 命令:
+
+    ![avatar](./Pictures/redis/client.png)
+
+    - [每个参数的详情](http://doc.redisfans.com/server/client_list.html)
+
+    - 连接/空闲时间:
+
+        - `age` 客户端连接的时间
+
+        - `idle`(空闲时间): 一旦`idle` 超过`timeout` 值(默认为0), 客户端会被关闭
+
+            - 因此建议设置为300秒, 防止客户端bug
+
+                ```redis
+                # 查看timeout
+                config get timeout
+
+                # 设置timeout为300秒
+                config set timeout 300
+
+                # 写入配置文件
+                config rewrite
+                ```
+
+    - 输入/输出缓冲区:
+
+        -  输入缓冲区: `qbuf`, `qbuf-free`: 将client的发送的命令暂时保存, redis服务器会拉取并执行
+
+        -  输出缓冲区: `obl`(固定缓冲区: 16KB的字节数组), `oll`(动态缓冲区: 列表), `omem`(字节数) : 将client的发送的命令暂时保存, redis服务器会拉取并执行
+
+            - `obl` 用完后, 会使用`oll`
+
+            - 输出缓冲区分3种客户端:
+
+                - normal(普通客户端)
+
+                - pusbsub(发布/订阅客户端)
+
+                - slave(主从复制里的从客户端)
+
+                    - 应适量增大slave客户端的输出缓冲区: 因为slave会比较大, 如果缓冲区溢出会被kill
+
+                ```redis
+                # 配置从客户端, hard limit为256mb(大于时, 客户端会被立刻关闭), soft limit为64mb(大于时, 超过60秒后才关闭)
+                client-out-buffer-limit slave 256mb 64mb 60
+                ```
+
+        - 注意: 输入/输出缓冲区, 都不受`mexmeory` 参数(最大内存限制)的控制
+
+            - 也就是说redis分配的内存(通过`info memory` 命令的`used_memory_human` 值)可以比`mexmeory`大
+                - 这表示redis的处理速度, 跟不上输入缓冲区的输入速度
+
+- `info client` 命令:
+
+    ![avatar](./Pictures/redis/client1.png)
+
+    | 参数                       | 内容                                                       |
+    |----------------------------|------------------------------------------------------------|
+    | connected_clients          | 已连接客户端的数量（不包括通过从属服务器连接的客户端）     |
+    | client_longest_output_list | 当前连接的客户端当中，最长的输出列表                       |
+    | client_longest_input_buf   | 当前连接的客户端当中，最大输入缓存                         |
+    | blocked_clients            | 正在等待阻塞命令（BLPOP、BRPOP、BRPOPLPUSH）的客户端的数量 |
+
+#### monitor
+
+- 生产环境应禁止使用该命令: 因为monitor在高并发的情况下, 会让输出缓冲区占用的内存过高(omem通过`clients list`命令查看), 最后内存超过`maxmemory` 导致OOM
+
+```redis
+monitor
+```
+
+![avatar](./Pictures/redis/monitor.gif)
+
 
 ### 远程登陆
 
 **server (服务端)：**
 
-```sql
+```redis
 # 关闭保护模式
 CONFIG SET protected-mode no
 
@@ -1121,66 +2056,189 @@ redis-cli -h You-Server-IP -p 6379
 
 ## persistence (持久化) RDB AOF
 
-**RDB :**
-
-- 在默认情况下， Redis 将数据库快照保存在名字为 dump.rdb 的二进制文件中。
-
-- 你可能会至少 5 分钟才保存一次 RDB 文件。 在这种情况下， 一旦发生故障停机， 你就可能会丢失好几分钟的数据。RDB 适合冷备份
-
-**AOF (append only log):**
-
-- AOF 文件是一个只进行追加操作的日志文件(类似于 mysql 的 binlog),所以随着写入命令的不断增加, AOF 文件的体积也会变得越来越大
-
-- 每次有新命令追加到 AOF 文件时就执行一次 fsync ：非常慢，也非常安全
-
-- AOF 的时间是 1 秒，也就是可能会丢失 1 秒的数据. AOF 适合热备份
-
-当两种持久化共存时，Redis 会使用 **AOF** 进行数据恢复.
-
-RDB 快照:
-
-```sql
-# 主动执行保存快照rdb
-save
-
-# 查看 rdb 配置
-config get save
+- 获取持久化的路径
+```redis
+config get dir
 ```
 
-![avatar](/Pictures/redis/config.png)
+- redis服务器启动时: 如果RDB和AOF都是开启配置时, 优先使用AOF
 
-上面 save 参数的三个值表示：以下三个条件随便满足一个,就触发一次保存.
+    - AOF默认关闭
 
-- 3600 秒内最少有 1 个 key 被改动
-- 300 秒内最少有 100 个 key 被改动
-- 60 秒内最少有 10000 个 key 被改动
+- RDB vs AOF:
 
-AOF:
+    - RDB优势:
 
-```sql
-# 查看 appendonly 配置
-config get append*
+        - 恢复数据更快
 
-# 主动执行 AOF 重写
-bgrewriteaof
-```
+        - 全量复制, 更适合备份
 
-关闭 **RDB** 开启 **AOF**
+    - AOF优势:
 
-```sql
+        - 实时性
+
+        - RDB并不是每个版本都互相兼容
+
+            - redis7.0 使用新的RDB(第10版), 并不兼容旧版
+
+        - 只有执行重写时才fork子进程, 而RDB每次都fork
+
+            ```redis
+            # info命令查看最近一次fork的耗时(微秒)
+            latest_fork_usec
+            ```
+
+- 优化:
+
+    - fork出来的子进程: 属于cpu密集型
+
+    - fork时: 如果父进程有内存修改, 对应的页表也会修改和复制
+
+        - 因此: 在此期间避免在写入大量数据
+
+### RDB
+
+> 把当前内存, 写入硬盘
+
+- [《Redis 设计与实现》: RDB 文件结构](http://redisbook.com/preview/rdb/rdb_struct.html)
+
+- RDB只会对大于20字节的字符串进行压缩(LZF算法)
+    ```redis
+    # 默认开启
+    config get rdbcompression
+    ```
+
+- `bgsave`触发条件:
+
+    - 自动触发: 可在配置文件添加`save m n`:
+
+        ```
+        # 默认的save配置
+        config get save
+        # 输出
+        save: 900 1 300 10 60 10000
+        ```
+
+        - 1.3600 秒内最少有 1 个 key 被改动
+        - 2.300 秒内最少有 10 个 key 被改动
+        - 3.60 秒内最少有 1000 个 key 被改动
+
+    - 执行`shutdown`命令, 并且没有开启AOF持久化
+
+    - 执行`dubug reload`命令
+
+    - 主从复制中: 主结点在进行全量复制时
+
+    - 手动触发命令: `bgsave`
+
+        - 如果已经存在正在执行的`bgsave`子进程, 则直接返回
+
+
+- `bgsave` 执行过程:
+
+    - 1.fork子进程(阻塞)
+
+        - 查看bgsave子进程是否运行: `rdb_bgsave_in_progress`参数
+
+            - 如果存在bgsave子进程, 则直接返回
+
+        - 虽然有cow(copy on write), 但仍然需要复制父进程的页表
+
+            - 父进程的占用内存越大, 页表也越大
+
+```redis
+# 上一次RDB的时间(时间戳)
+lastsave
+
 # 关闭 RDB
 config set save ""
-
-# 开启 AOF
-config set appendonly yes
-
-# 写入 /etc/redis.conf 配置文件
-config rewrite
 ```
+
+### AOF(append only log)
+
+- AOF默认关闭
+
+    ```redis
+    # 设置开启AOF
+    config set appendonly yes
+
+    # 查看 appendonly 配置
+    config get append*
+    ```
+
+- AOF执行过程:
+
+    > 写入的是命令是RESP(以\r\n结尾)文本
+
+    - 1.将命令追加到aof_buf(缓冲区)
+
+    - 2.将aof_buf同步硬盘, 有以下3中同步机制:
+
+        | 同步机制       | 操作                                                |
+        |----------------|-----------------------------------------------------|
+        | always         | 写入aof_buf后, 立即fsync                            |
+        | everysec(默认) | 写入aof_buf后, 执行write. fsync由专门线程1秒调用1次 |
+        | no             | 写入aof_buf后, 由操作系统负责fsync(一般30秒1次)     |
+
+        - `everysec` 执行过程:
+
+            - 对比距离上次同步的时间
+
+                - 小于2秒时: 返回
+
+                - 大于2秒时: 阻塞等待同步完成
+
+                    - `aof_delayed_fsync`: 阻塞的次数
+
+            - 因此: 最多丢失2秒内的数据, 而不是1秒
+
+#### AOF重写
+
+> 把当前进程的数据转换为命令后, 实现更小的AOF文件
+
+- 重写触发条件:
+
+    - 自动触发必须**同时满足**以下2个条件:
+
+        - `auto-aof-rewrite-min-size`(默认64MB): AOF文件大于此参数(单位字节)
+
+        - `auto-aof-rewiret-percentage` : 当前AOF文件大小与上一次AOF文件大小的**比值**大于此参数
+
+    - 手动触发命令: `bgrewriteaof`
+
+- AOF重写过程
+
+    ![avatar](./Pictures/redis/AOFRW.png)
+
+    - 1.fork子进程(阻塞)
+
+        - AOF重写子进程是否运行: `aof_rewrite_in_progress`参数
+
+        - 主进程继续响应新的命令, 并写入aof_rewrite_buf(重写缓冲区)
+
+    - 2.子进程批量写入硬盘. 参数`aof-rewrite-incrememntal-fsync`(默认32MB)
+
+        - 防止1次写入过多数据, 造成硬盘busy
+
+    - 3.主进程将aof_rewrite_buf(重写缓冲区)使用pipe发送给子进程, 子进程再追加到新的AOF文件
+
+    - 4.新的AOF文件替换旧的
+
+- [阿里技术: Redis 7.0 Multi Part AOF的设计和实现](https://developer.aliyun.com/article/866957)
+
+    ![avatar](./Pictures/redis/AOFRW1.png)
+
+    - 子进程重写的AOF为BASE AOF文件(本质是一个RDB文件)
+
+    - 没有了aof_rewrite_buf(重写缓冲区), 改为INCR AOF文件
+
+    - 主进程通过manifest文件负责管理这些BASE INCR文件
+
+#### 恢复
 
 通过 aof 文件恢复删除的数据
 
-```sql
+```redis
 # 设置key
 set a 123
 
@@ -1190,11 +2248,11 @@ del a
 
 打开 `/var/lib/redis/appendonly.aof` 文件，把和 **del** 相关的行删除
 
-![avatar](/Pictures/redis/aof.png)
+![avatar](./Pictures/redis/aof.png)
 
 删除后：
 
-![avatar](/Pictures/redis/aof1.png)
+![avatar](./Pictures/redis/aof1.png)
 
 ```sh
 # 然后使用redis-check-aof 修复 appendonly.aof 文件
@@ -1204,13 +2262,13 @@ redis-check-aof --fix /var/lib/redis/appendonly.aof
 ```
 
 演示:
-![avatar](/Pictures/redis/aof.gif)
+![avatar](./Pictures/redis/aof.gif)
 
 ## master slave replication (主从复制)
 
 Redis 主从架构可实现高并发，也就是 **master (主服务器)** 负责写入，**slave (从服务器)** 读取.
 
-![avatar](/Pictures/redis/slave2.png)
+![avatar](./Pictures/redis/slave2.png)
 
 也可以主服务器关闭持久化，在从服务器开启持久化，当主服务器崩溃时，转换主从服务器的角色，并能同步
 
@@ -1230,13 +2288,13 @@ Redis 主从架构可实现高并发，也就是 **master (主服务器)** 负�
 
 - no 表示写入硬盘 rdb 后同步
 
-![avatar](/Pictures/redis/slave.png)
+![avatar](./Pictures/redis/slave.png)
 
 当 slave 与 master 连接断开后重连进行增量复制
 
-![avatar](/Pictures/redis/slave1.png)
+![avatar](./Pictures/redis/slave1.png)
 
-```sql
+```redis
 # 打开 主从复制 连接6379服务器
 slaveof 127.0.0.1 6379
 
@@ -1252,14 +2310,14 @@ slaveof no one
 - 左边连接的是 127.0.0.1:6379 主服务器
 - 右边连接的是 127.0.0.1:7777 从服务器
 
-![avatar](/Pictures/redis/slave.gif)
+![avatar](./Pictures/redis/slave.gif)
 
 **远程**主从复制：
 
 - 左边连接的是 虚拟机 192.168.100.208:6379 主服务器
 - 右边连接的是 本机 127.0.0.1:6379 从服务器
 
-![avatar](/Pictures/redis/slave1.gif)
+![avatar](./Pictures/redis/slave1.gif)
 
 建议设置 slave(从服务器) **只读** `replica-read-only`:
 
@@ -1267,7 +2325,7 @@ slaveof no one
 >
 > 因为主从复制是单向复制，修改 slave 节点的数据， master 节点是感知不到的.
 
-```sql
+```redis
 # 查看 replica-read-only
 config get replica-read-only
 
@@ -1279,7 +2337,7 @@ config set replica-read-only yes
 
 - 右边连接的是 127.0.0.1:6380 从服务器,在 slaveof 过程中无法使用 set 写入，执行 config set replica-read-only no 后，便可以使用 set
 
-![avatar](/Pictures/redis/slave2.gif)
+![avatar](./Pictures/redis/slave2.gif)
 
 ## sentinel (哨兵模式)
 
@@ -1287,7 +2345,7 @@ Sentinel 会不断地检查你的主服务器和从服务器是否运作正常: 
 
 ### 开启 sentinal
 
-> ```sql
+> ```redis
 > # 命令
 > sentinel monitor <name> 127.0.0.1 6379 <quorum>
 > ```
@@ -1351,7 +2409,7 @@ redis-cli -p 26379
 
 ### sentinel 的命令
 
-```sql
+```redis
 # 查看监听的主机
 sentinel masters
 
@@ -1369,26 +2427,26 @@ PSUBSCRIBE *
 - 右上连接的是 127.0.0.1:6381 从服务器
 - 右下连接的是 127.0.0.1:26379 哨兵服务器
 
-![avatar](/Pictures/redis/sentinel.png)
+![avatar](./Pictures/redis/sentinel.png)
 
-```sql
+```redis
 # 为了方便实验 哨兵的主观下线时间 我改为了 1 秒
 sentinel down-after-milliseconds YouMasterName 1000
 ```
 
 可见把 **6379** 主服务器关闭后，6380 成为新的主服务器:
 
-![avatar](/Pictures/redis/sentinel.gif)
+![avatar](./Pictures/redis/sentinel.gif)
 
 6379 重新连接后成为 **6380** 的从服务器:
 
-![avatar](/Pictures/redis/sentinel1.gif)
+![avatar](./Pictures/redis/sentinel1.gif)
 
 ## cluster (集群)
 
 Redis 集群不像单机 Redis 那样支持多数据库功能， 集群只使用默认的 0 号数据库， 并且不能使用 SELECT index 命令。[详情](https://mp.weixin.qq.com/s?src=11&timestamp=1604973763&ver=2697&signature=sfP3uoHQVifP6D8FsI*YtxzMzvqbDieWDj1R8J8iT5codhR2A3LGWF46jHQ8mKJk*RZ4qXixc7DUACwbXbU2-MhaJ2P2Tr0YF-eLIVBPrKdvlX*YGM8UGtJoOR1ee3oB&new=1)
 
-```sql
+```redis
 # 查看 集群 配置
 config get cluster*
 ```
@@ -1421,7 +2479,7 @@ for (( i=6380; i<=6385; i=i+1 )); do
 done
 ```
 
-![avatar](/Pictures/redis/cluster.png)
+![avatar](./Pictures/redis/cluster.png)
 
 开启集群:
 
@@ -1429,8 +2487,8 @@ done
 redis-cli --cluster create 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 127.0.0.1:6385 --cluster-replicas 1
 ```
 
-![avatar](/Pictures/redis/cluster1.png)
-![avatar](/Pictures/redis/cluster2.png)
+![avatar](./Pictures/redis/cluster1.png)
+![avatar](./Pictures/redis/cluster2.png)
 
 ```sh
 # -c 参数连接集群
@@ -1441,13 +2499,13 @@ redis-cli -c -p 6380
 
 重新连接后 get name 变成了 6384 实例
 
-![avatar](/Pictures/redis/cluster.gif)
+![avatar](./Pictures/redis/cluster.gif)
 
 Redis 集群包含 16384 个哈希槽（hash slot),每个节点负责处理一部分哈希槽,以及一部分数据
 
-![avatar](/Pictures/redis/cluster7.png)
+![avatar](./Pictures/redis/cluster7.png)
 
-```sql
+```redis
 # 查看每个node(节点),等同于nodes.conf文件
 cluster nodes
 ```
@@ -1458,9 +2516,9 @@ cluster nodes
 - node 6384 负责 5461-10922 slots
 - node 6385 负责 10923-16383 slots
 
-![avatar](/Pictures/redis/cluster3.png)
+![avatar](./Pictures/redis/cluster3.png)
 
-```sql
+```redis
 # 查看每个node(节点) 的 slots(槽)
 cluster slots
 ```
@@ -1471,7 +2529,7 @@ cluster slots
 - 6381 是 6384 的从节点
 - 6382 是 6385 的从节点
 
-![avatar](/Pictures/redis/cluster4.png)
+![avatar](./Pictures/redis/cluster4.png)
 
 也可以在 shell 里执行，通过 grep 显示:
 
@@ -1483,7 +2541,7 @@ redis-cli -p 6380 cluster nodes | grep master
 redis-cli -p 6380 cluster nodes | grep slave
 ```
 
-![avatar](/Pictures/redis/cluster5.png)
+![avatar](./Pictures/redis/cluster5.png)
 
 关闭主节点 6384:
 
@@ -1494,7 +2552,7 @@ redis-cli -p 6384 debug segfault
 
 可以看到原属于 6384 的从节点 6381,现在变成了主节点(master)
 
-![avatar](/Pictures/redis/cluster6.png)
+![avatar](./Pictures/redis/cluster6.png)
 
 这时再关闭主节点 6381:
 
@@ -1504,54 +2562,142 @@ redis-cli -p 6381 debug segfault
 
 因为 6381 已经没有从节点了，可以看到整个 cluster 已经 down 掉了
 
-![avatar](/Pictures/redis/cluster1.gif)
+![avatar](./Pictures/redis/cluster1.gif)
 
 重新启动 6381 或者 6384 后会恢复集群
 
 ## publish subscribe (发布和订阅)
 
+- 消息不会持久化
+
 只能在同一个 `redis-server` 下使用
 
-> ```sql
+> ```redis
 > # 发布
 > pubhlish 订阅号 内容
 > ```
 
-> ```sql
+> ```redis
 > # 订阅
 > subscribe 订阅号1 订阅号2
 > ```
 
 我这里一共三个客户端.左边为发布者;右边上订阅 rom,rom1;右边下只订阅 rom
 
-![avatar](/Pictures/redis/subscribe.gif)
+![avatar](./Pictures/redis/subscribe.gif)
 
 `psubscribe` 通过通配符,可以匹配 rom,rom1 等订阅.
 
 - psubscribe 信息类型为 `pmessage`
 - subscribe 信息类型为 `message`
 
-```sql
+```redis
 psubscribe rom*
 ```
 
-![avatar](/Pictures/redis/subscribe1.gif)
+![avatar](./Pictures/redis/subscribe1.gif)
 
 ### 键空间通知
 
 接收那些以某种方式改动了 Redis 数据集的事件。[详情](http://redisdoc.com/topic/notification.html)
 
-```sql
+```redis
 # 开启键空间通知
 config set notify-keyspace-events "AKE"
 ```
 
-```sql
+```redis
 # 订阅监听key
 psubscribe '__key*__:*
 ```
 
-![avatar](/Pictures/redis/keyspace.png)
+![avatar](./Pictures/redis/keyspace.png)
+
+## [redis-benchmark性能测试](https://redis.io/topics/benchmarks)
+
+- [loopback benchmarks is silly](https://redis.io/topics/pipelining#appendix-why-are-busy-loops-slow-even-on-the-loopback-interface)
+
+```sh
+# 测试set, lpush命令的吞吐量
+redis-benchmark -t set,lpush -n 100000 -q
+```
+
+- unxi socket vs tcp/ip
+
+```sh
+time redis-benchmark -h 127.0.0.1 -p 6379
+# 输出: redis-benchmark -h 127.0.0.1 -p 6379  10.25s user 14.48s system 83% cpu 29.676 total
+
+time redis-benchmark -s /var/run/redis/redis.sock
+# 输出: redis-benchmark -s /var/run/redis/redis.sock  10.36s user 10.83s system 98% cpu 21.558 total
+```
+
+## 优化
+
+
+- 不要和其他高硬盘服务放在一起(如存储服务, 消息队列)
+
+- 配置多硬盘分摊AOF文件
+
+# docker
+
+```sh
+# 包含所有模块
+docker run -d -p 6379:6379 redislabs/redismod
+```
+
+## Grafana监控
+
+- reference:
+
+    - [微信: 颜值爆表！Redis 官方可视化工具来啦，功能真心强大！](https://mp.weixin.qq.com/s?src=11&timestamp=1647579448&ver=3683&signature=eBTCSdLn*naHlqkuDmQucrXvHgXpwLEv3BahbB-ilkt5VbUqtLNq25y1tWSu2Q9uIBgd0s1qJzFbKljphryyn9MNx7XcXlwvx-ERZ6cQ33wQ-S9Qy3TA-Y9NIJgwKwxB&new=1)
+
+- 安装grafana
+```sh
+docker pull grafana/grafana
+docker run -p 3000:3000 --name grafana \
+-d grafana/grafana
+```
+
+- 写入以下配置文件: `/home/tz/prometheus.yml`
+```yml
+global:
+  scrape_interval: 5s
+```
+
+- 安装prometheus, 并导入配置文件
+```sh
+docker pull prom/prometheus
+docker run -p 9090:9090 --name prometheus \
+-v /home/tz/prometheus.yml:/etc/prometheus/prometheus.yml \
+-d prom/prometheus
+```
+
+- 安装redis插件
+```sh
+# 进入grafana
+docker exec -it grafana /bin/bash
+# 安装redis插件
+grafana-cli plugins install redis-datasource
+
+# 退出grafana
+exit
+# 安装插件后, 需要重启grafana容器
+docker container restart b9c68aec9425
+```
+
+- 查看redismod容器的ip地址
+```sh
+docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a25cf3c110
+```
+
+- 进入grafana
+
+    - 浏览器打开`http://127.0.0.1:3000/` 输入帐号秘密`admin:admin`
+
+    - 进入设置, 选择redis数据库, 输入刚才获取的redismod容器的ip地址
+
+        ![avatar](./Pictures/redis/grafana-redis.png)
 
 # redis 如何做到和 mysql 数据库的同步
 
@@ -1630,16 +2776,14 @@ echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf
 sysctl -p
 ```
 
-## 高效强大的第三方 redis 软件
+# 第三方 redis 软件
 [一键安装脚本](https://github.com/ztoiax/userfulscripts/blob/master/awesome-redis.sh)
 
-<span id="iredis"></span>
-
-### [iredis](https://github.com/laixintao/iredis)
+### [iredis: 比redis-cli更强大](https://github.com/laixintao/iredis)
 
 - 更友好的补全和语法高亮的终端(cli)
 
-![avatar](/Pictures/redis/iredis.png)
+![avatar](./Pictures/redis/iredis.png)
 
 [其他客户端](https://redis.io/clients#c)
 
@@ -1647,7 +2791,7 @@ sysctl -p
 
 - 更友好的补全和语法高亮,有输出,key 等多个界面的终端(tui)
 
-![avatar](/Pictures/redis/redis-tui.png)
+![avatar](./Pictures/redis/redis-tui.png)
 
 ### [redis-memory-analyzer](https://github.com/gamenet/redis-memory-analyzer)
 
@@ -1658,17 +2802,17 @@ sysctl -p
 watch -d -n 2 rma
 ```
 
-![avatar](/Pictures/redis/rma.png)
+![avatar](./Pictures/redis/rma.png)
 
-<span id="gui"></span>
+### [RedisInsight: 官方推出的gui, 并且带有补全的cli](https://github.com/RedisInsight/RedisInsight)
 
-### [AnotherRedisDesktopManager](https://github.com/qishibo/AnotherRedisDesktopManager)
+### [AnotherRedisDesktopManager: gui](https://github.com/qishibo/AnotherRedisDesktopManager)
 
 - 一个有图形界面的`Redis`的桌面客户端,其中也可以显示 刚才提到的 `rma` 的内存数据
 
-![avatar](/Pictures/redis/redis-gui.png)
+![avatar](./Pictures/redis/redis-gui.png)
 
-### [RedisLive](https://github.com/nkrode/RedisLive)
+### [RedisLive: 可视化](https://github.com/nkrode/RedisLive)
 
 ### [redis-rdb-tools](https://github.com/sripathikrishnan/redis-rdb-tools)
 
@@ -1677,7 +2821,7 @@ watch -d -n 2 rma
 rdb --command json dump.rdb
 ```
 
-![avatar](/Pictures/redis/rdbtool.png)
+![avatar](./Pictures/redis/rdbtool.png)
 
 ```sh
 rdb -c memory dump.rdb
@@ -1685,7 +2829,7 @@ rdb -c memory dump.rdb
 rdb -c memory dump.rdb > /tmp/redis.csv
 ```
 
-![avatar](/Pictures/redis/rdbtool1.png)
+![avatar](./Pictures/redis/rdbtool1.png)
 
 ### [redis-shake](https://github.com/alibaba/RedisShake)
 
@@ -1697,7 +2841,7 @@ Redis-shake 是一个用于在两个 redis 之间同步数据的工具，满足�
 
 ### [dbatools](https://github.com/xiepaup/dbatools)
 
-![avatar](/Pictures/redis/dbatools.png)
+![avatar](./Pictures/redis/dbatools.png)
 
 # reference
 
@@ -1705,8 +2849,13 @@ Redis-shake 是一个用于在两个 redis 之间同步数据的工具，满足�
 - [《Redis 使用手册》](http://redisdoc.com/)
 - [《Redis 实战》部分试读](http://redisinaction.com/)
 - [Redis 官方文档](https://redis.io/documentation)
-- [Redis 所有命令说明](https://redis.io/commands#)
 - [Redis 知识扫盲](https://github.com/doocs/advanced-java#%E7%BC%93%E5%AD%98)
+
+
+- [腾讯技术工程: 一篇详文带你入门 Redis](https://www.modb.pro/db/331298)
+- [腾讯技术工程: 这篇Redis文章，图灵看了都说好](https://cloud.tencent.com/developer/article/1840412)
+
+- [redis作者博客](http://antirez.com/latest/0)
 
 # online tool
 

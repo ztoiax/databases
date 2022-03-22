@@ -66,6 +66,9 @@
 
     ![image](./Pictures/ddbs/cap.png)
 
+- [Michael Stonebraker: Errors in Database Systems, Eventual Consistency, and the CAP Theorem](https://cacm.acm.org/blogs/blog-cacm/83396-errors-in-database-systems-eventual-consistency-and-the-cap-theorem/fulltext)
+    - 对cap理论, 提出意见
+
 ### [PACELC理论](https://en.wikipedia.org/wiki/PACELC_theorem)
 
 > PACELC是CAP的拓展
