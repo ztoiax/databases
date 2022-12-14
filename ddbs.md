@@ -8,7 +8,7 @@
 
 > sharding(网络分片): 将数据划分到多个节点
 
-![image](./Pictures/ddbs/share.webp)
+![image](./Pictures/ddbs/share.avif)
 
 - Shard-everting：共享数据库引擎和数据库存储，无数据存储问题
 
@@ -64,7 +64,7 @@
     | 传统RDBMS                                                                                  | CA      |
 
 
-    ![image](./Pictures/ddbs/cap.png)
+    ![image](./Pictures/ddbs/cap.avif)
 
 - [Michael Stonebraker: Errors in Database Systems, Eventual Consistency, and the CAP Theorem](https://cacm.acm.org/blogs/blog-cacm/83396-errors-in-database-systems-eventual-consistency-and-the-cap-theorem/fulltext)
     - 对cap理论, 提出意见
@@ -121,7 +121,7 @@
 
         - 协调局部站点的各个事务(包含局部, 全局事务)
 
-    ![image](./Pictures/ddbs/manager-and-coordinator.png)
+    ![image](./Pictures/ddbs/manager-and-coordinator.avif)
 
 ### 提交协议(确保事务的原子性)
 
@@ -135,7 +135,7 @@
 
 - 假设Si站点发起事务T, C是S站点的事务协调器(transaction coordinator)
 
-![image](./Pictures/ddbs/2pc.png)
+![image](./Pictures/ddbs/2pc.avif)
 
 - 阶段1:
 
@@ -203,7 +203,7 @@
 
     - 缺点: 有额外的故障问题
 
-![image](./Pictures/ddbs/persisent-message.png)
+![image](./Pictures/ddbs/persisent-message.avif)
 
 - 发送站点协议(sending site protocol):
 
@@ -271,7 +271,7 @@
 
     - 死锁处理复杂:
 
-        ![image](./Pictures/ddbs/wait-for-graphs.png)
+        ![image](./Pictures/ddbs/wait-for-graphs.avif)
 
         - 每个站点维护一个局部等待图(local wait-for graph)
 
@@ -287,7 +287,7 @@
 
         - 假环(false cycle)
 
-            ![image](./Pictures/ddbs/wait-for-graphs1.png)
+            ![image](./Pictures/ddbs/wait-for-graphs1.avif)
 
             - 1.S1站点, T2释放, T1占用: T1->T2
 
@@ -348,7 +348,7 @@
 
 - 流程:
 
-    ![image](./Pictures/ddbs/paxos.png)
+    ![image](./Pictures/ddbs/paxos.avif)
 
     - 1.proposer发送编号n给所有结点
 
@@ -474,7 +474,7 @@
 
             - 带上前一个日志任期号和索引, 继续发送日志复制请求, 直到匹配
 
-        ![image](./Pictures/ddbs/raft-log.png)
+        ![image](./Pictures/ddbs/raft-log.avif)
 
     - 4.如果出现网络分区
 
@@ -482,7 +482,7 @@
 
         - 2.如果此时新出现的client发送命令给新分区的leader; 原来网络分区的leader收到原来client的新命令
 
-            ![image](./Pictures/ddbs/raft-partition.png)
+            ![image](./Pictures/ddbs/raft-partition.avif)
 
             - 新leader**得到**大多数follower的true: 因此提交日志
 
@@ -491,7 +491,7 @@
 
         - 3.如果此时网络分区消失了
 
-            ![image](./Pictures/ddbs/raft-partition1.png)
+            ![image](./Pictures/ddbs/raft-partition1.avif)
 
             - 原leader会变为follower, 并同步新leader的日志
 
@@ -501,7 +501,7 @@
 
     - 基于Replicated log(复制日志)
 
-![image](./Pictures/ddbs/raft-replicate.png)
+![image](./Pictures/ddbs/raft-replicate.avif)
 
 - 复制状态机能实现不同的容错服务
 

@@ -660,7 +660,7 @@ hincrbyfloat n a -1.1
 | linkedlist   | 每个双端链表节点（node）都保存了一个字符串对象,而每个字符串对象都保存了一个列表元素.                                                                                                                            |
 | 　 quickList | zipList 和 linkedList 的混合体,它将 linkedList 按段切分,每一段使用 zipList 来紧凑存储,多个 zipList 之间使用双向指针串接起来.默认的压缩深度是 0,也就是不压缩.压缩的实际深度由配置参数 `list-compress-depth` 决定 |
 
-![avatar](./Pictures/redis/list5.png)
+![avatar](./Pictures/redis/list5.avif)
 
 | 命令       | 时间复杂度                           |
 |------------|--------------------------------------|
@@ -955,7 +955,7 @@ sunionstore s-union sss ssss
 sdiffstore s-diff sss ssss
 ```
 
-![avatar](./Pictures/redis/set2.png)
+![avatar](./Pictures/redis/set2.avif)
 
 ### zset(有序集合)
 
@@ -1102,7 +1102,7 @@ zadd z3 1 a3 3 b3 3 c3 4 d3 5 e3
 zunionstore unionz 3 z1 z2 z3
 ```
 
-![avatar](./Pictures/redis/sortset.png)
+![avatar](./Pictures/redis/sortset.avif)
 
 使用 WIGHTS 给 不同的有序集合 分别 指定一个乘法因子来改变排序 (默认设置为 1 )
 
@@ -1111,21 +1111,21 @@ zunionstore unionz 3 z1 z2 z3
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 10 100
 ```
 
-![avatar](./Pictures/redis/sortset1.png)
+![avatar](./Pictures/redis/sortset1.avif)
 
 ```redis
 # 这次是z2乘10,z3乘100
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 100 10
 ```
 
-![avatar](./Pictures/redis/sortset2.png)
+![avatar](./Pictures/redis/sortset2.avif)
 
 ```redis
 # z1,z2乘10,z3乘10
 zunionstore unionz 3 z1 z2 z3 WEIGHTS 1 1 10
 ```
 
-![avatar](./Pictures/redis/sortset3.png)
+![avatar](./Pictures/redis/sortset3.avif)
 
 **ZINTERSTORE (交集)**
 
@@ -1140,7 +1140,7 @@ zadd history 50 xiaoming 90 xiaohong
 zinterstore sum 2 math history
 ```
 
-![avatar](./Pictures/redis/sortset4.png)
+![avatar](./Pictures/redis/sortset4.avif)
 
 #### geo(地理信息定位)
 
@@ -1638,7 +1638,7 @@ discard
 
     - 事务是原子的, pipelining不是原子的.因此事务不能同时运行, 而pipelining可以交替运行
 
-    ![avatar](./Pictures/redis/redis-pipeline-vs-transaction.png)
+    ![avatar](./Pictures/redis/redis-pipeline-vs-transaction.avif)
 
 - 普通timeline vs pipelining:
 
@@ -1951,7 +1951,7 @@ client pause <time(毫秒)>
 
 - `client list` 命令:
 
-    ![avatar](./Pictures/redis/client.png)
+    ![avatar](./Pictures/redis/client.avif)
 
     - [每个参数的详情](http://doc.redisfans.com/server/client_list.html)
 
@@ -2004,7 +2004,7 @@ client pause <time(毫秒)>
 
 - `info client` 命令:
 
-    ![avatar](./Pictures/redis/client1.png)
+    ![avatar](./Pictures/redis/client1.avif)
 
     | 参数                       | 内容                                                       |
     |----------------------------|------------------------------------------------------------|
@@ -2215,7 +2215,7 @@ config set save ""
 
 - AOF重写过程
 
-    ![avatar](./Pictures/redis/AOFRW.png)
+    ![avatar](./Pictures/redis/AOFRW.avif)
 
     - 1.fork子进程(阻塞)
 
@@ -2233,7 +2233,7 @@ config set save ""
 
 - [阿里技术: Redis 7.0 Multi Part AOF的设计和实现](https://developer.aliyun.com/article/866957)
 
-    ![avatar](./Pictures/redis/AOFRW1.png)
+    ![avatar](./Pictures/redis/AOFRW1.avif)
 
     - 子进程重写的AOF为BASE AOF文件(本质是一个RDB文件)
 
@@ -2255,11 +2255,11 @@ del a
 
 打开 `/var/lib/redis/appendonly.aof` 文件，把和 **del** 相关的行删除
 
-![avatar](./Pictures/redis/aof.png)
+![avatar](./Pictures/redis/aof.avif)
 
 删除后：
 
-![avatar](./Pictures/redis/aof1.png)
+![avatar](./Pictures/redis/aof1.avif)
 
 ```sh
 # 然后使用redis-check-aof 修复 appendonly.aof 文件
@@ -2289,7 +2289,7 @@ redis-check-aof --fix /var/lib/redis/appendonly.aof
 
         - 缺点: 主节点写命令时, 需要复制多个从节点, 从而导致更大的网络开销
 
-        ![avatar](./Pictures/redis/slave2.png)
+        ![avatar](./Pictures/redis/slave2.avif)
 
     - 3.树状
 
@@ -2297,7 +2297,7 @@ redis-check-aof --fix /var/lib/redis/appendonly.aof
 
         - 优点: 解决一主多从架构的缺点, 降低主节点复制压力
 
-        ![avatar](./Pictures/redis/slave3.png)
+        ![avatar](./Pictures/redis/slave3.avif)
 
 - 从节点的配置:
 
@@ -2382,7 +2382,7 @@ redis-check-aof --fix /var/lib/redis/appendonly.aof
 
         > 复制命令丢失的补救措施
 
-        ![avatar](./Pictures/redis/slave.png)
+        ![avatar](./Pictures/redis/slave.avif)
 
         ```redis
         # 查看缓冲区
@@ -2450,7 +2450,7 @@ redis-check-aof --fix /var/lib/redis/appendonly.aof
 
 当 slave 与 master 连接断开后重连进行增量复制
 
-![avatar](./Pictures/redis/slave1.png)
+![avatar](./Pictures/redis/slave1.avif)
 
 ```redis
 # 打开 主从复制 连接6379服务器
@@ -2585,7 +2585,7 @@ PSUBSCRIBE *
 - 右上连接的是 127.0.0.1:6381 从服务器
 - 右下连接的是 127.0.0.1:26379 哨兵服务器
 
-![avatar](./Pictures/redis/sentinel.png)
+![avatar](./Pictures/redis/sentinel.avif)
 
 ```redis
 # 为了方便实验 哨兵的主观下线时间 我改为了 1 秒
@@ -2637,7 +2637,7 @@ for (( i=6380; i<=6385; i=i+1 )); do
 done
 ```
 
-![avatar](./Pictures/redis/cluster.png)
+![avatar](./Pictures/redis/cluster.avif)
 
 开启集群:
 
@@ -2645,8 +2645,8 @@ done
 redis-cli --cluster create 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 127.0.0.1:6385 --cluster-replicas 1
 ```
 
-![avatar](./Pictures/redis/cluster1.png)
-![avatar](./Pictures/redis/cluster2.png)
+![avatar](./Pictures/redis/cluster1.avif)
+![avatar](./Pictures/redis/cluster2.avif)
 
 ```sh
 # -c 参数连接集群
@@ -2661,7 +2661,7 @@ redis-cli -c -p 6380
 
 Redis 集群包含 16384 个哈希槽（hash slot),每个节点负责处理一部分哈希槽,以及一部分数据
 
-![avatar](./Pictures/redis/cluster7.png)
+![avatar](./Pictures/redis/cluster7.avif)
 
 ```redis
 # 查看每个node(节点),等同于nodes.conf文件
@@ -2674,7 +2674,7 @@ cluster nodes
 - node 6384 负责 5461-10922 slots
 - node 6385 负责 10923-16383 slots
 
-![avatar](./Pictures/redis/cluster3.png)
+![avatar](./Pictures/redis/cluster3.avif)
 
 ```redis
 # 查看每个node(节点) 的 slots(槽)
@@ -2687,7 +2687,7 @@ cluster slots
 - 6381 是 6384 的从节点
 - 6382 是 6385 的从节点
 
-![avatar](./Pictures/redis/cluster4.png)
+![avatar](./Pictures/redis/cluster4.avif)
 
 也可以在 shell 里执行，通过 grep 显示:
 
@@ -2699,7 +2699,7 @@ redis-cli -p 6380 cluster nodes | grep master
 redis-cli -p 6380 cluster nodes | grep slave
 ```
 
-![avatar](./Pictures/redis/cluster5.png)
+![avatar](./Pictures/redis/cluster5.avif)
 
 关闭主节点 6384:
 
@@ -2710,7 +2710,7 @@ redis-cli -p 6384 debug segfault
 
 可以看到原属于 6384 的从节点 6381,现在变成了主节点(master)
 
-![avatar](./Pictures/redis/cluster6.png)
+![avatar](./Pictures/redis/cluster6.avif)
 
 这时再关闭主节点 6381:
 
@@ -2769,7 +2769,7 @@ config set notify-keyspace-events "AKE"
 psubscribe '__key*__:*
 ```
 
-![avatar](./Pictures/redis/keyspace.png)
+![avatar](./Pictures/redis/keyspace.avif)
 
 ## [redis-benchmark性能测试](https://redis.io/topics/benchmarks)
 
@@ -2855,7 +2855,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
     - 进入设置, 选择redis数据库, 输入刚才获取的redismod容器的ip地址
 
-        ![avatar](./Pictures/redis/grafana-redis.png)
+        ![avatar](./Pictures/redis/grafana-redis.avif)
 
 # redis 如何做到和 mysql 数据库的同步
 
@@ -2941,7 +2941,7 @@ sysctl -p
 
 - 更友好的补全和语法高亮的终端(cli)
 
-![avatar](./Pictures/redis/iredis.png)
+![avatar](./Pictures/redis/iredis.avif)
 
 [其他客户端](https://redis.io/clients#c)
 
@@ -2949,7 +2949,7 @@ sysctl -p
 
 - 更友好的补全和语法高亮,有输出,key 等多个界面的终端(tui)
 
-![avatar](./Pictures/redis/redis-tui.png)
+![avatar](./Pictures/redis/redis-tui.avif)
 
 ### [redis-memory-analyzer](https://github.com/gamenet/redis-memory-analyzer)
 
@@ -2960,7 +2960,7 @@ sysctl -p
 watch -d -n 2 rma
 ```
 
-![avatar](./Pictures/redis/rma.png)
+![avatar](./Pictures/redis/rma.avif)
 
 ### [RedisInsight: 官方推出的gui, 并且带有补全的cli](https://github.com/RedisInsight/RedisInsight)
 
@@ -2968,7 +2968,7 @@ watch -d -n 2 rma
 
 - 一个有图形界面的`Redis`的桌面客户端,其中也可以显示 刚才提到的 `rma` 的内存数据
 
-![avatar](./Pictures/redis/redis-gui.png)
+![avatar](./Pictures/redis/redis-gui.avif)
 
 ### [RedisLive: 可视化](https://github.com/nkrode/RedisLive)
 
@@ -2979,7 +2979,7 @@ watch -d -n 2 rma
 rdb --command json dump.rdb
 ```
 
-![avatar](./Pictures/redis/rdbtool.png)
+![avatar](./Pictures/redis/rdbtool.avif)
 
 ```sh
 rdb -c memory dump.rdb
@@ -2987,7 +2987,7 @@ rdb -c memory dump.rdb
 rdb -c memory dump.rdb > /tmp/redis.csv
 ```
 
-![avatar](./Pictures/redis/rdbtool1.png)
+![avatar](./Pictures/redis/rdbtool1.avif)
 
 ### [redis-shake](https://github.com/alibaba/RedisShake)
 
@@ -2999,7 +2999,7 @@ Redis-shake 是一个用于在两个 redis 之间同步数据的工具，满足�
 
 ### [dbatools](https://github.com/xiepaup/dbatools)
 
-![avatar](./Pictures/redis/dbatools.png)
+![avatar](./Pictures/redis/dbatools.avif)
 
 # reference
 

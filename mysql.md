@@ -131,11 +131,11 @@
 
 - MariaDB
 
-![image](./Pictures/mysql/mariadb.png)
+![image](./Pictures/mysql/mariadb.avif)
 
 - Mysql
 
-![image](./Pictures/mysql/mysql.png)
+![image](./Pictures/mysql/mysql.avif)
 
 [Centos7 安装 Mysql](#install)
 
@@ -1173,7 +1173,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
 - 查询过程:
 
-    ![image](./Pictures/mysql/select-procedure.png)
+    ![image](./Pictures/mysql/select-procedure.avif)
 
     - 1.client发送查询给server
 
@@ -1314,7 +1314,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 ### [松散索引(loose index scan)](http://mysqlserverteam.com/what-is-the-scanning-variant-of-a-loose-index-scan/)
 
 - 松散索引:
-    ![image](./Pictures/mysql/lis-regular.jpg)
+    ![image](./Pictures/mysql/lis-regular.avif)
 
 - 非松散索引:
     ![image](./Pictures/mysql/lis-scanning.jpr)
@@ -1417,7 +1417,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
 #### 数据类型
 
-![image](./Pictures/mysql/MySQL-Data-Types.jpg)
+![image](./Pictures/mysql/MySQL-Data-Types.avif)
 
 - 不同的存储引擎,有不同的实现
 
@@ -1521,7 +1521,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         ('2038-7-3 13:40:30');
         ```
 
-        ![image](./Pictures/mysql/time_test.png)
+        ![image](./Pictures/mysql/time_test.avif)
 
 - BIT(位):
 
@@ -1544,7 +1544,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         SELECT b, b+0 FROM bit_test
         ```
 
-        ![image](./Pictures/mysql/bit_test.png)
+        ![image](./Pictures/mysql/bit_test.avif)
 
         - 因此应该谨慎使用BIT类型
 
@@ -1562,7 +1562,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
         SELECT * FROM tf_test
         ```
-        ![image](./Pictures/mysql/tf_test.png)
+        ![image](./Pictures/mysql/tf_test.avif)
 
 - SET:
 
@@ -1604,7 +1604,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
         SELECT * FROM set_int_test WHERE acl & @READ;
         ```
-        ![image](./Pictures/mysql/set_int_test.png)
+        ![image](./Pictures/mysql/set_int_test.avif)
 
 - 字符串:
 
@@ -1645,7 +1645,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         FROM char_test;
         ```
 
-        ![image](./Pictures/mysql/char_test.png)
+        ![image](./Pictures/mysql/char_test.avif)
 
 
     - BINARY, VARBINARY类似于CHAR, VARCHAR
@@ -1708,7 +1708,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
             - [快速ALTER TABLE](#alter_frm)
 
-        ![image](./Pictures/mysql/emum_test.png)
+        ![image](./Pictures/mysql/emum_test.avif)
 
 #### 列字段完整性约束
 
@@ -2203,7 +2203,7 @@ where id = 1;
 
 虽然没有报错,但 a_id 并没有修改:
 
-![image](./Pictures/mysql/foreign.png)
+![image](./Pictures/mysql/foreign.avif)
 
 delete 也一样:
 
@@ -2212,7 +2212,7 @@ delete from b
 where id =1;
 ```
 
-![image](./Pictures/mysql/foreign1.png)
+![image](./Pictures/mysql/foreign1.avif)
 
 a 表:
 
@@ -2245,10 +2245,10 @@ where id = 1;
 select * from b;
 ```
 
-![image](./Pictures/mysql/foreign2.png)
+![image](./Pictures/mysql/foreign2.avif)
 
 又或者删除 b 表后重新新建,并授予权限:
-![image](./Pictures/mysql/foreign3.png)
+![image](./Pictures/mysql/foreign3.avif)
 
 删除 a 表 刚才的数据:
 
@@ -2261,7 +2261,7 @@ select * from b;
 ```
 
 此时 a 表的数据删除,b 表对应的数据也会删除:
-![image](./Pictures/mysql/foreign4.png)
+![image](./Pictures/mysql/foreign4.avif)
 
 如果创建外键表时,没有指定 CONSTRAINT ,系统会自动生成(我这里为 b_ibfk_1):
 
@@ -2373,8 +2373,8 @@ ERROR 1369 (44000): CHECK OPTION failed `china`.`vvv`
 show table status like '名称'\G;
 ```
 
-![image](./Pictures/mysql/view.png)
-![image](./Pictures/mysql/view1.png)
+![image](./Pictures/mysql/view.avif)
+![image](./Pictures/mysql/view1.avif)
 
 ## Stored Procedure and Function (自定义存储过程 和 函数)
 
@@ -2470,7 +2470,7 @@ insert into foo (val) values (5);
 select * from foo;
 ```
 
-![image](./Pictures/mysql/procedure.png)
+![image](./Pictures/mysql/procedure.avif)
 
 循环 5 次, val 字段设置为 0 :
 
@@ -2512,7 +2512,7 @@ select @n;
 select * from foo;
 ```
 
-![image](./Pictures/mysql/procedure1.png)
+![image](./Pictures/mysql/procedure1.avif)
 
 循环 1000 次,val 字段插入随机数:
 
@@ -2545,7 +2545,7 @@ call foo_rand();
 select * from foo order by id;
 ```
 
-![image](./Pictures/mysql/procedure2.png)
+![image](./Pictures/mysql/procedure2.avif)
 
 创建 10 个表
 
@@ -2636,7 +2636,7 @@ ALTER TABLE ca ENGINE = MYISAM;
 
         - 增加, 移除, 修改EMUM, SET类型
 
-    ![image](./Pictures/mysql/alter_frm.png)
+    ![image](./Pictures/mysql/alter_frm.avif)
     ```sql
     -- 创建新表
     CREATE TABLE emum_test_new LIKE emum_test;
@@ -2669,7 +2669,7 @@ ALTER TABLE ca ENGINE = MYISAM;
     -- 查看数据
     SELECT * FROM emum_test
     ```
-    ![image](./Pictures/mysql/alter_frm1.png)
+    ![image](./Pictures/mysql/alter_frm1.avif)
 
 ## INDEX(索引)
 
@@ -3095,7 +3095,7 @@ ADD KEY(last_name, first_name, date);
 
         SELECT * FROM hash_test
         ```
-        ![image](./Pictures/mysql/hash_test.png)
+        ![image](./Pictures/mysql/hash_test.avif)
 
     - 防止hash值冲突, 需要加上`AND url = `:
         ```sql
@@ -3322,7 +3322,7 @@ flush status;
 SHOW STATUS LIKE 'handler_read%';
 ```
 
-![image](./Pictures/mysql/handler_read.png)
+![image](./Pictures/mysql/handler_read.avif)
 
 此时 name 字段,还没有索引:
 
@@ -3331,7 +3331,7 @@ select name from cnarea_2019_innodb;
 SHOW STATUS LIKE 'handler_read%';
 ```
 
-![image](./Pictures/mysql/handler_read1.png)
+![image](./Pictures/mysql/handler_read1.avif)
 建立索引后在查询:
 
 ```sql
@@ -3343,7 +3343,7 @@ select name from cnarea_2019_innodb;
 SHOW STATUS LIKE 'handler_read%';
 ```
 
-![image](./Pictures/mysql/handler_read2.png)
+![image](./Pictures/mysql/handler_read2.avif)
 
 ## DCL
 
@@ -3816,7 +3816,7 @@ sudo docker exec -it mysql-tz cat '/etc/hosts'
 
 我这里为 `172.17.0.2`
 
-![image](./Pictures/mysql/docker-replication.png)
+![image](./Pictures/mysql/docker-replication.avif)
 
 开启 **slave**:
 
@@ -3887,7 +3887,7 @@ show master status;
 show binlog events in 'bin.000016'\G;
 ```
 
-![image](./Pictures/mysql/mysqlbinlog.png)
+![image](./Pictures/mysql/mysqlbinlog.avif)
 
 - 通过 `start-datetime` 还原:
 
@@ -3978,14 +3978,14 @@ mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host
 (1142, "SELECT command denied to user 'root'@'localhost' for table 'user'")
 ```
 
-![image](./Pictures/mysql/mycli.png)
+![image](./Pictures/mysql/mycli.avif)
 
 ### [mitzasql](https://github.com/vladbalmos/mitzasql)
 
 - 一个使用`vim`快捷键的 `mysql-tui`
 
-![image](./Pictures/mysql/mysql-tui.png)
-![image](./Pictures/mysql/mysql-tui1.png)
+![image](./Pictures/mysql/mysql-tui.avif)
+![image](./Pictures/mysql/mysql-tui1.avif)
 
 <span id="mydumper"></span>
 
@@ -4007,7 +4007,7 @@ mydumper \
 --compress-protocol
 ```
 
-![image](./Pictures/mysql/du.png)
+![image](./Pictures/mysql/du.avif)
 
 ```sh
 # 不带压缩备份,最后再用7z压缩
@@ -4022,7 +4022,7 @@ mydumper \
 --compress-protocol
 ```
 
-![image](./Pictures/mysql/du1.png)
+![image](./Pictures/mysql/du1.avif)
 
 ```sh
 # 恢复
@@ -4143,14 +4143,14 @@ cat /tmp/pt_general.log
 
 这是在用 `mysqlslap` 进行压力测试下的监控
 
-![image](./Pictures/mysql/innotop.png)
-![image](./Pictures/mysql/mysqlslap.png)
+![image](./Pictures/mysql/innotop.avif)
+![image](./Pictures/mysql/mysqlslap.avif)
 
 ### [dbatool](https://github.com/xiepaup/dbatools)
 
 监控以及查询工具
 
-![image](./Pictures/mysql/dbatools.png)
+![image](./Pictures/mysql/dbatools.avif)
 
 ### undrop-for-innodb(\*数据恢复)
 
@@ -4379,7 +4379,7 @@ echo ");" >> /tmp/1017.sql
 sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1017.sql
 ```
 
-![image](./Pictures/mysql/1017.png)
+![image](./Pictures/mysql/1017.avif)
 
 改为 1018:
 
@@ -4400,7 +4400,7 @@ echo ");" >> /tmp/1018.sql
 sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 ```
 
-![image](./Pictures/mysql/1018.png)
+![image](./Pictures/mysql/1018.avif)
 
 ## benchmark(基准测试)
 

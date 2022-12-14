@@ -119,8 +119,8 @@
 
        - 否则: 不操作
 
-    ![image](./Pictures/rdbms/dense_index.png)
-    ![image](./Pictures/rdbms/dense_index1.png)
+    ![image](./Pictures/rdbms/dense_index.avif)
+    ![image](./Pictures/rdbms/dense_index1.avif)
 
 - sparse index(稠密索引): 每个搜索码都有一个索引项,每条索引项都是指针, 因此**no clustering index必须是sparse index**
 
@@ -134,7 +134,7 @@
 
         - 如果指向相同搜索码的第一条记录指针: 删除这条记录, 更新索引项指向下一条记录
 
-    ![image](./Pictures/rdbms/sparse_index.png)
+    ![image](./Pictures/rdbms/sparse_index.avif)
 
 - mulitilevel index (多级索引): 两极或以上的索引. 在很大的原始索引上构造一层dense index的外层索引
 
@@ -186,7 +186,7 @@
 
     - close addressing(闭地址): 假设3000-6000桶已经满了, 新插入的记录会添加到新桶里,以此类推. 3000-6000的桶与溢出桶使用链表连接在一起
 
-    ![image](./Pictures/rdbms/bucket_overflows.png)
+    ![image](./Pictures/rdbms/bucket_overflows.avif)
     - open addressing(开地址): 假设3000-6000桶已经满了, 新插入的记录会添加到其它桶里. 删除操作很麻烦, 所以一般应用于只做查找, 插入的编译器符号表
 
 - 动态散列: 通过桶的分裂, 合并适应数据库大小的变化. 性能不会随着数据库的增长而降低
@@ -219,7 +219,7 @@ WHERE Ai < c2 and Ai > c1
 
 - lsm树
 
-    ![image](./Pictures/rdbms/lsm.png)
+    ![image](./Pictures/rdbms/lsm.avif)
 
     - 先insert在内存中的L0树
 
@@ -243,7 +243,7 @@ WHERE Ai < c2 and Ai > c1
 
 #### 阶梯式合并索引(Stepped Merge Index)
 
-    ![image](./Pictures/rdbms/stepped-merge-index.png)
+    ![image](./Pictures/rdbms/stepped-merge-index.avif)
 
     - 每层k个树
 
@@ -260,11 +260,11 @@ WHERE Ai < c2 and Ai > c1
             - 优化:通过Bloom Filter(布隆过滤器), 快速判断数据是否在树里
     - update操作使用delete+insert
 
-![image](./Pictures/rdbms/lsm.png)
+![image](./Pictures/rdbms/lsm.avif)
 
 ### Buffer Tree
 
-![image](./Pictures/rdbms/buffer-tree.png)
+![image](./Pictures/rdbms/buffer-tree.avif)
 
 - 对B+树的优化
 
@@ -289,7 +289,7 @@ FROM r
 WHERE A2 = c2 and A1 = c1
 ```
 
-![image](./Pictures/rdbms/bigmap.png)
+![image](./Pictures/rdbms/bigmap.avif)
 
 ## TRANSACTION (事务)
 
@@ -315,7 +315,7 @@ WHERE A2 = c2 and A1 = c1
 
     - T10回滚; 由于T11依赖于T10,因此T11也必须回滚; 而T12依赖于T11,因此T12也必须回滚
 
-        ![image](./Pictures/rdbms/rollback.png)
+        ![image](./Pictures/rdbms/rollback.avif)
 
 #### 并发控制(隔离性等级的实现)
 
@@ -356,7 +356,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 当死锁发生后必须回滚两个事务中的一个
 
-        ![image](./Pictures/rdbms/deadlock.png)
+        ![image](./Pictures/rdbms/deadlock.avif)
 
         - 1.T3有B的排他锁
 
@@ -385,7 +385,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 死锁检测:
 
-        ![image](./Pictures/rdbms/deadlock_detection.png)
+        ![image](./Pictures/rdbms/deadlock_detection.avif)
 
         - 使用等待图(wait-for graph)结构, 有环则存在死锁
 
@@ -429,7 +429,7 @@ WHERE A2 = c2 and A1 = c1
 
 - 锁管理器(lock manager):
 
-    ![image](./Pictures/rdbms/protocol_two-pyhase.png)
+    ![image](./Pictures/rdbms/protocol_two-pyhase.avif)
 
     - 对当前已加锁的数据项维护的一个链表
 
@@ -449,7 +449,7 @@ WHERE A2 = c2 and A1 = c1
 
 ###### 图的协议
 
-![image](./Pictures/rdbms/protocol_tree.png)
+![image](./Pictures/rdbms/protocol_tree.avif)
 
 - 只能使用排他锁
 
@@ -472,7 +472,7 @@ WHERE A2 = c2 and A1 = c1
     - 当事务需要少量数据项, 则对其数据项加锁
 
 - 树结构: database -> area -> file -> record
-    ![image](./Pictures/rdbms/protocol_granularity.png)
+    ![image](./Pictures/rdbms/protocol_granularity.avif)
 
 - 加锁是自上而下的, 释放是自下而上的
 
@@ -482,7 +482,7 @@ WHERE A2 = c2 and A1 = c1
 
 - 意向锁的相容性
 
-    ![image](./Pictures/rdbms/intention_lock.png)
+    ![image](./Pictures/rdbms/intention_lock.avif)
 
     - 共享意向锁(inention-shared(IS) mode):子结点只能加共享锁
 
@@ -530,7 +530,7 @@ WHERE A2 = c2 and A1 = c1
 
 - Thomas写规则:
 
-    ![image](./Pictures/rdbms/thomas.png)
+    ![image](./Pictures/rdbms/thomas.avif)
 
     - 流程:
 
@@ -674,7 +674,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 斜写(skew write):非可串行化
 
-        ![image](./Pictures/rdbms/skew_write.png)
+        ![image](./Pictures/rdbms/skew_write.avif)
 
         - 通过主键可以避免, 数据库会在快照之外检查主键冲突, 回滚其中一方
 
@@ -731,7 +731,7 @@ WHERE A2 = c2 and A1 = c1
 ## 日志(恢复系统)
 
 - 更新日志记录(update log record):
-    ![image](./Pictures/rdbms/log_record.png)
+    ![image](./Pictures/rdbms/log_record.avif)
 
     | 日志记录             | 内容                               |
     |----------------------|------------------------------------|
@@ -779,7 +779,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 假设系统崩溃在`<T0 abort>`
 
-        ![image](./Pictures/rdbms/log_check.png)
+        ![image](./Pictures/rdbms/log_check.avif)
 
         - 1.undo-list初始发现T0, T1时, 就添加到表里
 
@@ -829,7 +829,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 例子1:
 
-        ![image](./Pictures/rdbms/log_logical-undo.png)
+        ![image](./Pictures/rdbms/log_logical-undo.avif)
 
         - 1.数据项C通过添加一个值进行回滚, 对应`<T0, C, 400, 500>`记录
 
@@ -841,7 +841,7 @@ WHERE A2 = c2 and A1 = c1
 
         - 系统崩溃在`<T2, C, 400, 300>`:
 
-        ![image](./Pictures/rdbms/log_logical-undo1.png)
+        ![image](./Pictures/rdbms/log_logical-undo1.avif)
 
         - 1.undo-list包含T1,T2
 
@@ -865,7 +865,7 @@ WHERE A2 = c2 and A1 = c1
 
 - ARIES数据结构:
 
-    ![image](./Pictures/rdbms/aries_structures.png)
+    ![image](./Pictures/rdbms/aries_structures.avif)
 
     - 脏页表(dirtypage table):
 
@@ -901,7 +901,7 @@ WHERE A2 = c2 and A1 = c1
 
     - 系统崩溃在LSN 7571:
 
-        ![image](./Pictures/rdbms/aries_structures.png)
+        ![image](./Pictures/rdbms/aries_structures.avif)
 
         - 1.分析阶段从`<checkpoint log record>`的LSN开始, 也就是LSN 7568
 
@@ -928,9 +928,9 @@ WHERE A2 = c2 and A1 = c1
 - 返回匹配的记录,以及表 B 多余的记录,这叫右连接(right join)
 - 返回匹配的记录,以及表 A 和表 B 各自的多余记录,这叫全连接(full join)
 
-![image](./Pictures/rdbms/join.png)
+![image](./Pictures/rdbms/join.avif)
 
-![image](./Pictures/rdbms/join1.png)
+![image](./Pictures/rdbms/join1.avif)
 
 ### join的实现
 
@@ -946,7 +946,7 @@ Nested-Loop Join(嵌套循环连接)
 
 - 对于表r的每一条记录, 需要对表s作完整的搜索. 代价很大
 
-![image](./Pictures/rdbms/join_SNLJ.webp)
+![image](./Pictures/rdbms/join_SNLJ.avif)
 
 
 #### 代价分析
@@ -1005,7 +1005,7 @@ Nested-Loop Join(嵌套循环连接)
 
     - MySQL 默认 buffer 大小 256K,如果有 n 个 join 操作,会生成 n-1 个 join buffer
 
-![image](./Pictures/rdbms/join_BNLJ.webp)
+![image](./Pictures/rdbms/join_BNLJ.avif)
 
 #### 代价分析
 
@@ -1033,7 +1033,7 @@ Nested-Loop Join(嵌套循环连接)
 
 - 一般行数少的作驱动表(外层表)
 
-![image](./Pictures/rdbms/join_INLJ.webp)
+![image](./Pictures/rdbms/join_INLJ.avif)
 
 #### 代价分析
 
@@ -1059,7 +1059,7 @@ Nested-Loop Join(嵌套循环连接)
 
 - 先排序, 再为每个表分配一个指向第一行的指针, 指针会遍历整个表
 
-![image](./Pictures/rdbms/join_merge.png)
+![image](./Pictures/rdbms/join_merge.avif)
 
 #### 代价分析
 
@@ -1104,7 +1104,7 @@ Nested-Loop Join(嵌套循环连接)
 
     - 假设相同的值为i, 则比较ri, si的散列值
 
-![image](./Pictures/rdbms/join_hash.png)
+![image](./Pictures/rdbms/join_hash.avif)
 
 ## HTAP(Hybrid transaction/analytical processing) 混合事务 / 分析处理
 
@@ -1127,11 +1127,11 @@ Nested-Loop Join(嵌套循环连接)
 
 - 而HTAP数据库便是兼容两者, 不需要在一个数据库里执行事务, 另一个数据库里分析
 
-    ![image](./Pictures/database_concept/htap.jpg)
+    ![image](./Pictures/database_concept/htap.avif)
 
 ### 列存储
 
-![image](./Pictures/rdbms/column.png)
+![image](./Pictures/rdbms/column.avif)
 
 - 优点:
 

@@ -249,11 +249,11 @@ commit;
 **informantion_schema** 的表一般有多种 **engine**(存储引擎):
 
 - **Memory**(内存)
-  ![image](./Pictures/mysql/dictionary.png)
+  ![image](./Pictures/mysql/dictionary.avif)
 - **MariaDB** 数据库: **Aria**(类似 MyISAM)
-  ![image](./Pictures/mysql/dictionary1.png)
+  ![image](./Pictures/mysql/dictionary1.avif)
 - **Mysql** 数据库: **Innodb**
-  ![image](./Pictures/mysql/dictionary2.png)
+  ![image](./Pictures/mysql/dictionary2.avif)
 
 ```sql
 # 查看innoddb字典
@@ -282,7 +282,7 @@ show tables like '%INNODB_SYS%';
 select * from INNODB_SYS_TABLES;
 ```
 
-![image](./Pictures/mysql/dictionary3.png)
+![image](./Pictures/mysql/dictionary3.avif)
 
 **InnoDB Buffer Pool** 储数据和索引,减少磁盘 I/O,是一种特殊的 mitpoint LRU 算法
 [查看 INNODB_BUFFER 表](https://mariadb.com/kb/en/information-schema-innodb_buffer_pool_stats-table/)
@@ -304,7 +304,7 @@ FREE_BUFFERS: 6024
 DATABASE_PAGES: 2033
 ```
 
-![image](./Pictures/mysql/dictionary5.png)
+![image](./Pictures/mysql/dictionary5.avif)
 
 **innodb_buffer_pool_size** 越大,初始化时间就越长
 
@@ -312,13 +312,13 @@ DATABASE_PAGES: 2033
 show variables like 'innodb%buffer%';
 ```
 
-![image](./Pictures/mysql/dictionary6.png)
+![image](./Pictures/mysql/dictionary6.avif)
 
 #### performance_schema
 
 独立的内存存储引擎:
 
-![image](./Pictures/mysql/dictionary4.png)
+![image](./Pictures/mysql/dictionary4.avif)
 ## MyISAM
 
 在 Mysql 保存目录下:
@@ -329,7 +329,7 @@ show variables like 'innodb%buffer%';
 
 - MYI: 索引文件
 
-![image](./Pictures/mysql/myisam.png)
+![image](./Pictures/mysql/myisam.avif)
 
 MyISAM 不支持行锁,在执行查询语句(SELECT、UPDATE、DELETE、INSERT 等)前,会自动给涉及的表加读锁,这个过程并不需要用户干预
 
@@ -395,8 +395,8 @@ where id < 11;
 
 - ibd: 索引和数据文件
 
-![image](./Pictures/mysql/innodb.png)
-![image](./Pictures/mysql/innodb1.png)
+![image](./Pictures/mysql/innodb.avif)
+![image](./Pictures/mysql/innodb1.avif)
 
 行格式:
 
@@ -404,7 +404,7 @@ where id < 11;
 
 - Redundant
 
-![image](./Pictures/mysql/innodb2.png)
+![image](./Pictures/mysql/innodb2.avif)
 
 tablespace (表空间):
 
@@ -412,7 +412,7 @@ tablespace (表空间):
 - extent (区)
 - page (页)
 
-![image](./Pictures/mysql/innodb3.png)
+![image](./Pictures/mysql/innodb3.avif)
 
 InnoDB 采用`WAL`(Write-Ahead Logging). 先修改日志,再在修改数据页进 buffer(内存).当等到有空闲线程、内存不足、Redo log 满了时再 Checkpoint(刷脏).写 Redo log 是顺序写入,Checkpoint(刷脏)是随机写.
 
@@ -422,7 +422,7 @@ InnoDB 采用`WAL`(Write-Ahead Logging). 先修改日志,再在修改数据页�
 
 - binlog 逻辑日志:事务提交成功,记录数据库所有更改操作. 不包括 select,show
 
-![image](./Pictures/mysql/log.png)
+![image](./Pictures/mysql/log.avif)
 
 redo log 参数:`innodb_flush_log_at_trx_commit`.在导入数据时可以临时调整为 `0` 提高性能.
 
@@ -523,10 +523,10 @@ commit;
 flush table clone
 ```
 
-![image](./Pictures/mysql/flush.png)
+![image](./Pictures/mysql/flush.avif)
 
 `flush table clone`后, `select` 数据同步
-![image](./Pictures/mysql/flush1.png)
+![image](./Pictures/mysql/flush1.avif)
 
 ---
 
@@ -674,7 +674,7 @@ select * from test;
 #### 锁
 
 **死锁:**
-![image](./Pictures/mysql/innodb_lock.png)
+![image](./Pictures/mysql/innodb_lock.avif)
 
 事务 A 在等待事务 B 释放 id=2 的行锁,而事务 B 在等待事务 A 释放 id=1 的行锁.互相等待对方的资源释放,就进入了死锁状态.当出现死锁以后,有两种策略:
 
@@ -742,7 +742,7 @@ where id < 11;
 
     - 多个版本会通过指针连接起来, 通过指针即可遍历所有版本
 
-    ![image](./Pictures/mysql/mvcc.jpg)
+    ![image](./Pictures/mysql/mvcc.avif)
 
 - 旧版本回收:
 
@@ -750,7 +750,7 @@ where id < 11;
 
 - innodb 采用 n2o(从最新到最旧):
 
-    ![image](./Pictures/mysql/o2n-n2o.jpg)
+    ![image](./Pictures/mysql/o2n-n2o.avif)
 
     - TRX_ID: 是创建这个Tuple 的 TRX_ID
 
@@ -758,5 +758,5 @@ where id < 11;
 
         - 旧版本的数据存储在**undo log**里
 
-        ![image](./Pictures/mysql/innodb-n2o.jpg)
+        ![image](./Pictures/mysql/innodb-n2o.avif)
 

@@ -27,6 +27,8 @@
         * [LSM拓展](#lsm拓展)
         * [查询json](#查询json)
         * [全文搜索(full-text search):fts5](#全文搜索full-text-searchfts5)
+        * [使用sql操作excel文件](#使用sql操作excel文件)
+        * [wasm](#wasm)
     * [python](#python)
         * [内存模式](#内存模式)
     * [优化](#优化)
@@ -181,7 +183,7 @@ SELECT typeof(100),
         (x'0100'),
         (NULL);
     ```
-    ![image](./Pictures/sqlite/datatypes.png)
+    ![image](./Pictures/sqlite/datatypes.avif)
 
 ### datetime(日期和时间)
 
@@ -211,15 +213,15 @@ SELECT datetime();
     FROM datetime_int;
     ```
 
-    ![image](./Pictures/sqlite/datetime_int.png)
+    ![image](./Pictures/sqlite/datetime_int.avif)
 
 - `TEXT` 类型的日期时间:
 
-    ![image](./Pictures/sqlite/datetime_text.png)
+    ![image](./Pictures/sqlite/datetime_text.avif)
 
 - `REAL` 类型的日期时间:
 
-    ![image](./Pictures/sqlite/datetime_real.png)
+    ![image](./Pictures/sqlite/datetime_real.avif)
 
 ## SELECT(查询)
 
@@ -418,7 +420,7 @@ SELECT id FROM test1;
         SELECT * from temp.test
         ```
 
-        ![image](./Pictures/sqlite/table_temp.png)
+        ![image](./Pictures/sqlite/table_temp.avif)
 
 - `WITHOUT ROWID` 去除隐藏列ROWID. 适合非整型,非长字符, blob的主键的表.[官网介绍](https://www.sqlite.org/withoutrowid.html)
 
@@ -559,7 +561,7 @@ INSERT INTO a1 VALUES(1, 2);
     ```sql
     INSERT INTO a1 VALUES(1, 3);
     ```
-    ![image](./Pictures/sqlite/foreign.png)
+    ![image](./Pictures/sqlite/foreign.avif)
 
 - `CASCADE`: 允许对父表外键对应值进行操作
 
@@ -572,10 +574,10 @@ INSERT INTO a1 VALUES(1, 2);
     DELETE FROM a
         WHERE id = 1;
     ```
-    ![image](./Pictures/sqlite/foreign_delete_cascade.png)
+    ![image](./Pictures/sqlite/foreign_delete_cascade.avif)
 
 - 报错: 如果`ON DELETE`没有指定任何字段
-    ![image](./Pictures/sqlite/foreign_delete_cascade_off.png)
+    ![image](./Pictures/sqlite/foreign_delete_cascade_off.avif)
 
 
 - `ON UPDATE CASCADE` 父表`UPDATE`对应的值, 子表也会修改
@@ -584,11 +586,11 @@ INSERT INTO a1 VALUES(1, 2);
         SET id = 20
         WHERE id = 2;
     ```
-    ![image](./Pictures/sqlite/foreign_update_cascade.png)
+    ![image](./Pictures/sqlite/foreign_update_cascade.avif)
 
 
 - 报错: `ON UPDATE NO ACTION` 当子表的外键存在时, 父表不能`UPDATE`对应的值
-    ![image](./Pictures/sqlite/foreign_update_no_action.png)
+    ![image](./Pictures/sqlite/foreign_update_no_action.avif)
 
 ## ALTER
 
@@ -675,7 +677,7 @@ sqlite3 new_archive.db -Acv file1 file2 file3
 select * from sqlar
 ```
 
-![image](./Pictures/sqlite/sqlar.png)
+![image](./Pictures/sqlite/sqlar.avif)
 
 - zip
 
@@ -789,7 +791,7 @@ EXPLAIN QUERY PLAN
 SELECT * FROM t2 WHERE x+y=22;
 ```
 
-![image](./Pictures/sqlite/idx_check.png)
+![image](./Pictures/sqlite/idx_check.avif)
 
 - `CREATE UNIQUE INDEX`创建唯一索引
     - 值必须唯一, 不然会报错
@@ -814,7 +816,7 @@ INSERT INTO idx_unique VALUES('tz');
 INSERT INTO idx_unique VALUES('tz');
 ```
 
-![image](./Pictures/sqlite/idx_unique.png)
+![image](./Pictures/sqlite/idx_unique.avif)
 
 ### 多列索引
 
@@ -1051,6 +1053,10 @@ gcc -g -fPIC -shared zipfile.c -o zipfile.so
     .load ./fts5
     ```
 
+### [使用sql操作excel文件](https://github.com/x2bool/xlite)
+
+### [wasm](https://sqlite.org/wasm/doc/ckout/index.md)
+
 ## python
 
 - [官方文档](https://docs.python.org/3/library/sqlite3.html)
@@ -1174,6 +1180,11 @@ pragma optimize;
     termdbms -q test.db
     ```
 
+- [sqlite-utils: 命令行工具](https://github.com/simonw/sqlite-utils)
+    ```sh
+    sqlite-utils history.db 'select * from history'
+    ```
+
 - [visidata: 支持查看sqlite的文件管理器](https://github.com/saulpw/visidata)
 
 - [dqlite: 分布式sqlite的c库](https://github.com/canonical/dqlite)
@@ -1184,4 +1195,4 @@ pragma optimize;
 
 - [在线使用sqlite](https://sqlime.org/)
 
-    ![image](./Pictures/sqlite/sqlime.png)
+    ![image](./Pictures/sqlite/sqlime.avif)

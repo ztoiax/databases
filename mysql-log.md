@@ -9,7 +9,7 @@
 | binlog二进制日志 | 记录所有语句执行记录，用于数据同步等   |
 | 中继日志   | 线程读取别人的二进制日志存到本地的日志 |
 
-![image](./Pictures/mysql/logs.webp)
+![image](./Pictures/mysql/logs.avif)
 
 ## 普通日志
 
@@ -119,7 +119,7 @@ binlog_ignore_db
 sync_binlog=n
 ```
 
-![image](./Pictures/mysql/binlog.png)
+![image](./Pictures/mysql/binlog.avif)
 
 ```sql
 # 我这里是 row 格式

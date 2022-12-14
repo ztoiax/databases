@@ -2,7 +2,7 @@
 
 ## 数据库体系结构
 
-![image](./Pictures/database_concept/architecture_database.png)
+![image](./Pictures/database_concept/architecture_database.avif)
 
 - 1.共享内存:
 
@@ -47,7 +47,7 @@
 
 ### 服务器体系结构
 
-![image](./Pictures/database_concept/architecture_server.png)
+![image](./Pictures/database_concept/architecture_server.avif)
 
 - 进程架构
 
@@ -77,7 +77,7 @@
 
         - 亚线性加速比:加速比 < N
 
-        ![image](./Pictures/database_concept/speedup.png)
+        ![image](./Pictures/database_concept/speedup.avif)
 
 - 扩展比:通过增加并行度(cpu,磁盘等),使其在相同时间内完成更多的任务. 即完成任务的数量(吞吐量)
 
@@ -89,7 +89,7 @@
 
             - 考虑到进程的启动代价,上下文切换, 以及总线,硬盘,锁的占用.实际情况往往是Tl > Ts, 也就是亚线性扩展比
 
-        ![image](./Pictures/database_concept/scaleup.png)
+        ![image](./Pictures/database_concept/scaleup.avif)
 
 #### 分表, 分库(IO并行)
 
@@ -97,7 +97,7 @@
 
 - 分表, 分库开源产品
 
-    ![image](./Pictures/mysql/split.webp)
+    ![image](./Pictures/mysql/split.avif)
 
 - 水平分库
 
@@ -107,7 +107,7 @@
 
     - 每个库的结构都一样; 数据不一样
 
-    ![image](./Pictures/mysql/transverse_database.webp)
+    ![image](./Pictures/mysql/transverse_database.avif)
 
 - 垂直分库
 
@@ -115,7 +115,7 @@
 
     - 每个库的结构都不一样; 数据也不一样
 
-    ![image](./Pictures/mysql/vertical_database.webp)
+    ![image](./Pictures/mysql/vertical_database.avif)
 
 - 水平分表
 
@@ -125,7 +125,7 @@
 
     - 每个表的结构都一样; 数据不一样
 
-    ![image](./Pictures/mysql/transverse_table.webp)
+    ![image](./Pictures/mysql/transverse_table.avif)
 
 - 垂直分表
 
@@ -133,7 +133,7 @@
 
     - 每个表的结构都不一样; 数据也不一样
 
-    ![image](./Pictures/mysql/vertical_table.webp)
+    ![image](./Pictures/mysql/vertical_table.avif)
 
 - 磁盘读 IO 瓶颈: 热点数据太多,数据库缓存放不下,每次查询时会产生大量的 IO,降低查询速度
 
@@ -168,7 +168,7 @@
 
 - 范围划分(range partitioning):
 
-    ![image](./Pictures/database_concept/range_partitioning.png)
+    ![image](./Pictures/database_concept/range_partitioning.avif)
 
     - 基于属性的范围划分, 一般查询只需扫描单个磁盘
 
@@ -176,7 +176,7 @@
 
 - 编斜(skew)
 
-    ![image](./Pictures/database_concept/skew.png)
+    ![image](./Pictures/database_concept/skew.avif)
 
     - 散列划分和范围划分会出现偏斜
 
@@ -188,7 +188,7 @@
 
             - 随着关系的增长, 也会动态的创建新虚拟结点.并将数量更多虚拟结点移动到数量少的结点
 
-            ![image](./Pictures/database_concept/virtual-node.png)
+            ![image](./Pictures/database_concept/virtual-node.avif)
 
 ## RDBMS (关系性数据库)
 
@@ -305,17 +305,17 @@ Port:3306
 
     - 读取性能对比
 
-        ![image](./Pictures/database_concept/benchmark_read.png)
+        ![image](./Pictures/database_concept/benchmark_read.avif)
 
     - 写入性能对比
 
-        ![image](./Pictures/database_concept/benchmark_write.png)
+        ![image](./Pictures/database_concept/benchmark_write.avif)
 
     - 对100M大小的文件, 分割成不同大小的块, 进行性能对比
 
         - 大于1的: 文件系统更快, 小于1: 数据库更快
 
-        ![image](./Pictures/database_concept/benchmark_blob.png)
+        ![image](./Pictures/database_concept/benchmark_blob.avif)
 
 - 使用N + 1, 但没有传统N + 1的问题(因此可以使用大量查询):
 

@@ -21,7 +21,7 @@
 
 - 结构:
 
-    ![image](./Pictures/rdbms/hdfs.png)
+    ![image](./Pictures/rdbms/hdfs.avif)
 
     - 一个NameNode为一个集群
 
