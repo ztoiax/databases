@@ -34,6 +34,8 @@
 
 - CAP
 
+    ![image](./Pictures/ddbs/cap.avif)
+
     - Consistency(一致性)：每次读取都会收到最新写入
 
     - Availability(可用性)：每个请求都会收到一个(非错误)响应,但不保证它包含最新的写入
@@ -64,7 +66,11 @@
     | 传统RDBMS                                                                                  | CA      |
 
 
-    ![image](./Pictures/ddbs/cap.avif)
+    ![image](./Pictures/ddbs/cap1.avif)
+
+- 业务对`CAP`选择
+
+    ![image](./Pictures/ddbs/cap2.avif)
 
 - [Michael Stonebraker: Errors in Database Systems, Eventual Consistency, and the CAP Theorem](https://cacm.acm.org/blogs/blog-cacm/83396-errors-in-database-systems-eventual-consistency-and-the-cap-theorem/fulltext)
     - 对cap理论, 提出意见

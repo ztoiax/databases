@@ -444,6 +444,10 @@ redis-cli -p 6666
 
 - 在浏览器与IndexedDB之间, 添加一层sqlite
 
+#### [junodb:paypal开发的kv nosql](https://github.com/paypal/junodb)
+
+- [Unlocking the Power of JunoDB: PayPal’s Key-Value Store Goes Open-Source](https://medium.com/paypal-tech/unlocking-the-power-of-junodb-paypals-key-value-store-goes-open-source-ee85f935bdc1)
+
 ### 文档
 
 #### MonogoDB
@@ -645,6 +649,12 @@ tiup playground v5.0.0 --db 2 --pd 3 --kv 3 --monitor
 # Grafana: 用户密码为为admin
 http://127.0.0.1:3000
 ```
+
+# AI工具
+
+- [sqlchat](https://github.com/sqlchat/sqlchat)
+
+- [DB-GPT:local GPT](https://github.com/csunny/DB-GPT)
 
 # reference
 

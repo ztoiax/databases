@@ -1153,3 +1153,6 @@ Nested-Loop Join(嵌套循环连接)
 
         - 更新一行, 需要更新每一列
 
+## SQL工具
+
+- [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
