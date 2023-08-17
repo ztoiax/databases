@@ -437,6 +437,8 @@ redis-cli -p 6666
 
 #### [rocksdb: 基于leveldb, 由facebook维护](https://github.com/facebook/rocksdb)
 
+- [木鸟杂记：一文科普 RocksDB 工作原理]()
+
 #### [boltdb](https://github.com/boltdb/bolt)
 
 - 纯go语言写的kv数据库
