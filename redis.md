@@ -21,7 +21,11 @@
         * [zset(有序集合)](#zset有序集合)
             * [交集,并集](#交集并集)
             * [geo(地理信息定位)](#geo地理信息定位)
+        * [publish subscribe (发布和订阅)](#publish-subscribe-发布和订阅)
+            * [键空间通知（监控改动的键）](#键空间通知监控改动的键)
         * [streams(消息队列)](#streams消息队列)
+            * [消息队列的发展](#消息队列的发展)
+            * [基本命令](#基本命令-1)
         * [HyperLogLog（概率集合）](#hyperloglog概率集合)
     * [Module(模块)](#module模块)
         * [RedisJSON](#redisjson)
@@ -68,11 +72,30 @@
         * [redis 7.0 共享主从复制缓冲区](#redis-70-共享主从复制缓冲区)
         * [一些问题和注意事项](#一些问题和注意事项)
     * [sentinel (哨兵模式)](#sentinel-哨兵模式)
-        * [开启 sentinal](#开启-sentinal)
-        * [sentinel 的命令](#sentinel-的命令)
+        * [sentinal的配置](#sentinal的配置)
+        * [sentinel演示](#sentinel演示)
+        * [专属API](#专属api)
+        * [实现原理](#实现原理)
+        * [slave（从节点）高可用](#slave从节点高可用)
     * [cluster (集群)](#cluster-集群)
-    * [publish subscribe (发布和订阅)](#publish-subscribe-发布和订阅)
-        * [键空间通知（监控改动的键）](#键空间通知监控改动的键)
+        * [集群功能限制](#集群功能限制)
+        * [手动建立集群](#手动建立集群)
+            * [节点握手](#节点握手)
+            * [分配槽（slot）](#分配槽slot)
+        * [自动建立集群](#自动建立集群)
+            * [演示](#演示)
+        * [Gossip通信协议](#gossip通信协议)
+        * [集群的扩容和收缩](#集群的扩容和收缩)
+            * [扩容](#扩容)
+            * [收缩](#收缩)
+        * [key的重定向](#key的重定向)
+            * [Smart客户端](#smart客户端)
+        * [故障转移](#故障转移)
+            * [日志演示](#日志演示)
+            * [手动故障转移](#手动故障转移)
+        * [集群倾斜](#集群倾斜)
+        * [单机redis数据迁移到cluster](#单机redis数据迁移到cluster)
+        * [常见问题](#常见问题)
     * [调试和性能测试和优化](#调试和性能测试和优化)
         * [redis-benchmark性能测试](#redis-benchmark性能测试)
         * [阻塞](#阻塞)
@@ -101,12 +124,9 @@
         * [如何减少缓存删除/更新的失败？](#如何减少缓存删除更新的失败)
         * [如何处理复杂的多缓存场景？](#如何处理复杂的多缓存场景)
 * [k8s](#k8s)
-* [redis 如何做到和 mysql 数据库的同步](#redis-如何做到和-mysql-数据库的同步)
 * [redis 安装](#redis-安装)
     * [centos7 安装 redis6.0.9](#centos7-安装-redis609)
     * [docker install](#docker-install)
-* [常见错误](#常见错误)
-    * [vm.overcommit_memory = 1](#vmovercommit_memory--1)
 * [其他版本的redis](#其他版本的redis)
     * [阿里云的Tair](#阿里云的tair)
     * [腾讯云的Tendis](#腾讯云的tendis)
@@ -140,6 +160,8 @@
 - [刘Java：Redis 6.0 引入的多线程机制简介](https://juejin.cn/post/7109841068669009933)
 
 - [腾讯技术工程: Redis 多线程网络模型全面揭秘](https://segmentfault.com/a/1190000039223696)
+
+![avatar](./Pictures/redis/redis-version.avif)
 
 - 演进：
 
@@ -1485,6 +1507,8 @@ zinterstore sum 2 math history
 
 #### geo(地理信息定位)
 
+- [刘Java：Redis GEO 地理位置的使用与原理解析以及Java实现GEOHash算法](https://juejin.cn/post/7113202149533679630?searchId=202308270748512C0BDDB8FBBD7BAB391C)
+
 - 实际上是zset(有序集合)类型
 
     - 通过`geohash`命令 和 `zset` 类型, 实现geo的命令
@@ -1530,19 +1554,242 @@ zrem china beijing
     geohash china beijing
     ```
 
+### publish subscribe (发布和订阅)
+
+- [刘Java：Redis Pub/Sub 发布订阅模式的深度解析与实现消息队列](https://juejin.cn/post/7112434646851584013?searchId=202308270748512C0BDDB8FBBD7BAB391C)
+
+- 应用：聊天室、公告牌、b站等视频服务、服务之间的消息解耦
+
+> ```redis
+> # 发布
+> pubhlish 订阅号 内容
+> ```
+
+> ```redis
+> # 订阅
+> subscribe 订阅号1 订阅号2
+> ```
+
+- 视频服务
+    ```redis
+    # 客户端订阅
+    subscribe video:changes
+
+    # 另一个客户端push
+    publish video:changes "video1, video2"
+    ```
+
+- 我这里一共三个客户端.左边为发布者;右边上订阅 rom,rom1;右边下只订阅 rom
+
+    ![avatar](./Pictures/redis/subscribe.gif)
+
+- `psubscribe` 通过通配符*,可以匹配 rom,rom1 等订阅.
+
+    - psubscribe 信息类型为 `pmessage`
+    - subscribe 信息类型为 `message`
+
+    ```redis
+    psubscribe rom*
+    ```
+
+    ![avatar](./Pictures/redis/subscribe1.gif)
+
+- Pub/Sub 原理
+
+    - 每个 Redis 服务器进程维持着一个标识服务器状态的`redis.h/redisServer`结构
+
+        ```c
+        struct redisServer {
+            // ...
+            dict *pubsub_channels;  // 订阅频道
+            list *pubsub_patterns;  // 订阅模式
+            // ...
+        };
+        ```
+
+        - `pubsub_channels`是一个 dict 字典结构，key（数组元素）为 channel，value 就是某个 client，client 以链表的方式串联起来
+
+            - `SUBSCRIBE`：就是将 channel 和 client 加入到 dict 中
+            - `PUBLISH`：只需要通过上述字典定位到具体的 channel，就能找到所有订阅该 channel 的客户端，再把消息发送给它们就好了。
+            - `UNSUBSCRIBE`：将对应 channel 下面的链表中的 client 删除即可。
+
+    - pubsub_patterns用于存储所有的 glob channel，它是一个 list 结构，节点类型为redis.h/pubsubPattern
+
+        ```c
+        typedefstruct pubsubPattern {
+            redisClient *client;  // 订阅模式的客户端
+            robj *pattern;        // 订阅的模式
+        } pubsubPattern;
+        ```
+
+        - `PSUBSCRIBE`：程序就创建一个pubsubPattern添加到 pubsub_patterns 链表中。如果另一个客户端也订阅一个模式，则向链表的后面新增一个 pubsubPattern 节点即可。
+        - `PUBLISH`：除了会在 pubsub_channels 中定位具体的 channel 之外，还会将指定的 channel 与 pubsub_patterns 中的模式进行对比，如果 指定的 channel 和某个模式匹配的话，那么也将 message 发送到订阅那个模式的全部客户端。
+        - `PUNSUBSCRIBE`：删除 pubsub_patterns 中，client 和 pattern 信息对比一致的节点。
+
+#### 键空间通知（监控改动的键）
+
+接收那些以某种方式改动了 Redis 数据集的事件。[详情](http://redisdoc.com/topic/notification.html)
+
+```redis
+# 开启键空间通知
+config set notify-keyspace-events "AKE"
+```
+
+```redis
+# 订阅监听key
+psubscribe '__key*__:*'
+```
+
+![avatar](./Pictures/redis/keyspace.avif)
+
 ### streams(消息队列)
 
 - [官方文档](https://redis.io/topics/streams-intro)
 
-- append-only数据结构
+- [刘Java：Redis Stream 流的深度解析与实现高级消息队列【一万字】](https://juejin.cn/post/7112825943231561741?searchId=202308270748512C0BDDB8FBBD7BAB391C)
+
+#### 消息队列的发展
+
+- [阿里云开发者：Redis消息队列发展历程]()
+
+    - List（列表）：
+
+        - 1.通过 lpush 命令写入消息，通过 rpop 命令拉取消息，也可以使用 BRPOP 实现阻塞式的拉取消息。
+
+            - brpop阻塞接口实现了长轮询，该效果等同于服务端推送，消费者能立刻感知到新的消息，而且通过设置合理的超时时间，使系统资源的消耗降到很低。
+
+            ![avatar](./Pictures/redis/stream-list.avif)
+
+        - 2.rpop或brpop这样接口消费消息会先从队列中删除消息，然后再由应用消费，如果应用应用在处理消息前异常宕机了，消息就丢失了。
+
+            - 但如果使用lindex这样的只读命令先读取消息处理完毕后在删除，又需要额外的机制来保证一条消息不会被其他消费者重复读到。
+
+                - 因此需要通过2个list组和来完成消息的消费和确认功能。使用rpoplpush从list A中消费消息并移入list B，等消息处理完毕后在从list B中删除消息。
+
+            ![avatar](./Pictures/redis/stream-list1.avif)
+
+        - 优点：
+
+            - Redis的接口是并发安全的，可以同时有多个生产者向一个list中生产消息，多个消费者从list中读取消息。
+
+        - 缺点：
+
+            - 不支持消息广播机制（每个消息只会被读取一次）。生产者生产的一个消息可以被多个消费者消费到，这个功能在分布式系统中非常重要。
+
+    - Pub/Sub（发布/订阅）：支持消息多播
+
+        ![avatar](./Pictures/redis/stream-pub_sub.avif)
+
+        - 优点：
+            - 支持广播
+
+            - psubscribe能按字符串通配符匹配：消费者可以会订阅一批channel
+                - 例子：一个用户订阅了浙江的新闻的推送，但浙江新闻还会进行细分，例如“浙江杭州xx”、“浙江温州xx”，这里订阅者不需要获取浙江的所有子类在挨个订阅，只需要调用psubscribe“浙江*”就能订阅所有以浙江开头的新闻推送了
+
+            - 能订阅特定key或特定命令的系统消息
+
+            - 与数据库也无关：在 db10 上发布，将可以被 db1 上的订阅者听到。
+
+        - 缺点：
+
+            - 消息不会持久化
+
+                - 必须先执行订阅，再等待消息发布。如果先发布了消息，那么该消息由于没有订阅者，消息将被直接丢弃。
+
+            - 消息只管发送，不管接收，也没有 ACK 机制，无法保证消息的消费成功。如果某个消费者中途加入进来，或者挂掉重启，那么这之前丢失的消息也不能再次消费。
+
+            - 如果消费者应用处理能力不足，消息就会在Redis的client buf中堆积，当堆积数据超过一个阈值后会断开这条连接，这意味着这些消息全部丢失了，在也找不回来了。
+
+                - 如果同时有多个消费者的client buf堆积数据但又还没达到断开连接的阈值，那么Redis服务端的内存会膨胀，进程可能因为oom而被杀掉，这导致了整个服务中断。
+
+            - 只能在同一个 `redis-server` 下使用
+
+            - 结论：以上的缺点导致 Redis 的 Pub/Sub 模式就像个小玩具，在生产环境中几乎无用武之地，非常的尴尬！为此，Redis5.0 版本新增了 Stream 数据结构，不但支持多播，还支持数据持久化
+
+    - Redis 5.0 stream
+
+
+        - 优点：
+
+            - 开销成本：存储message数据使用了listpack结构，这是一个紧凑型的数据结构，不同于list的双向链表每个节点都要额外占用2个指针的存储空间，这使得小msg情况下stream的空间利用率更高。
+
+            - 持久化：stream的数据会存储在aof和rdb文件中
+            - ack机制：保证消息至少被处理一次
+                - 已经读取但没有ack的消息，stream会标示这条消息的状态为pending，等客户端重连后通过xpending命令可以重新读取到pengind状态的消息，继续处理。
+                - 如果这个应用永久宕机了，并通过xclaim命令将转移到其他消费者
+
+        - 消费组 (Consumer Group)：从 Kafka 借鉴的概念
+
+            - `XREAD`命令可以实现一个消费者监听多个 Stream
+            - 消费组`XREADGROUP`命令：多个消费者获取一个stream. entry被哪个消费者获取? 取决于哪个消费者更快(竞争)
+
+                - kafka 的消费者组中的消费者还需要和分区对应，而 Redis 的消费者组中的消费者相当于直接从 Stream 中获取消息。
+
+            - 功能：
+
+                - 1.每条消息都提供给不同的消费者，因此不可能将相同的消息传递给同一个组内的多个消费者。
+                - 2.在消费者组中，消费者通过名称进行标识，该名称是实现消费者的客户端必须提供的区分大小写的字符串。
+                    - 即使在断开连接后，流消费者组仍保留所有消费者的状态，客户端可以再次声明为同一个消费者。
+                - 3.ack：消费消息需要使用特定命令进行显式确认，表示此消息已正确处理，可以移除。
+
+                    - 消费者组跟踪所有当前未 ack 的消息。因此每个消费者只会看到传递给它的消息。
+
+            - 优点：
+                - 消费者组实现同组多个消费者并行但不重复消费消息的能力，提升消费能力。
+                - 消费者组能够记住最新消费的信息，保证消息连续消费
+                - 消费者组能够记住消息转移次数
+                    - 实现消费失败重试以及永久性故障的消息转移。
+                    - 借此可以实现死信消息的功能（需自己实现）。
+                - 消费者组提供了 PEL 未确认列表和 ACK 确认机制，保证消息被成功消费，不丢失
+
+            - 数据结构：
+
+                - 像是一个仅追加内容的消息链表，每个消息都有一个唯一的 ID 和内容
+                ![avatar](./Pictures/redis/stream.avif)
+
+                - 1.消费者组（Consumer Group）：一个消费组可以有多个消费者 (Consumer) 同时进行组内消费，所有消费者共享 Stream 内的所有信息
+
+                    - 但同一条消息只会有一个消费者消费到，不同的消费者会消费 Stream 中不同的消息，这样就可以应用在分布式的场景中来保证消息消费的唯一性。
+
+                - 2.游标（last_delivered_id）：用来记录某个消费者组在 Stream 上的消费位置信息 **，每个消费组会有个游标，任意一个消费者读取了消息都会使游标 last_delivered_id 往前移动。
+
+                    - 就是最新消费的消息ID：创建消费者组时需要指定从 Stream 的哪一个消息 ID（哪个位置）开始消费，该位置之前的数据会被忽略
+
+                - 3.pending_ids：消费者内部的状态变量，作用是维护消费者的未确认的消息 ID。
+                    - pending_ids 记录了当前已经被客户端读取，但是还没有 ack (Acknowledge character：确认字符）的消息。
+                    - 如果客户端没有 ack，那么这个变量里面的消息 ID 就会越来越多，一旦某个消息被 ack，它就会对应开始减少。这个变量也被 Redis 官方称为 PEL (Pending Entries List)。
+
+        - 重复处理问题：消息被重复处理要么是生产者重复投递，要么是消费者重复消费。
+
+            - 解决生产者重复投递问题：
+
+                - 每个消息都设置了一个唯一递增的id。当xadd超时后应用并不能确定消息是否投递成功，可以通过xread查询该id的消息是否存在，存在就说明已经投递成功，不存在则重新投递
+
+                - 而且stream限制了id必须递增，这意味了已经存在的消息重复投递会被拒绝。
+
+            - 解决消费者重复消费问题：考虑一个场景，消费者读取消息后业务处理完毕，但还没来得及ack就发生了异常，应用恢复后对于这条没有ack的消息进行了重复消费。这个问题因为ack和消费消息的业务逻辑发生在2个系统，没法做到事务性，需要业务来改造，保证消息处理的幂等性。
+
+
+- 相比其他消息队列
+
+    - 优点：基于内存存储，其速度相比于真正的消息队列比如 kafka、rocketmq 等更快
+    - 缺点：
+        - 也是因为内存的原因，我们无法使用 Redis Stream 长时间的存储大量的数据
+        - 没有提供延时消息的能力
+
+- 应用场景：由于基于内存，无法存储大量数据，因此在生产环境的应用也并不多
+
+    - 更适用于小型、廉价的应用程序，以及可以丢弃数据的场景（限制 Stream 长度），比如记录某些不重要的操作日志。
+
+#### 基本命令
 
 | 命令       | 时间复杂度 |
 |------------|------------|
 | xpending   | O(N)       |
 | xread      | O(N)       |
-| xrange     | O(N)       |
+| xrange     | O(log(N)) 来寻找，然后 O(M) 来返回 M 个元素 |
+| xrevrange  | O(log(N)) 来寻找，然后 O(M) 来返回 M 个元素 |
 | xtrim      | O(N)       |
-| xrevrange  | O(N)       |
 | xinfo      | O(N)       |
 | xreadgroup | O(M)       |
 | xclaim     | O(log N)   |
@@ -1553,7 +1800,10 @@ zrem china beijing
 | xgroup     | O(1)       |
 
 ```redis
-# 添加队列(返回id值), *表示自动生成id(毫秒 + 偏移量))
+# Stream 中每一个消息都有一个唯一的id
+# 一条消息由一组字段值对组成，它基本上是一个小 dict 字典。键值对将会按照用户给定的顺序存储
+
+# 添加消息到stream末尾(返回id值), *表示自动生成唯一id(毫秒时间戳 + 偏移量))
 XADD mystream * key0 0
 XADD mystream * key1 1 key2 2
 
@@ -1570,13 +1820,16 @@ XADD mystream MAXLEN 2 * value 1
 XTRIM mystream MAXLEN 1
 XADD mystream * value 1
 
-# 删除entry
+# 删除entry（不会真正的删除消息，它只是给消息做了个标志位）
 XDEL mystream <id值>
+
+# 数量限制（自动将最老的消息清除，确保最多不超过指定长度）。如果消息积累太多，那么 Stream 链表会很长，对内存来说是一个大问题。
+XTRIM mystream MAXLEN 3
 
 # 查看长度. 返回2
 XLEN mystream
 
-# 查看队列
+# 查看队列.复杂度 O(log(N))，迭代的每一步都很快。不需要 XSCAN 命令（Redis 没有提供 XSCAN）。
 XRANGE mystream - +
 # 查看队列, 顺序相反显示
 XREVRANGE mystream + -
@@ -1594,43 +1847,42 @@ XRANGE mystream - + COUNT 2
 XRANGE mystream <id值> + COUNT 2
 
 
-# XREAD(非阻塞), 查看mystream队列
+# XREAD(非阻塞), 查看mystream队列（非阻塞模式和 XRANGE 似乎没有太大的区别）
 XREAD STREAMS mystream 0
+
+# 读取多个队列
+XREAD STREAMS mystream mystram1 0 0
 
 # 查看前2条entry
 XREAD COUNT 2 STREAMS mystream 0
 
-# 阻塞获取最新的entry, 获取后返回
+# 阻塞获取最新的entry, 获取后返回。$表示返回的最大的 ID。
+# 单位是毫秒，超时自动返回 null；0表示永久阻塞直到任何一个的 Stream 有数据返回。
 XREAD BLOCK 0 STREAMS mystream $
 ```
 
 - Consumer groups(消费者组)
 
-    > 多个消费者获取单个stream. entry被哪个消费者获取? 取决于哪个消费者更快(竞争)
-
 ```redis
-# 为mystream创建消费者组
+# 为mystream创建消费者组。最后一个参数表示从哪里开始，0从第一条开始，$表示仅消费最新消息
 XGROUP CREATE mystream mygroup $
+# 如果mygroup不存在，才创建
+XGROUP CREATE mystream mygroup $ MKSTREAM
 
 # 查看组内的指定队列
 XINFO GROUPS mystream
 
-# MKSTREAM: 可以创建一个不存在的流
-XGROUP CREATE newstream mygroup $ MKSTREAM
-
-# 创建user0, 并获取最新的1条entry
+# 创建user0, 并获取最新的1条entry. > 表示获取到目前为止，从未传递给其他消费者的消息，并且会更新 last_delivered_id，通常都是传递这个参数。
 XREADGROUP GROUP mygroup user0 COUNT 1 STREAMS mystream >
 
 # 创建user1, 并获取最新的1条entry(最新的entry, 被user0还是user1获取? 取决于谁更快执行这条命令)
 XREADGROUP GROUP mygroup user1 COUNT 1 STREAMS mystream >
 
-# 查看user0, 已经获取的entry
+# 查看user0, 已经获取的entry. 0表示消费者因故障重启时可以指定 ID 为 0 来获取分配给该消费者的所有未 ACK 的消息，实现消息的不丢失。
 XREADGROUP GROUP mygroup user0 STREAMS mystream 0
 
-# 确认已经获取的entry, 确认后的entry无法从XREADGROUP获取
-XACK mystream mygroup <id值>
-
-# 查看指定队列的entry的处理情况
+# 查看指定队列的entry的未处理（待确认的）消息.消费者可能会永久失败并且永远无法恢复。待处理消息该怎么办呢？
+# XDEL命令并未真正被移除，只是被标记为已删除，使用 XPENDING 也能够看到其还在存在于 PEL 中。
 XPENDING mystream mygroup
 
 # 查看所有entry的users获取情况(第三个参数为: entry从XADD到user XREADGROUP的时间(毫秒))
@@ -1639,11 +1891,15 @@ XPENDING mystream mygroup - + 2
 # 查看每个user的entry的处理情况
 XINFO CONSUMERS mystream mygroup
 
-# 1小时后修改指定entry的ack用户为user1
+# 转移消息（假设用户故障无法恢复）。1小时后修改指定entry的ack用户为user1
 XCLAIM mystream mygroup user1 3600000 <id值>
 
-# 1小时后修改指定entry在内的后10条entry的, ack用户为user1
+# 自动转移（相当于先调用 XPENDING，然后调用 XCLAIM）。1小时后修改指定entry在内的后10条entry的, ack用户为user1
 XAUTOCLAIM mystream mygroup user1 3600000 <id值> COUNT 10
+
+# 确认已经获取的entry, 确认后的entry无法从XREADGROUP获取，这条消息的 PEL 记录也被清除，从 Redis 服务器释放内存。
+# 一旦消费者成功处理了一条消息，它就应该调用 XACK
+XACK mystream mygroup <id值>
 ```
 
 ### HyperLogLog（概率集合）
@@ -3258,7 +3514,7 @@ slaveof no one
 
         - `runid`：slave保存的master节点id
 
-            - master会核对id与自己是否一致。id重启时重新生成，如果master重启过，会导致全量复制。可以使用`debug reload`进行重启，就不会丢失id
+            - master会核对id与自己是否一致。runid重启时重新生成，如果master重启过，会导致全量复制。可以使用`debug reload`进行重启，就不会丢失runid
 
         - `offset`：slave的偏移量。如果是第一次复制，那么值就是-1，将会引发全量复制
 
@@ -3304,7 +3560,7 @@ slaveof no one
 
     - 2.master响应`+FULLRESYNC`
 
-    - 3.slave接受master的响应数据保存运行id和offset（偏移量）
+    - 3.slave接受master的响应数据保存runid和offset（偏移量）
 
     - 4.master执行`bgsave` 命令生成RDB文件
 
@@ -3347,9 +3603,9 @@ slaveof no one
         - master根据`repl-backlog-buffer`（复制缓冲区）的数据发送给slave
 
 
-- 以前slave重启后丢失了master的id和复制偏移量，这导致重启后需要全量同步（已解决）：Redis 4.0 后，主节点的编号信息被写入到 RDB 中持久化保存。
+- 以前slave重启后丢失了master的runid和复制偏移量，这导致重启后需要全量同步（已解决）：Redis 4.0 后，主节点的编号信息被写入到 RDB 中持久化保存。
 
-- 以前slave切换master会导致全量复制（已解决）：Redis 4.0 以后，对 PSYNC 进行了改进。主从切换后，新的主节点会将先前的主节点记录下来。 info replication 的结果，可以可以看到 `master_replid` 和 `master_replid2` 两个id，前者是当前主节点的id，后者为先前主节点的id
+- 以前slave切换master会导致全量复制（已解决）：Redis 4.0 以后，对 PSYNC 进行了改进。主从切换后，新的主节点会将先前的主节点记录下来。 info replication 的结果，可以可以看到 `master_replid` 和 `master_replid2` 两个id，前者是当前主节点的runid，后者为先前主节点的runid
 
     - 新的master能够认识 <原master id>，并明白自己的数据就是从该节点复制来的。那么新的master就应该清楚它和该slave师出同门，应该接受部分复制。
 
@@ -3423,15 +3679,15 @@ slaveof no one
 
     - `hash-max-ziplist-entries`（哈希编码的触发条件）：主从复制一致，但实际内存不一样
 
-- 节点id：
+- runid：
 
-    > redis服务器启动时会分配一个不同的id, 从而识别不同的redis服务器
+    > redis服务器启动时会分配一个不同的runid, 从而识别不同的redis服务器
 
-    - `info server` 命令查看id
+    - `info server` 命令查看runid
 
     - 开启主从复制后, 主节点如果重启, 导致前后id不一致, 引发全量复制
 
-        - 解决方法: 主节点使用`debug reload` 命令(阻塞)重启, 从而保持id一致, 避免全量复制
+        - 解决方法: 主节点使用`debug reload` 命令(阻塞)重启, 从而保持runid一致, 避免全量复制
 
             - 缺点: 虽然可以避免全量复制, 但`debug reload` 是阻塞命令, 而阻塞期间会生成新的RDB文件, 并加载
 
@@ -3453,9 +3709,45 @@ slaveof no one
 
 ## sentinel (哨兵模式)
 
-Sentinel 会不断地检查你的主服务器和从服务器是否运作正常: [详情](http://redisdoc.com/topic/sentinel.html)
+- [《Redis使用手册》中的sentinel章](http://redisdoc.com/topic/sentinel.html)
 
-### 开启 sentinal
+- 如果master故障（以下步骤都需要手动操作）
+    - 1.将slave-1晋升为master（`slaveof no one`）
+    - 2.将slave-2成为new master的slave（`slaveof {NewMaster-ip} {NewMaster-port}`
+    - 3.客户端修改master的地址
+
+    - 结论：上述都需要人介入，所以不是高可用，sentinal就是为了解决这一问题而生
+
+- sentinel本身是redis节点，不存储数据，只支持部分命令
+
+- sentinel 会不断地检查你的主服务器和从服务器是否运作正常
+
+- 发现故障后，如果部署了多个sentinel（集群），会选举领导者负责故障转移（自动完成）
+    - 1.对slave-1节点执行：`slaveof no one`
+    - 2.对slave-2节点执行：`slaveof {NewMaster-ip} {NewMaster-port}`
+    - 3.通知客户端
+
+- 生产环境建议sentinel的节点分布在不同的物理机上
+
+- 至少部署3个或奇数个sentinel节点
+    - 3个是提高对于故障判定的准确性
+    - 领导者选举要一半+1个节点，奇数可以节省1个节点
+
+- sentinel集合监控1个master？还是多个master？两套方案的优点即另一方的缺点
+    - 监控1个master：
+        - 优点：每套sentinel相互隔离
+        - 缺点：资源浪费
+    - 监控多个master：
+        - 优点：降低运维成本，只需要一套sentinel集合就可以了
+        - 缺点：
+            - 如果这套sentinel集合出现异常，对多个redis造成影响
+            - 如果redis节点过多，会造成sentinel节点产生过多的网络连接
+
+- 部署sentinel的机器时间要同步（NTP服务），否则日志的时序会混乱。
+
+- sentinal节点的配置要尽可能一致
+
+### sentinal的配置
 
 > ```redis
 > # 命令
@@ -3485,41 +3777,76 @@ quorum = 2 两哨兵一主三从架构:
 +----+         +----+
 ```
 
-**sentinel** 配置文件 `/etc/sentinel.conf`加入以下代码:
+- 所有配置可以通过`sentinel set`命令进行调整。如`sentinel set mymaster quorum 2`
+
+- **sentinel** 配置文件 `~/redis/sentinel/redis-sentinel-26379.conf`加入以下代码:
 
 ```sh
-#允许后台启动
+# 端口
+port 26379
+
+# 允许后台启动
 daemonize yes
 
-# 仅仅只需要指定要监控的主节点 1
+# 日志文件的目录
+dir "/home/tz/redis/sentinel"
+
+# 日志文件名
+logfile "26379.log"
+
+# 仅仅只需要指定要监控的主节点，并自己定义名字
+# 1表示quorum：要判定master最终不可达的票数（设置越小，下线条件越宽松，反之越严格）一般设置sentinel节点数的一半+1（例如3个sentinel节点就设置2）
+# quorum除了代表票数外，还与领导者选举有关，至少要max(quorum, num(sentinels) / 2 + 1)个sentinel节点参与投票才能进行选举领导者（例如quorum=4，那么至少4个在线sentinel节点才能进行选举）
 sentinel monitor YouMasterName 127.0.0.1 6379 1
 
-# 主观下线的时间(这里为60秒)
+# sentinel定期PING 主从节点和其他sentinel节点，超过时间(单位毫秒，这里为60秒)没有答复，则判定不可达
 sentinel down-after-milliseconds YouMasterName 60000
 
 # 当主服务器失效时， 在不询问其他 Sentinel 意见的情况下， 强制开始一次自动故障迁移
+# 故障转移超时时间，超过后故障转移失败。下一次在故障超时时间设置为2倍
 sentinel failover-timeout YouMasterName 5000
 
-# 在执行故障转移时， 最多可以有多少个从服务器同时对新的主服务器进行同步， 这个数字越小， 完成故障转移所需的时间就越长。
+# 在执行故障转移，选举出新master后：最多可以有多少个slave同时对新master进行复制操作， 这个数字越大表示多个slave向新master同时发起复制操作（虽不会阻塞master，但会造成master的网络和磁盘IO开销）
+# =1表示slave会轮询发起复制
 sentinel parallel-syncs YouMasterName 1
 ```
 
-开启 sentiel 服务器
+- 其他配置参数。
+
+    - `sentinel auth-pass <YouMasterName> <password>`：master如果设置密码，这里要添加master的密码
+
+    - `sentinel notification-script <master-name> <script-path>`：故障转移期间，出现重要事件（如-sdown客观下线、-odown主观下线）时，会触发对应路径的shell脚本，并向脚本发送相应事件的参数。脚本的时间不能大于60秒，超过后会被kill掉
+        ```sh
+        #!bin/sh
+        # 获取所有参数
+        msg=$*
+
+        # 退出
+        exit 0
+        ```
+
+        - shell脚本记得设置执行权限（x），不然启动sentinel节点时会报以下错误
+        ```
+        >>> 'sentinel notification-script YouMasterName /home/tz/redis/sentinel/notification-script.sh'
+        Notification script seems non existing or non executable.
+        ```
+
+    - `sentinel client-reconfig-script <master-name> <script-path>`：将故障转移后的结果发送给对应路径的shell脚本（也可以使用上一个参数的脚本）。脚本的时间不能大于60秒，超过后会被kill掉
+
+### sentinel演示
+
+开启 sentiel 服务器（默认端口为26379）
 
 ```sh
-redis-sentinel /etc/sentinel.conf
+redis-sentinel ~/redis/sentinel/redis-sentinel-26379.conf
 # 或者
-redis-server /etc/sentinel.conf --sentinel
+redis-server ~/redis/sentinel/redis-sentinel-26379.conf --sentinel
 ```
-
-**sentinel** 端口为`26379`
 
 ```sh
 # 连接 sentinel
 redis-cli -p 26379
 ```
-
-### sentinel 的命令
 
 ```redis
 # 查看监听的主机
@@ -3554,42 +3881,337 @@ sentinel down-after-milliseconds YouMasterName 1000
 
 ![avatar](./Pictures/redis/sentinel1.gif)
 
+### 专属API
+```redis
+# 只显示指定master的ip和端口
+sentinel get-master-addr-by-name YouMasterName
+
+# 显示所有被监控的master的状态和统计信息
+sentinel masters
+
+# 指定master
+sentinel masters YouMasterName
+
+# 显示指定master中所有slave的状态和统计信息
+sentinel slaves YouMasterName
+
+# 显示监控指定master的其他sentinel节点信息（不包含自己）
+sentinel sentinels YouMasterName
+
+# 清除指定master的相关状态（如故障转移）
+sentinel reset YouMasterName
+
+# 对指定强制故障转移
+sentinel failover YouMasterName
+
+# 检测sentinel节点的总数，是否达到<quorum>的个数。如果quorum=3，sentinel节点个数是2，那么将无法进行故障转移
+sentinel ckquorum YouMasterName
+
+# 保存sentinel节点的配置，如配置文件还在则不会保存（只有配置文件丢失时有用）
+sentinel flushconfig
+
+# 取消指定master的监控。取消后可通过info Sentinel命令查看
+sentinel remove YouMasterName
+
+# 监控master（与配置文件一样）
+sentinel monitor YouMasterName 127.0.0.1 6379 1
+```
+
+### 实现原理
+
+- 3个定时任务
+
+    - 1.每隔10秒，每个sentinel节点会向master和slave发送`info`命令获取最新的拓扑图
+        - 通过向master执行`info`命令获取slave信息，这也是为什么不需要显示配置slave
+        - 节点故障，可以实时获取
+
+    - 2.每隔2秒，每个sentinel节点会订阅redis数据节点的`__sentinel__:hello频道`，并发送自身对master的判断以及自身的信息，从而了解其他sentinel节点
+        - 可以发现新的sentinel节点
+        - sentinel节点交换master的信息，并作为之后领导人选举的依据
+
+    - 3.每隔1秒，每个sentinel会给主从节点、其他sentinel节点，发送`PING`命令做一次心跳检测，判断是否可达
+        - 主观下线：超过`down-after-milliseconds`配置参数时，则对该节点做出失败判断。也叫主观下线，也就是存在误判的可能
+
+        - 客观下线：当主观下线的是master的时候，该sentinel节点会通过`sentinel is-master-down-by-addr`命令向其他sentinel节点询问对master的判断，当超过<quorum>个数时，就做出客观下线的决定
+
+            - master下线后sentinel节点依然会对其进行定期监控。日志设置`loglevel=debug`，可以查看
+                - 缺点：造成网络资源浪费
+    
+- 领导者sentinel节点选举：故障转移只需1隔sentinel节点完成，所有需要选举。redis使用raft算法实现
+
+    - 1.每个sentinel都有资格成为领导者，当主观下线master的时，sentinel节点会通过`sentinel is-master-down-by-addr`命令，会将自己设置为领导者
+    - 2.收到命令的sentinel，如果没有同意其他节点的发过来的命令，则同意该节点，否则拒绝
+    - 3.sentinel节点发现自己的票数>= max(quorum, num(sentinels) / 2 + 1)时，就成为领导者
+    - 4.如果此轮没有选举成功，则进入下一次选举
+    
+- 故障转移：领导者sentinel节点进行
+
+    - 1.在slave列表里选出一个作为master
+
+        - 1.过滤以下不健康：
+
+            | 不健康                                          |
+            |-------------------------------------------------|
+            | 主观下线                                        |
+            | 断线                                            |
+            | 5秒内没有回复过sentinel节点的`PING`命令心跳检测 |
+            | 与master失联超过`down-after-milliseconds*10秒`  |
+
+        - 2.选择`slave-priority`（优先级）最高的slave。存在则返回，不存在则继续下一步
+        - 3.选择复制偏移量最大的slave。存在则返回，不存在则继续下一步
+        - 4.选择`runid`最小的slave
+
+    - 2.对选择好的slave执行`slaveof no one`命令，成为master
+    - 3.向剩余的slave执行`slaveof {NewMaster-ip} {NewMaster-port}`
+
+- 如果没有可用的slave，将无法完成故障转移
+
+    - 可以手动启动一个从节点（配置添加`slaveof {master-ip} {master-port}`），它会被sentinel自动发现
+
+### slave（从节点）高可用
+
+- 只有master高可用：
+
+    ![avatar](./Pictures/redis/sentinel-slave.avif)
+
+    - 如果slave-1故障，client-1将失联，sentinel节点只会对slave-1做主观下线，因为故障转移是针对master的。
+
+    - 所以很多时候slave只是热备份，不让它参与客户端的读操作
+
+- 实现slave高可用：
+    - sentinel监控的slave变动事件
+        - `+switch-master`：切换master（从升主），说明减少了1个slave
+        - `+convert-to-slave`：切换slave（主降从），说明增加了1个slave
+        - `+sdown`：主观下线。说明某个slave可能不可用，sentinel没有slave客观下线。需要客户端自己实现
+        - `+reboot`：重启某节点，如果它是slave,说明添加了1个slave
+
+    - 只要掌握所有slave的状态，把所有slave看作一个资源池。无论上线还是下线都能感知到，高可用就到达了
+
+    ![avatar](./Pictures/redis/sentinel-slave1.avif)
+
 ## cluster (集群)
 
-Redis 集群不像单机 Redis 那样支持多数据库功能， 集群只使用默认的 0 号数据库， 并且不能使用 SELECT index 命令。[详情](https://mp.weixin.qq.com/s?src=11&timestamp=1604973763&ver=2697&signature=sfP3uoHQVifP6D8FsI*YtxzMzvqbDieWDj1R8J8iT5codhR2A3LGWF46jHQ8mKJk*RZ4qXixc7DUACwbXbU2-MhaJ2P2Tr0YF-eLIVBPrKdvlX*YGM8UGtJoOR1ee3oB&new=1)
+- 数据分布理论
 
-```redis
-# 查看 集群 配置
-config get cluster*
-```
+| 分区方式 | 哈希分区                                 | 顺序分区                                 |
+|----------|------------------------------------------|------------------------------------------|
+| 特点     | 离散度好、数据分布业务无关、无法顺序访问 | 离散度倾斜、数据分布业务相关、可顺序访问 |
+| 代表产品 | redis、cassandra、dynamo                 | bigtable、hbase、hypertable              |
 
-配置 6 个实例,从端口 6380 到 6385:
+- 哈希分区的几个方法：
 
-```sh
-# 这是6380
-port 6380
-daemonize yes
-pidfile "/var/run/redis-6380.pid"
-logfile "6380.log"
-dir "/var/lib/redis/6380"
+    - 1.节点取余分区（hash算法）：根据特定数据，如redis的key或用户id，hash(key) % N（节点数）计算哈希值，映射到对应节点
 
-replica-read-only yes
+        - 优点：简单。常用于数据库分库分表（一般采用预分区方式，提前规划好分区数），扩容时通常翻倍扩容，避免映射全部被打乱，导致全量迁移
 
-cluster-enabled yes
-cluster-config-file nodes.conf
+        - 缺点：扩容或收缩节点时，映射关系需要重新计算，会导致数据重新迁移
 
-# 每个节点每秒会执行 10 次 ping，每次会选择 5 个最久没有通信的其它节点。当然如果发现某个节点通信延时达到了 cluster_node_timeout / 2
-cluster-node-timeout 15000
-```
+    - 2.一致性哈希分区（Distributed Hash Table）：为每个节点分配一个token（0-2^32），这些token构成一个哈希环。先根据key计算hash值，然后顺时针找到第一个大于等于该hash值的token节点
 
-开启 6 个实例:
+        - 优点：增删节点，只影响哈希环相邻节点
+
+        - 缺点：
+            - 增删节点，会造成哈希环部分数据无法命中，需要手动处理或忽略这些数据
+                - 因此常用于缓存场景
+
+            - 使用少量节点时，节点变化将大范围影响哈希环中数据映射
+                - 因此不适合少量节点
+
+            - 增删节点，需要增加1倍或删除1半节点，才能保证数据和负载的均衡
+
+    - 3.虚拟槽分区：槽（slot）的数量远远大于节点数，采用大范围的槽是方便数据拆分和集群扩容。
+
+        - Dynamo也使用这方案
+
+        - redis cluster槽的范围为0-16383，假设有5个节点，每个节点负责3276个槽
+            - slot=CRC16(key) & 16383
+
+            ![avatar](./Pictures/redis/cluster7.avif)
+
+### 集群功能限制
+
+- 1.key批量操作受限：如`mget`、`mset`，只支持相同slot值的key。不同的slot值key不被支持
+- 2.事务：只支持key在同一个节点，不支持多个节点
+- 3.key为数据分区的最小粒度：不能将一个大key如hash、list映射到不同节点
+- 4.不支持多数据库：单机下redis支持16个数据库，集群只能使用默认的db 0 号数据库
+- 5.主从复制结构只支持一层：不支持嵌套树状复制结构
+
+### 手动建立集群
+
+- 开启6个redis
+
+    ```sh
+    # 通过for循环,开启6个实例
+    for (( i=6379; i<=6384; i=i+1 )); do
+        redis-server /var/lib/redis/$i/redis.conf
+    done
+    ```
+
+    - 第一次开启，没有内部配置文件，会自动创建一份
+
+        - redis会自动维护集群内部文件，不要手动修改，防止集群重启时产生错误
+
+        - nodes-6379.conf文件内容
+
+            ```
+            253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 :0@0 myself,master - 0 0 0 connected
+    vars currentEpoch 0 lastVoteEpoch 0
+            ```
+            - 最重要的是节点id（40位16进制字符串），用于标识集群内的唯一性，很多操作需要借助节点id来完成。
+                - 节点id不同于runid，节点id在集群初始化时只创建1次，重启后重用；runid重启是会重置，因此master节点重启会触发全量备份
+
+    - 开启后检测节点日志是否正确
+
+#### 节点握手
+
+- 由客户端连接6379节点，发起`cluster meet 127.0.0.1 6380`命令
+
+    - `cluster meet`是异步命令，执行后立刻返回
+
+    - 流程：
+        - 1.6379节点本地创建6380节点信息对象，并发送meet
+            ![avatar](./Pictures/redis/cluster-meet.avif)
+
+        - 2.6380节点收到后，回复`PONG`
+
+        - 3.之后6379和6380定期通过`PING/PONG`小学进行节点通信
+
+    - 在6379和6380分别执行`cluster nodes`命令（等同于nodes-6379.conf配置文件），可以看到双方已经建立集群
+        ![avatar](./Pictures/redis/cluster-meet1.avif)
+
+        ```redis
+        eaf4548fff6106be87d672019ecb600f2481f18d 127.0.0.1:6380@16380 master - 0 1692435953323 0 connected
+        253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 127.0.0.1:6379@16379 myself,master - 0 0 1 connected
+        ```
+
+- 握手没能正常工作，集群还在下线状态，读写都被禁止
+
+    ```redis
+    127.0.0.1:6379> set hello 11111
+    (error) ERROR CLUSTERDOWN Hash slot not served
+    ```
+
+    - `cluster info`命令查看
+    ```redis
+    127.0.0.1:6379> cluster info
+    cluster_state:fail
+    //以下省略
+    ```
+
+    - 只有当16384个槽全部分配给节点后，才进入在线状态
+
+#### 分配槽（slot）
+
+- 分配槽
+
+    ```sh
+    #!/bin/sh
+    for (( i=0; i<=5461; i=i+1 )); do
+        redis-cli -h 127.0.0.1 -p 6379 cluster addslots $i
+    done
+
+    for (( i=5462; i<=10922; i=i+1 )); do
+        redis-cli -h 127.0.0.1 -p 6380 cluster addslots $i
+    done
+
+    for (( i=10923; i<=16383; i=i+1 )); do
+        redis-cli -h 127.0.0.1 -p 6381 cluster addslots $i
+    done
+    ```
+
+    - `cluster nodes`查看节点分配的槽
+    ```redis
+    127.0.0.1:6379> cluster nodes
+    ba17a754f45ce4ac259768d973de8354eee10a1b 127.0.0.1:6384@16384 master - 0 1692437361478 5 connected
+    253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 127.0.0.1:6379@16379 myself,master - 0 1692437358000 1 connected 0-5461
+    a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3 127.0.0.1:6382@16382 master - 0 1692437359000 2 connected
+    4d36091538f0cfb2c73d18dd1d43dc37f4d198d2 127.0.0.1:6383@16383 master - 0 1692437360000 3 connected
+    d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2 127.0.0.1:6381@16381 master - 0 1692437361000 4 connected 10923-16383
+    eaf4548fff6106be87d672019ecb600f2481f18d 127.0.0.1:6380@16380 master - 0 1692437362480 0 connected 5462-10922
+    ```
+
+- 建立主从复制，必须在从节点上执行`cluster replicate {master nodeid}`
+
+    ```sh
+    redis-cli -h 127.0.0.1 -p 6382 cluster replicate 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+    redis-cli -h 127.0.0.1 -p 6383 cluster replicate eaf4548fff6106be87d672019ecb600f2481f18d
+    redis-cli -h 127.0.0.1 -p 6384 cluster replicate d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2
+    ```
+
+    - `cluster nodes`可以看到节点状态变为`slave`
+    ```redis
+    127.0.0.1:6379> cluster nodes
+    ba17a754f45ce4ac259768d973de8354eee10a1b 127.0.0.1:6384@16384 slave d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2 0 1692438829285 4 connected
+    253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 127.0.0.1:6379@16379 myself,master - 0 1692438825000 1 connected 0-5461
+    a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3 127.0.0.1:6382@16382 slave 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 0 1692438827280 1 connected
+    4d36091538f0cfb2c73d18dd1d43dc37f4d198d2 127.0.0.1:6383@16383 slave eaf4548fff6106be87d672019ecb600f2481f18d 0 1692438826277 0 connected
+    d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2 127.0.0.1:6381@16381 master - 0 1692438827000 4 connected 10923-16383
+    eaf4548fff6106be87d672019ecb600f2481f18d 127.0.0.1:6380@16380 master - 0 1692438829000 0 connected 5462-10922
+    ```
+
+- 此时集群已经创建成功，已经可以使用`set`命令了
+    ```redis
+    127.0.0.1:6379> cluster info
+    cluster_state:ok
+    //省略
+    ```
+
+### 自动建立集群
 
 ```sh
 # 通过for循环,开启6个实例
-for (( i=6380; i<=6385; i=i+1 )); do
+for (( i=6379; i<=6384; i=i+1 )); do
     redis-server /var/lib/redis/$i/redis.conf
 done
+
+# 自动建立集群
+redis-cli --cluster create 127.0.0.1:6379 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 --cluster-replicas 1
+
+# 查看集群是否建立成功（包含cluster nodes命令）
+redis-cli --cluster check 127.0.0.1:6379
 ```
+
+#### 演示
+
+- 至少配置6个节点，才能实现高可用
+
+    - 配置 6 个实例,从端口 6380 到 6385:
+
+    ```sh
+    # 端口
+    port 6380
+
+    # 后台运行
+    daemonize yes
+    pidfile "/var/run/redis-6380.pid"
+
+    # 日志和集群内部配置文件的保存目录
+    dir "/var/lib/redis/6380"
+
+    # 日志文件名
+    logfile "6380.log"
+
+    # 从节点只读模式
+    replica-read-only yes
+
+    # 开启集群模式
+    cluster-enabled yes
+
+    # 集群内部配置文件
+    cluster-config-file nodes-6380.conf
+
+    # 节点超时时间（单位毫秒）。每个节点每秒会执行 10 次 ping，每次会选择 5 个最久没有通信的其它节点。当然如果发现某个节点通信延时达到了 cluster_node_timeout / 2
+    cluster-node-timeout 15000
+    ```
+
+- 开启 6 个实例:
+
+    ```sh
+    # 通过for循环,开启6个实例
+    for (( i=6380; i<=6385; i=i+1 )); do
+        redis-server /var/lib/redis/$i/redis.conf
+    done
+    ```
 
 ![avatar](./Pictures/redis/cluster.avif)
 
@@ -3612,10 +4234,6 @@ redis-cli -c -p 6380
 重新连接后 get name 变成了 6384 实例
 
 ![avatar](./Pictures/redis/cluster.gif)
-
-Redis 集群包含 16384 个哈希槽（hash slot),每个节点负责处理一部分哈希槽,以及一部分数据
-
-![avatar](./Pictures/redis/cluster7.avif)
 
 ```redis
 # 查看每个node(节点),等同于nodes.conf文件
@@ -3678,63 +4296,471 @@ redis-cli -p 6381 debug segfault
 
 重新启动 6381 或者 6384 后会恢复集群
 
-## publish subscribe (发布和订阅)
+### Gossip通信协议
 
-- 消息不会持久化
+- 分布式存储需要维护node的元数据信息（故障信息、状态信息等）。维护方式分为：集中式、P2P
 
-- 只能在同一个 `redis-server` 下使用
+     - redis采用P2P的Gossip（流言）协议。node彼此不断通信交换信息，一段时间后所有node都知道cluster的完整信息
 
-- 应用：聊天室、公告牌、b站等视频服务、服务之间的消息解耦
+- 通信过程：
 
-> ```redis
-> # 发布
-> pubhlish 订阅号 内容
-> ```
+    - 1.每个node都会开通一个tcp通道，与其他node通信。端口为基础端口加上10000
 
-> ```redis
-> # 订阅
-> subscribe 订阅号1 订阅号2
-> ```
+    - 2.每个node每秒1次选择几个node发送`PING`消息
+        - 通信node过多虽然可以及时获取信息，但交换成本过高。因此选择通信的node列表就变得非常重要
+            - 1.每秒随机5次找出最久没有通信的1个node，发送`PING`
+            - 2.每100毫秒都会扫描本地node节点，如果发现最后通信时间大于`node-timeout` / 2，则立刻发送`PING`
+            - 根据以上2个规则可以计算出：每个node每秒发送`PING`的数量= 1 + 10 * num(node.pong_received > cluster_node_timeout / 2)
+                - 因此`cluster_node_timeout`参数对消息发送的影响非常大。带宽资源紧张时可以调整为30秒（默认为15秒）
 
-- 视频服务
-    ```redis
-    # 客户端订阅
-    subscribe video:changes
+    - 3.接受`PING`的node，回复`PONG`
 
-    # 另一个客户端push
-    publish video:changes "video1, video2"
-    ```
+- 消息类型：消息格式划分为`消息头` + `消息体`。消息头是固定的2KB，消息体包含其他node的信息
 
-- 我这里一共三个客户端.左边为发布者;右边上订阅 rom,rom1;右边下只订阅 rom
+    - ping消息：封装了自己node和其他node状态的数据。用于检测node是否在线，并交换彼此状态信息。cluster内最频繁的消息
 
-    ![avatar](./Pictures/redis/subscribe.gif)
+    - pong消息：响应ping和meet。封装了自身node状态的数据。也可以向cluster广播自身pong，对自身状态的更新
+        ![avatar](./Pictures/redis/gossip-pong.avif)
 
-- `psubscribe` 通过通配符*,可以匹配 rom,rom1 等订阅.
+    - meet消息：通知有新node加入
 
-    - psubscribe 信息类型为 `pmessage`
-    - subscribe 信息类型为 `message`
+    - fail消息：判断一个node下线时，会向cluster广播一个fail消息。其他node收到后会把对应node更新为下线状态
 
-    ```redis
-    psubscribe rom*
-    ```
+### 集群的扩容和收缩
 
-    ![avatar](./Pictures/redis/subscribe1.gif)
+- 扩容和收缩：可以看作是槽（slot）和对应数据在不同node之间移动
 
-### 键空间通知（监控改动的键）
+#### 扩容
 
-接收那些以某种方式改动了 Redis 数据集的事件。[详情](http://redisdoc.com/topic/notification.html)
+- 扩容是cluster最常见的需求
 
-```redis
-# 开启键空间通知
-config set notify-keyspace-events "AKE"
+- 1.准备好2个新节点（1个master + 1个slave）
+```sh
+redis-server redis-6385.conf
+redis-server redis-6386.conf
+```
+- 2.加入集群
+```sh
+# 加入到6379集群
+redis-cli --cluster add-node 127.0.0.1:6385 127.0.0.1:6379
+redis-cli --cluster add-node 127.0.0.1:6386 127.0.0.1:6379
+```
+```sh
+# 设置6386为6385的slave。这里输入6385的节点id（nodeid）
+redis-cli -p 6386 cluster replicate 38df4d6291d994f1a9aa629fd23404f74abed9db
 ```
 
-```redis
-# 订阅监听key
-psubscribe '__key*__:*'
+- 3.分配槽
+```sh
+redis-cli --cluster reshard 127.0.0.1:6379
+# 以下为输出
+# 输入4096。之前3个主节点，现在4个主节点16384 /4 = 4096
+How many slots do you want to move (from 1 to 16384)? 4096
+# 这里输入新节点6385的节点id
+What is the receiving node ID? 38df4d6291d994f1a9aa629fd23404f74abed9db
+# 这里输入源节点的id，分别输入6379、6380、6381的节点id，最后输入done
+Source node #1: 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+Source node #2: eaf4548fff6106be87d672019ecb600f2481f18d
+Source node #3: d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2
+Source node #4: done
 ```
 
-![avatar](./Pictures/redis/keyspace.avif)
+```sh
+# 检测节点的均衡性。在2%以内表示相对均衡，无需调整
+redis-cli --cluster rebalance 127.0.0.1:6379
+*** No rebalancing needed! All nodes are within the 2.00% threshold.
+```
+
+- 4.最后`cluster nodes`命令查看cluster
+
+#### 收缩
+
+- 需要把自身的槽（slot）均匀的迁移到其他主节点
+
+- cluster有4个节点，平均每个4096个槽。现在要下线1个节点（6385端口），剩下3个节点也就是4096 / 3 = 1365 + 1365 + 1366个槽。一共3次迁移
+
+- 1.迁移
+
+    - 从6385迁移到6379
+    ```sh
+    redis-cli --cluster reshard 127.0.0.1:6385
+    # 以下为输出
+    # 输入1365
+    How many slots do you want to move (from 1 to 16384)? 1365
+    # 输入目标的节点id，我这里是6379
+    What is the receiving node ID? 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+    # 输入源的节点id，也就是下线的6385节点id
+    Source node #1: 38df4d6291d994f1a9aa629fd23404f74abed9db
+    Source node #2: done
+    ```
+
+    - 从6385迁移到6380
+    ```sh
+    redis-cli --cluster reshard 127.0.0.1:6385
+    # 以下为输出
+    # 输入1365
+    How many slots do you want to move (from 1 to 16384)? 1365
+    # 输入目标的节点id，这次是6380
+    What is the receiving node ID? eaf4548fff6106be87d672019ecb600f2481f18d
+    # 输入源的节点id，也就是下线的6385节点id
+    Source node #1: 38df4d6291d994f1a9aa629fd23404f74abed9db
+    Source node #2: done
+    ```
+
+    - 从6385迁移到6380
+    ```sh
+    redis-cli --cluster reshard 127.0.0.1:6385
+    # 以下为输出
+    # 这次输入1366
+    How many slots do you want to move (from 1 to 16384)? 1366
+    # 输入目标的节点id，这次是6381
+    What is the receiving node ID? d1ab3a98eb3f46bcb5572ecef1c29ba97fb668b2
+    # 输入源的节点id，也就是下线的6385节点id
+    Source node #1: 38df4d6291d994f1a9aa629fd23404f74abed9db
+    Source node #2: done
+    ```
+
+- 2.忘记节点：不在让其他node与下线node进行Gossip消息交换
+
+    - 如果只有master下线，则需要把slave指向其他master
+    - 如果主从都下线，建议先下线slave，在下线master。防止不必要的全量复制
+
+    - 错误做法：`cluster foget {nodeid}`命令
+
+        - 会把nodeid的node加入节点禁用列表，有效期是60秒，超过会再次进行Gossip消息交换。也就是只有60秒时间，要集群内的每个node都要执行此命令
+
+            - 因此不建议线上用使用命令，需要大量节点命令交互，容易遗漏
+
+    - 正确做法：
+
+        ```sh
+        # 下线slave 6386 最后输入节点id
+        redis-cli --cluster del-node 127.0.0.1:6386 16a182f86987e9b2336f6eff4ba5f95db7bbe324
+
+        # 下线master 6385 最后输入节点id
+        redis-cli --cluster del-node 127.0.0.1:6385 38df4d6291d994f1a9aa629fd23404f74abed9db
+        ```
+
+- 3.最后`cluster nodes`命令查看cluster
+    - 不包含6385和6386表示安全下线
+
+### key的重定向
+
+- key的重定向：
+
+    - `redis-cli -c`开启自动重定向get key。不过我建议直接使用`iredis`客户端
+
+    ```redis
+    # 如果key不在本地，会显示MOVED。我这里表示key在6379节点的866槽。
+    127.0.0.1:6380> get hello
+    MOVED 866 127.0.0.1:6379
+    "11111"
+
+    # 查看key所在的槽（slot）
+    cluster keyslot hello
+    ```
+    ![avatar](./Pictures/redis/cluster-client重定向.avif)
+
+- `hash-tag`：如果key包含`{}`只计算{}内的hash值。这样可以指定一些key，存储在同一个槽
+
+    ```redis
+    # 只计算1的hash值
+    set hello:{1}:1 11111
+    set hello:{1}:2 11111
+    set hello:{1}:3 11111
+
+    # 使用mget测试是否在同一个槽
+    mget hello:{1}:3 hello:{1}:2 hello:{1}:1
+    ```
+
+#### Smart客户端
+
+- 通过客户端内部维护slot->node的映射关系，直接到目的node查找。从而减少1次网络往返
+
+- jedis客户端需要自行修改
+
+### 故障转移
+
+- 故障发现：
+
+    - 主观下线（pfail）：`cluster-node-timeout`时间内，发送的`PING`消息没有回复。会更新本地对node的状态为主观下线。然后在cluster内广播
+
+    - 客观下线：node接受到其他node的pfail，都会尝试触发客观下线
+        - 统计下线报告的数量
+            - 小于cluster主节点总数的一半，则退出
+            - 大于cluster主节点总数的一半，则标记客观下线
+                - 广播`fail`
+                    - 通知cluster内的node标记故障节点为客观下线状态，并立刻生效
+                    - 通知故障节点的slave触发故障转移
+
+                    - 但可能会存在cluster被分割成一大一小两个独立cluster
+                        - 大cluster完成客观下线，并广播`fail`
+                        - 小cluster无法接受到`fail`。但只要恢复后，只要故障节点变为客观下线，最终可以通过Gossip消息传播到所有node
+
+                        ![avatar](./Pictures/redis/cluster-网络分区.avif)
+
+- 故障恢复：下线的master的所有slave，从中选一个成为新master
+
+    - 1.资格检查：每个slave都要检查与master的断线时间。如果超过`cluster-node-time * cluster-slave-validity-factor（有效因子，默认10）`则没有资格
+
+    - 2.准备选举时间：复制偏移量越大的slave，说明延迟越低，应该具有更高的优先级，将提前触发故障选举流程
+        ![avatar](./Pictures/redis/cluster-准备选举时间.avif)
+
+    - 3.发起选举：slave定时任务检测到达故障选举时间（failover_auth_time）到达后，发起选举
+
+        - 1.更新配置纪元
+
+            - 配置纪元：是一个只增不减的整数。
+
+                - 作用：标识cluster内每个master的不同版本，和当前cluster的最大版本。每次出现新的master（新加入或由slave转换而来）、slave竞争选举。都会递增cluster全局的配置纪元，赋值给相关master
+                    - 新节点的加入
+                    - 槽节点映射冲突检测
+                    - slave投票选举冲突检测
+
+                - cluster维护一个全局的配置纪元（clusterState.current Epoch），记录cluster内所有master配置纪元的最大版本
+
+                - master维护自身的配置纪元，表示当前master的版本，每个master的配置纪元都不相等
+
+                    - 配置纪元会跟随`PING/PONG`消息在cluster内传播，如果发送方和接收方的master配置纪元相等，则表示出现了冲突，节点id（nodeid）更大的一方会递增全局配置纪元，并赋值给当前node来区分冲突
+
+                - slave会复制master的配置纪元。
+
+                    - slave每次发起投票都会自增cluster的全局配置纪元
+
+        - 2.在cluster内广播选举信息，并记录已发送过的消息状态，保证该slave在一个配置纪元内只能发起一次选举。
+
+    - 4.选举投票：每个配置纪元代表一次选举周期，在开始投票之后的`cluster-node-timeout * 2`时间内slave没有获取足够数量的投票，则本次选举作废。slave将自增配置单元发起下一轮投票，直到选举成功为止。
+        - cluster内的master进行领导者选举。
+        - 当slave收集到N/2+1个持有槽的master投票，slave就会替换为master
+            - 故障master也算在投票数内，假设cluster是3主3从，有2个master部署在同一个机器上，当这台机器宕机时，slave无法收集到3/2+1个master选票导致故障转移失败
+                - 解决方法：部署cluster时，所有master最少需要部署3台物理机上，才能避免单点问题
+
+    - 5.替换master
+        - slave取消复制变为master
+        - 执行`clusterDelSlot`撤销故障master的槽，并执行`clusterAddSlot`把这些槽委派给自己
+        - 向cluster广播pong，通知cluster内的所有node：当前slave变为master，并接管了槽的信息
+
+#### 日志演示
+
+![avatar](./Pictures/redis/cluster-故障转移演示.avif)
+
+- 故障转移
+
+    - 1.强制关闭redis 6379
+    ```sh
+    kill -9 4748
+    ```
+    - 2.查看6379的slave 6382的日志，显示复制中断
+    ```
+    4906:S 20 Aug 2023 22:18:16.610 # Connection with master lost.
+    4906:S 20 Aug 2023 22:18:16.610 * Caching the disconnected master state.
+    4906:S 20 Aug 2023 22:18:16.610 * Reconnecting to MASTER 127.0.0.1:6379
+    4906:S 20 Aug 2023 22:18:16.610 * MASTER <-> REPLICA sync started
+    4906:S 20 Aug 2023 22:18:16.610 # Error condition on socket for SYNC: Connection refused
+    ```
+
+    - 3.其他两个master（6380、6381）将6379标记为主观下线，超过半数后标记为客观下线
+
+    ```
+    4854:M 20 Aug 2023 22:18:33.344 * Marking node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 as failing (quorum reached).
+    4906:S 20 Aug 2023 22:18:33.344 # Cluster state changed: fail
+    ```
+
+    - 4.6382在客观下线后准备选举时间，日志显示延迟879毫秒之后执行
+    ```
+    4906:S 20 Aug 2023 22:18:33.430 # Start of election delayed for 879 milliseconds (rank #0, offset 16993).
+    ```
+
+    - 5.延迟选举时间达到后，slave更新配置纪元（epoch），并发起故障选举
+    ```
+    4906:S 20 Aug 2023 22:18:34.333 # Starting a failover election for epoch 13.
+    ```
+
+    - 6.两个master（6380和6381）对slave（6385）投票
+    ```
+    4854:M 20 Aug 2023 22:18:34.334 # Failover auth granted to a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3 for epoch 13
+    ```
+    - 7.slave获取超过半数的投票后，执行替换master操作，完成故障转移
+    ```
+    4906:S 20 Aug 2023 22:18:34.336 # Failover election won: I'm the new master.
+    4906:S 20 Aug 2023 22:18:34.336 # configEpoch set to 13 after successful failover
+    ```
+
+    - 8.`cluster nodes`命令查看状态。6379状态是fail（客观下线），6382成为master
+    ```redis
+    a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3 127.0.0.1:6382@16382 master - 0 1692541920389 13 connected 0-1364 1366-5461
+    253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 127.0.0.1:6379@16379 master,fail - 1692541096691 1692541092000 10 disconnected
+    ```
+
+- 故障节点恢复
+    - 1.重新启动6379
+    ```sh
+    redis-server ~/redis/cluster/redis-6379.conf
+    ```
+    - 2.6379日志：成为了6382的slave
+    ```
+    8141:M 20 Aug 2023 22:35:33.617 # Configuration change detected. Reconfiguring myself as a replica of a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3
+    ```
+    - 3.cluster内其他node接收到6382发来`PING`，清空客观下线
+    ```
+    4801:M 20 Aug 2023 22:35:33.713 * Clear FAIL state for node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9: master without slots is reachable again.
+    ```
+    - 4.6379发起6382的复制流程
+    ```
+    8141:S 20 Aug 2023 22:35:38.618 * MASTER <-> REPLICA sync: Flushing old data
+8141:S 20 Aug 2023 22:35:38.618 * MASTER <-> REPLICA sync: Loading DB in memory
+    ```
+
+#### 手动故障转移
+
+- 在slave执行`cluster failover`命令，slave会变为master（默认情况下，客户端会有短暂阻塞，但不会丢失数据）
+
+    - 1.slave统治master停止处理所有客户端请求
+    - 2.master发送对应slave延迟复制的数据
+    - 3.slave接受处理延迟复制的数据，知道主从复制的偏移量一致为止，保证复制数据不丢失
+
+    - 4.slave立刻发起投票选举（不需要延迟触发机制）。选举成功后成为master，向cluster广播master`PONG`消息
+    - 5.旧master接受到消息后，更新自身配置成为slave，解除所有客户端的阻塞，这些请求会被重定向到新master上执行
+    - 6.新slave向新master发起全量复制流程
+
+- 应用场景：
+
+    - 1.调整节点部署时，如节点所在的老机器替换到了新机器。
+
+    - 2.强制故障转移。当自动故障转移失败时，只要master有存活的slave就可以了。自动转移失败的场景有以下
+        - 1.master和所有slave同时故障。尽量保证master和slave不在同一机器/机架上。除非机房大面积故障，不然两台机器/机架故障概率很低
+        - 2.slave与master复制断线时间爱你超过`cluster-slave-validity-factor * cluster-node-timeout + repl-ping-slave-period`导致slave被判定为没有故障转移资格。
+            - 手动故障转移不做中断超时检查
+        - cluster超过一半以上的master同时故障
+
+    - 针对以上情况`cluster failover`命令提供两个参数`force/takeover`
+        - `cluster failover force`：salve直接发起选举，不再跟master确认复制偏移量（数据会丢失），slave选举成功后替换新master，并向cluster广播配置
+            - 应用场景：master宕机无法完成自动故障转移
+
+        - `cluster failover takeover`：不在进行选举，而是直接替换成为新master。由于没有领导者选举发起故障转移，可能会导致配置纪元（epoch）冲突。冲突发生后以节点id（nodeid）高的一方为准，低的一方在这段时间内写入的数据会丢失
+
+            - 应用场景：cluster内超过一半以上master故障，因为slave无法收到超过半数以上master的投票，所以无法完成选举
+
+            - 例子：cluster分别部署在2个同城机房，每个机房都有4个master和4个slave
+
+                ![avatar](./Pictures/redis/cluster-takeover.avif)
+
+                - 当两个机房网络中断后：
+                    - 机房A：完成自动故障转移，slave-4成为master-4
+                    - 机房B：运维人员对slave-1、slave-2、slave-3分别执行`cluster failover takeover`命令强制故障转移
+                - 当两个机房网络恢复后：cluster会有两套持有相同槽信息的node，cluster会使用配置纪元（epoch）高的master槽信息，相等时使用节点id（nodeid）更高的一方。另一方在这段时间内写入的数据将会丢失
+
+- 建议优先级：`cluster failover` > `cluster failover force` > `cluster failover takeover`
+
+### 集群倾斜
+
+- 数据倾斜
+
+    - 1.node和槽（slot）分配严重不均
+
+        ```sh
+        # 查看每个node负责的槽和key总量，以及每个槽平均的key数
+        redis-cli --cluster info 127.0.0.1:6379
+        127.0.0.1:6382 (a18392ee...) -> 3 keys | 5461 slots | 1 slaves.
+        127.0.0.1:6381 (d1ab3a98...) -> 3 keys | 5462 slots | 1 slaves.
+        127.0.0.1:6380 (eaf4548f...) -> 3 keys | 5461 slots | 1 slaves.
+        [OK] 9 keys in 3 masters.
+        0.00 keys per slot on average.
+        ```
+
+        ```sh
+        # 节点对应的槽数量不均匀，可以使用
+        redis-cli --cluster rebalance 127.0.0.1:6379
+        ```
+
+    - 2.不同槽对应的key数量差异过大
+        - CRC16哈希函数，正常情况槽内key的数量会相对均衡
+        - 当大量使用`hash_tag`时，会映射到同一个槽
+            ```redis
+            # 获取槽有多少个key
+            cluster countkeysinslot {slof}
+
+            # count代表循环获取所有key，从而发现过度使用hash_tag的槽
+            cluster getkeysinslot {slof} {count}
+            ```
+    - 3.集合对象包含大量元素（也就是bigkey）
+
+        - cluster的槽迁移是对key执行`migrate`命令，如果key过大可能会超时导致迁移失败。
+
+        ```sh
+        # 搜索bigkey
+        redis-cli --bigkey
+        ```
+
+    - 4.内存相关配置不一致
+        - 如`hash-max-ziplist-value`、`set-max-intset-entries`等压缩数据配置。如果有大量hash、set的key，极端情况下可能会有数倍内存差异，造成node内存倾斜
+
+- 请求倾斜：对热key或大key使用算法复杂度比较高的命令（如hgetall、smembers等），会导致node负载过高
+
+    - 1.合理设计key：热key拆分，使用`hmget`代替`hgetall`
+    - 2.不要使用热key作为`hash_tag`，避免映射到同一个槽
+    - 3.对于一致性不高的场景，客户端使用本地缓存减少热key调用
+
+### 单机redis数据迁移到cluster
+```sh
+redis-cli import 127.0.0.1:6379 --from --copy --replace
+```
+### 常见问题
+
+- 为了完整性，默认情况下16384个槽，任何一个没有指派到node时，cluster是不可用的。执行任何命令会返回`（error）CLUSTERDOWN Hash slot not served`错误。
+
+    - 但当持有槽的master下线时：从故障发现到自动完成转移期间cluster是不可用的。可以设置参数`cluster-require-full-coverage=no`，当有master下线也只影响它负责槽的相关命令执行，不影响其他master
+
+- 带宽消耗
+
+    - cluster带宽消耗分为：读写命令消耗 + Gossip消息消耗
+
+        - cluster内每个node通过`PING/PONG`消息彼此交换信息，官方建议cluster的node控制在1000以内
+
+        - 消息数据量：每个消息包含：slots槽数组（2KB）+ cluster 1/10的状态数据（10个node状态数据约为1KB）
+
+            - 例子：200个node的cluster，部署在20台物理机上，每台划分10个node，`cluster-node-timeout`（默认15秒），这时`PING/PONG`消息占用25MB，如果设置成20，降低到15MB以下
+
+    - 合理规划：
+
+        - 满足业务尽量避免大集群。同一个系统可以针对不同业务常见拆分多套cluster
+
+        - 由于机器上线带宽是固定的，相同规模的cluster分布的机器越多，每台机器划分的节点划分的越均匀，则cluster内的整体可用带宽越高
+
+            - 例子：《redis开发与运维》作者维护一个推荐系统，根据数据特征使用了5个cluster， 每个cluster的node规模控制在100以内
+
+            - 如果cluster有60个node，部署在3台物理机上，每台部署20个node。这时带宽消耗将非常严重。
+
+        - 适度提高`cluster-node-time`降低消息发送频率，同时此参数还影响故障转移速度，因此需要兼顾二者平衡
+            - 主观下线（pfail）识别时间=cluster-node-timeout
+            - 主观下线状态消息传播时间<=cluster-node-timeout / 2。超过此时间未通信的node,会发起`ping`
+            - slave转移时间<=1000毫秒。由于存在延迟发起选举机制，偏移量最大的slave会最多延迟1秒发起选举。通常第一次就会选举成功，所以slave执行转移时间在1秒以内
+            - 故障转移时间：failover-time（毫秒）<= cluster-node-timeout + cluster-node-timeout / 2 + 1000
+
+- 避免在大量node的集群内，频繁使用Pub/Sub功能，否则会严重造成网络带宽的消耗
+
+    - 建议使用sentinel结构专门用于Pub/Sub功能
+
+- 集群读写分离
+
+    - 只读连接：cluster模式下，slave不接受任何读写请求（复制配置的`slave-read-only`在cluster模式下无效）
+
+        - 可以使用`readonly`命令打开客户端只读状态，让slave读取，分担master的压力。
+
+            - `readonly`只是连接级别生效，每次新建连接都要执行。开启readonly想关闭使用`readwrite`命令
+
+    - 读写分离：
+
+        - 需要修改客户端：
+            - 1.维护每个master可用的slave列表
+            - 2.针对读命令维护请求node路由
+            - 3.slave新建连接开启`readonly`状态
+
+        - 不建议做读写分离，因为成本很高，可以直接拓展master数量
+        - 读写分离用于特殊的业务场景
+            - 1.利用复制的最终一致性，使用多个slave做跨机房部署，降低命令网络延迟
+            - 2.master故障转移时间过长，业务把读请求路由给slave保证读操作可用
+            - 以上场景，也可以在不同机房独立部署redis cluster解决，通过客户端多写来维护；读命令直接请求到最近机房的cluster，故障时客户端转向另一个cluster
 
 ## 调试和性能测试和优化
 
@@ -4258,14 +5284,18 @@ slowlog reset
 
 - [阿里开发者：一文详解Redis中BigKey、HotKey的发现与处理](https://developer.aliyun.com/article/788271?spm=a2c6h.14164896.0.0.2a3a303akyut8e)
 
+- [vivo互联网技术：Bigkey问题的解决思路与方式探索]()
+
 - 由于网络的一次传输 MTU 最大为 1500 字节，所以为了保证高效的性能，建议单个 k-v 大小不超过 1KB，一次网络传输就能完成，避免多次网络交互
 
 - bigkey：key对应的value的占用内存较大
 
     - 字符串：最大可以512MB
 
+        - string的value值超过1MB，就可以认为是Bigkey。
+
     - 列表：最大2^32-1个元素
-        - 非字符串的类型，存储其实也是字符串
+        - 非字符串的类型，存储其实也是字符串。元素个数超过2000个，就可以认为是Bigkey。
 
     - STRING类型的Key，它的值为5MB（数据过大）
 
@@ -4275,22 +5305,107 @@ slowlog reset
 
     - HASH格式的Key，它的成员数量虽然只有1000个但这些成员的value总大小为100MB（成员体积过大）
 
-- 危害：
-    - 在cluster中内存使用不均匀（平衡）
-    - 超时阻塞：redis的单线程，操作bigkey比较耗时会阻塞
-    - 网络拥塞：假设bigkey为1MB，每秒访问1000次，就是1000MB流量，而千兆网卡才128MB/s
+- Bigkey是怎么产生的：程序设计不当或者对于数据规模预料不清楚造成的
 
-    - bigkey的存在并不是致命的，如果bigkey同时还是热点key，才是致命
+    - 【统计】：遇到一个统计类的key，是记录某网站的访问用户的IP，随着时间的推移，网站访问的用户越来越多，这个key的元素数量也会越来越大，形成Bigkey。
+
+    - 【队列】：把Redis当做队列使用，处理任务，如果消费出现不及时情况，将导致队列越来越大，形成Bigkey。
+
+    - 【缓存】： 缓存失效，从数据库查询出来序列化放到Redis里，短时间内会缓存大量的数据到Redis的key中，形成Bigkey。
+
+- 危害：
+
+    > bigkey的存在并不是致命的，如果bigkey同时还是热点key，才是致命
+
+    - 1.在cluster中内存使用不均匀（平衡）。不均匀会不利于cluster对内存的统一管理，有数据丢失风险。
+
+        ![avatar](./Pictures/redis/bigkey1.avif)
+
+        - 图中的三个节点是同属于一个集群，它们的key的数量比较接近，但内存容量相差比较多
+        - 可以使用使用Daas平台“工具集-操作项管理”，选择对应的slave实例执行分析，找出具体的Bigkey。
+
+    - 2.超时阻塞：redis的单线程，操作bigkey比较耗时会阻塞，导致客户端访问超时，更严重的会造成master-slave的故障切换。造成阻塞的操作不仅仅是业务程序的访问，还有key的自动过期的删除、del删除命令
+
+        - 业务方反映程序访问Redis集群出现超时现象，hkeys访问Redis的平均响应时间在200毫秒左右，最大响应时间达到了500毫秒以上，如下图。
+
+        ![avatar](./Pictures/redis/bigkey2.avif)
+
+        - 1.使用Daas平台“服务监控-数据库实例监控”，选择master节点，选择Redis响应时间监控指标`redis.instance.latency.max`，如下图所示，从监控图中我们可以看到
+
+            - (1).正常情况下，该实例的响应时间在0.1毫秒左右。
+
+            - (2).监控指标上面有很多突刺，该实例的响应时间到了70毫秒左右，最大到了100毫秒左右，这种情况就是该实例会有100毫秒都在处理Bigkey的访问命令，不能处理其他命令。
+
+            - 我们找到了具体的master实例，然后使用master实例的slave去分析下Bigkey情况。
+
+            ![avatar](./Pictures/redis/bigkey3.avif)
+            ![avatar](./Pictures/redis/bigkey4.avif)
+
+        - 2.使用Daas平台“工具集-操作项管理”，选择slave实例执行分析，分析结果如下图，有一个hash类型key有12102218个fields。
+
+            ![avatar](./Pictures/redis/bigkey5.avif)
+
+            - 和业务沟通，这个Bigkey是连续存放了30天的业务数据了，建议根据二次hash方式拆分成多个key，也可把30天的数据根据分钟级别拆分成多个key，把每个key的元素数量控制在5000以内，目前业务正在排期优化中。优化后，监控指标的响应时间的突刺就会消失了。
+
+    - 3.网络拥塞：假设bigkey为1MB，每秒访问1000次，就是1000MB流量，而千兆网卡才128MB/s
+        - vivo的Redis服务器是采用单机多实例的方式来部署Redis实例的，也就是说一个Bigkey可能会对同一个服务器上的其他Redis集群实例造成影响，影响到其他的业务。
+
+    - 4.迁移困难：
+
+        - cluster水平扩容就会涉及到key的迁移。
+
+            - (1).通过migrate命令来完成的，migrate实际上是通过dump + restore + del三个命令组合成原子命令完成，它在执行的时候会阻塞进行迁移的两个实例，直到以下任意结果发生才会释放：迁移成功，迁移失败，等待超时。
+            - (2).如果key的迁移过程中遇到Bigkey，会长时间阻塞进行迁移的那两个实例，可能造成客户端阻塞，导致客户端访问超时；也可能迁移时间太长，造成迁移超时导致迁移失败，水平扩容失败。
+
+            - vivo失败例子：一个Redis集群水平扩容的工单，需要进行key的迁移，当工单执行到60%的时候，迁移失败了。
+
+                ![avatar](./Pictures/redis/bigkey6.avif)
+
+                - 进入工单找到失败的实例，使用失败实例的slave节点，在Daas平台的“工具集-操作项管理”进行Bigkey分析。经过分析找出了hash类型的Bigkey有8421874个fields，正是这个Bigkey导致迁移时间太长，超过了迁移时间限制，导致工单失败了。
+
+                ![avatar](./Pictures/redis/bigkey7.avif)
+
+                - 和业务沟通，这些key是记录用户访问系统的某个功能模块的ip地址的，访问该功能模块的所有ip都会记录到给key里面，随着时间的积累，这个key变的越来越大。同样是采用拆分的方式进行优化，可以考虑按照时间日期维度来拆分，就是一段时间段的访问ip记录到一个key中。Bigkey优化后，扩容的工单可以重试，完成集群扩容操作。
+
+        - vivo分析了Daas平台的水平扩容时迁移key的过程及影响参数
+
+            - 1.`cluster-node-timeout`：控制集群的节点切换参数，master堵塞超过cluster-node-timeout/2这个时间，就会主观判定该节点下线pfail状态，如果迁移Bigkey阻塞时间超过cluster-node-timeout/2，就可能会导致master-slave发生切换。
+
+                - 优化：默认是60秒，在迁移之前设置为15分钟，防止由于迁移Bigkey阻塞导致master-slave故障切换。
+
+            - 2.`migrate timeout`：控制迁移io的超时时间，超过这个时间迁移没有完成，迁移就会中断。
+
+                - 优化：每次重试的超时时间都是10秒，3次重试之间间隔30秒，这样最多只会连续阻塞Redis实例10秒。
+
+            - 3.`迁移重试周期`：迁移的重试周期是由水平扩容的节点数决定的，比如一个集群扩容10个节点，迁移失败后的重试周期就是10次。
+
+            - 4.`一个迁移重试周期内的重试次数`：在一个起迁移重试周期内，会有3次重试迁移，每一次的migrate timeout的时间分别是10秒、20秒、30秒，每次重试之间无间隔。
+
+                - 例子：一个集群扩容10个节点，迁移时候遇到一个Bigkey，第一次迁移的migrate timeout是10秒，10秒后没有完成迁移，就会设置migrate timeout为20秒重试，如果再次失败，会设置migrate timeout为30秒重试，如果还是失败，程序会迁移其他新9个的节点，但是每次在迁移其他新的节点之前还会分别设置migrate timeout为10秒、20秒、30秒重试迁移那个迁移失败的Bigkey。这个重试过程，每个重试周期阻塞（10+20+30）秒，会重试10个周期，共阻塞600秒。其实后面的9个重试周期都是无用的，每次重试之间没有间隔，会连续阻塞了Redis实例。
+
+                - 优化：迁移失败后，只重试3次，每次重试间隔30秒，重试3次后都失败了，会暂停迁移，日志记录下Bigkey，去掉了其他节点迁移的重试。
+
+            - 5.`迁移失败日志`：迁移失败后，记录的日志没有包括迁移节点、solt、key信息，不能根据日志立即定位到问题key。
+
+                - 优化：记录迁移失败的节点、solt、key信息，可以立即定位到问题节点及key。
+
 
 - 发现bigkey
 
     - 开发人员对redis的理解不尽相同，bigkey的出现在所难免，重要的是能够通过合理机制发现它们。
 
-    ```sh
-    # 获取bigkey(内部采用scan)。优势在于方便及安全，而缺点也非常明显：分析结果不可定制化。
-    # bigkeys仅能分别输出Redis六种数据结构中的最大Key，无法只分析STRING类型或是找出全部成员数量超过10的HASH Key
-    redis-cli --bigkeys
-    ```
+    - `redis-cli --bigkeys`命令分析：
+
+        - 优点：在于方便及安全
+        - 缺点：分析结果不可定制化。只能计算每种数据结构的top1，无法只分析STRING类型或是找出全部成员数量超过10的HASH Key
+
+        - Daas平台集成了基于原生--bigkeys代码实现的查询Bigkey的方式，
+
+        ```sh
+        # 获取bigkey(内部采用scan)。
+        # bigkeys仅能分别输出Redis六种数据结构中的最大Key，
+        redis-cli --bigkeys
+        ```
 
     - 可以使用scan + debug object key计算每个key的serializedlength后，进行处理和报警
 
@@ -4303,13 +5418,27 @@ slowlog reset
         - 如果键比较多会比较慢，可以使用pipeline机制完成
         - 如果有从节点，建议在从节点完成
 
-    - 使用redis-rdb-tools工具以定制化方式找出bigKey
+    - RDB文件分析：使用redis-rdb-tools工具以定制化方式找出bigKey
 
-        - 分析RDB文件为离线工作，因此对线上服务不会有任何影响，这是它的最大优点但同时也是它的最大缺点：离线分析代表着分析结果的较差时效性。对于一个较大的RDB文件，它的分析可能会持续很久很久。
+        - 分析RDB文件为离线工作，因此对线上服务不会有任何影响，这是它的最大优点但同时也是它的最大缺点：离线分析代表着分析结果的较差时效性。
+
+        - 对于一个较大的RDB文件，它的分析可能会持续很久很久。
+
+            - 建议在slave节点执行，因为生成RDB文件会影响节点性能。
+
+        - Daas平台集成了基于RDB文件分析代码实现的查询Bigkey的方式，可以根据实际需求自定义填写N，分析的top N个Bigkey。该方式相对有一定风险，只有DBA有权限执行分析。
+
+        - 提前解决，避免故障的发生，进行全网Bigkey的巡检：vivo的存储研发组分布式数据库同学计划开发一个高效的RDB解析工具，通过大规模解析RDB文件来分析Bigkey，可以提高分析速度，实现Bigkey的巡检。
 
 - 解决方法：
 
-    - 1.拆分复制数据结构：如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
+    - 1.拆分复制数据结构：
+
+        - big list：list1、list2、...listN
+        - 如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
+        - 按照日期拆分多个：key20220310、key20220311、key202203212
+
+
 
     - 2.对失效数据进行定期清理：HASH结构中以增量的形式不断写入大量数据而忽略了这些数据的时效性，这些大量堆积的失效数据会造成大Key的产生
 
@@ -4335,6 +5464,18 @@ slowlog reset
             - 除了string外，其他类型的del速度很慢。使用sscan、hscan、zscan命令进行del，每次del 100个
 
         - redis4.0后支持lazy delete free模式：UNLINK命令，该命令能够以非阻塞的方式缓慢逐步的清理传入的Key
+
+- vivo例子：
+
+    - 全网Redis集群有2200个以上，实例数量达到4.5万以上，有的比较大的集群的实例数量达到了1000以上，在当前阶段进行一次全网 Bigkey检查，估计需要以年为时间单位，非常耗时。我们需要新的思路去解决Bigkey问题。
+
+    - 可以从集群维度选择全部slave进行分析。
+
+    - 同一个集群的相同服务器slave实例串行分析，不同服务器的slave实例并行分析，最大并发度默认10，同时可以分析10个实例，并且可以自定义输入执行分析的并发度。
+
+    - 分析出符合Bigkey规定标准的所有key信息：大于1MB的string类型的所有key，如果不存在就列出最大的50个key；hash、list、set、zset等类型元素个数大于2000的所有key，如不存在就给出每种类型最大的50个key。
+
+    - 增加暂停、重新开始、结束功能，暂停分析后可以重新开始。
 
 ### 寻找热点key
 
@@ -4974,16 +6115,6 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
 - [字节跳动技术团队：火山引擎 Redis 云原生实践]()
 
-# redis 如何做到和 mysql 数据库的同步
-
-- 1.  读: 读 redis->没有，读 mysql->把 mysql 数据写回 redi
-
-- 写: 写 mysql->成功，写 redis（捕捉所有 mysql 的修改，写入和删除事件，对 redis 进行操作）
-
-- 2.  分析 MySQL 的 binlog 文件并将数据插入 Redis
-
-- 借用已经比较成熟的 MySQL UDF，将 MySQL 数据首先放入 Gearman 中，然后通过一个自己编写的 PHP Gearman Worker，将数据同步到 Redis
-
 # redis 安装
 
 ## centos7 安装 redis6.0.9
@@ -5032,23 +6163,6 @@ docker exec -it redis-tz /bin/bash
 docker container stop redis-tz
 
 docker run -d -p 6379:6379 -v $PWD/conf/redis.conf:/usr/local/etc/redis/redis.conf -v $PWD/data:/data --name docker-redis docker.io/redis redis-server /usr/local/etc/redis/redis.conf --appendonly yes
-```
-
-# 常见错误
-
-## vm.overcommit_memory = 1
-
-内存分配策略
-/proc/sys/vm/overcommit_memory
-
-0: 表示内核将检查是否有足够的可用内存供应用进程使用；如果有足够的可用内存:内存申请允许；否则:内存申请失败:并把错误返回给应用进程.
-1: 表示内核允许分配所有的物理内存:而不管当前的内存状态如何.
-2: 表示内核允许分配超过所有物理内存和交换空间总和的内存
-
-```sh
-# 修复
-echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf
-sysctl -p
 ```
 
 # 其他版本的redis
