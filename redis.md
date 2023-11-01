@@ -11,11 +11,12 @@
         * [数据库迁移命令](#数据库迁移命令)
         * [高级技巧](#高级技巧)
     * [数据类型](#数据类型)
-        * [redis整体的存储结构](#redis整体的存储结构)
+        * [redis的hashmap存储结构](#redis的hashmap存储结构)
         * [redis使用hashtable存储键值对](#redis使用hashtable存储键值对)
             * [rehash](#rehash)
         * [编码](#编码)
             * [ziplist编码](#ziplist编码)
+            * [listpack编码](#listpack编码)
             * [intset编码](#intset编码)
         * [string (字符串)](#string-字符串)
             * [string实现分布式锁](#string实现分布式锁)
@@ -70,11 +71,13 @@
             * [AOF的实现原理](#aof的实现原理)
             * [AOFRW（重写）](#aofrw重写)
             * [redis 7.0.0的multi part AOF（多文件AOF机制）](#redis-700的multi-part-aof多文件aof机制)
+            * [AOF开和关性能测试](#aof开和关性能测试)
         * [RDB/AOF重写子进程对性能的影响](#rdbaof重写子进程对性能的影响)
         * [RDB + AOF混合持久化](#rdb--aof混合持久化)
         * [只用作内存缓存，禁用RDB + AOF](#只用作内存缓存禁用rdb--aof)
         * [flushall/flushdb等命令误删除数据](#flushallflushdb等命令误删除数据)
         * [百度持久化方案](#百度持久化方案)
+        * [Async-fork解决fork产生的阻塞](#async-fork解决fork产生的阻塞)
     * [master slave replication (主从复制)](#master-slave-replication-主从复制)
         * [主从建立过程](#主从建立过程)
         * [主从复制过程](#主从复制过程)
@@ -83,6 +86,8 @@
         * [redis 6.0 无盘全量复制和无盘加载](#redis-60-无盘全量复制和无盘加载)
         * [redis 7.0 共享主从复制缓冲区](#redis-70-共享主从复制缓冲区)
         * [百度智能云 Redis PSYNC-AOF 方案](#百度智能云-redis-psync-aof-方案)
+        * [Redis2.8-4.0过期key策略，主从不一致的优化历程](#redis28-40过期key策略主从不一致的优化历程)
+        * [内存满后逐出策略，主从不一致](#内存满后逐出策略主从不一致)
         * [一些问题和注意事项](#一些问题和注意事项)
     * [sentinel (哨兵模式)](#sentinel-哨兵模式)
         * [sentinal的配置](#sentinal的配置)
@@ -126,22 +131,36 @@
             * [内存管理](#内存管理)
             * [内存优化](#内存优化)
         * [处理大key（bigkey）](#处理大keybigkey)
+            * [怎么产生](#怎么产生)
+            * [危害](#危害)
+            * [发现bigkey](#发现bigkey)
+            * [解决方法](#解决方法)
+            * [如何删除](#如何删除)
+            * [vivo例子](#vivo例子)
         * [寻找热key（hotkey）](#寻找热keyhotkey)
         * [linux相关的性能配置](#linux相关的性能配置)
         * [监控](#监控)
+            * [监控指标](#监控指标)
             * [cachecloud](#cachecloud)
             * [Grafana](#grafana)
         * [生产环境排查案例](#生产环境排查案例)
+            * [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](#腾讯云开发者redis你永远不知道告警和下班谁先到来)
+            * [记一次Ziplist导致Redis Core Dump分析](#记一次ziplist导致redis-core-dump分析)
+            * [集群在做了一个前缀删除后，耗时涨了3倍](#集群在做了一个前缀删除后耗时涨了3倍)
     * [缓存（cache）](#缓存cache)
         * [缓存穿透、缓存雪崩、缓存击穿](#缓存穿透缓存雪崩缓存击穿)
+        * [缓存无底洞问题：更多的节点不代表更高的性能](#缓存无底洞问题更多的节点不代表更高的性能)
         * [缓存一致性问题](#缓存一致性问题)
             * [最终一致性策略](#最终一致性策略)
             * [强一致性策略](#强一致性策略)
         * [如何减少缓存删除/更新的失败？](#如何减少缓存删除更新的失败)
         * [如何处理复杂的多缓存场景？](#如何处理复杂的多缓存场景)
-    * [键值设计](#键值设计)
-        * [登录系统。用户表](#登录系统用户表)
-        * [TAG系统。book表](#tag系统book表)
+    * [redis正确使用](#redis正确使用)
+        * [命令使用](#命令使用)
+        * [客户端使用](#客户端使用)
+        * [键值设计](#键值设计)
+            * [登录系统。用户表](#登录系统用户表)
+            * [tag系统。book表](#tag系统book表)
 * [k8s](#k8s)
 * [redis 安装](#redis-安装)
     * [centos7 安装 redis6.0.9](#centos7-安装-redis609)
@@ -151,6 +170,8 @@
         * [proxy代理层](#proxy代理层)
         * [基于官方 redis cluster 的方案](#基于官方-redis-cluster-的方案)
     * [Redis Enterprise](#redis-enterprise)
+    * [实现方案对比](#实现方案对比)
+    * [Kvrocks](#kvrocks)
     * [阿里云的Tair](#阿里云的tair)
         * [数据类型](#数据类型-1)
         * [string](#string)
@@ -163,7 +184,11 @@
     * [美团的两套自研kv数据库](#美团的两套自研kv数据库)
         * [Squirrel](#squirrel)
         * [Cellar](#cellar)
+    * [得物的redis](#得物的redis)
 * [第三方 redis 软件](#第三方-redis-软件)
+    * [服务端](#服务端)
+        * [京东hotkey中间件方案：proxy缓存+热点数据的发现与存储](#京东hotkey中间件方案proxy缓存热点数据的发现与存储)
+    * [客户端](#客户端)
         * [iredis: 比redis-cli更强大](#iredis-比redis-cli更强大)
         * [redis-tui](#redis-tui)
         * [redis-memory-analyzer](#redis-memory-analyzer)
@@ -177,7 +202,6 @@
 * [online tool](#online-tool)
 
 <!-- vim-markdown-toc -->
-
 # Redis
 
 ## 根据qps的架构部署
@@ -203,7 +227,11 @@
 
 - [腾讯技术工程: Redis 多线程网络模型全面揭秘](https://segmentfault.com/a/1190000039223696)
 
+- [Redis开发运维实战：Redis6.0解密-1.Thread/IO多线程]()
+
 ![avatar](./Pictures/redis/redis-version.avif)
+
+- Redis6之前的Redis4，Redis5并不是单线程程序。通常我们说的Redis的单线程，是指Redis接受链接，接收数据并解析协议，发送结果等命令的执行，都是在主线程中执行的。
 
 - 演进：
 
@@ -246,37 +274,134 @@
                             - 1.一个包含100元素的list key, 它的free cost就是100
                             - 2.一个512MB的string key, 它的free cost是1 所以可以看出，redis的lazy free的cost计算主要时间复杂度相关。
 
-    - Redis6.0 多线程 Reactor 网络模型（默认关闭）：主要是为了提高网络 IO 读写性能，读写网络的 read/write 系统调用占用了 Redis 执行期间大部分 CPU 时间，瓶颈主要在于网络的 IO 消耗（还有一个瓶颈是内存）。多线程并行的进行网络 IO 操作，执行命令仍然是单线程顺序执行。因此不需要担心线程安全问题。
+    - Redis6.0 多线程 Reactor 网络模型（默认关闭）：多线程并行的进行网络 IO 操作，执行命令仍然是单线程顺序执行。因此不需要担心线程安全问题。
+
+        - Redis的主要瓶颈不在CPU，为什么又要引入IO多线程？
+
+            - 同步阻塞IO：当 socket 中有数据时，Redis 会通过系统调用将数据从内核态拷贝到用户态，供 Redis 解析用。这个拷贝过程是阻塞的，数据量越大拷贝的延迟越高，解析协议时间消耗也越大，糟糕的是这些操作都是在主线程中处理的，特别是链接数特别多的情况下，这种情况更加明显。
+
+                ![avatar](./Pictures/redis/redisIO线程处理流程.avif)
 
         - 开启多线程：在`redis.conf`配置文件设置
-        ```redis
-        # 开启多线程（默认为no）
-        io-threads-do-reads true
 
-        # 设置线程数（4 核的机器建议设置为 2 或 3 个线程，8 核的建议设置为 6 个线程）
-        io-threads 6
-        ```
+            ```redis
+            # 开启多线程（默认为no）
+            io-threads-do-reads true
 
-        - Multi-Reactors 模式：不再是单线程的事件循环，而是有多个线程（Sub Reactors）各自维护一个独立的事件循环
+            # 设置线程数（4 核的机器建议设置为 2 或 3 个线程，8 核的建议设置为 6 个线程）（默认为4，最大128个）
+            io-threads 6
+            ```
 
-            - 类似于Nginx 和 Memcached 等
+        - 注意事项：
+
+            - `io-threads`个数设置为1时，实际上还是只使用主线程
+            - `io-threads`默认只负责write，既发送数据给客户端
+            - `io-threads`的个数一旦设置，不能通过config动态设置
+            - 当设置ssl后，io-threads将不工作
+            - 通常io线程并不能有太大提升，除非cpu占用特别明显或者客户端链接特别多的情况下，否则不建议使用
+            - io线程只能是读，或者写，不存在读写并存的情况
+                - 命令的执行由主线程串行执行 (保持单线程)
+            - io线程的开关，实际取决于延迟发送客户端的数量是否小于IO线程数*2
 
         - 这里需要额外关注 I/O 线程初次启动时会设置当前线程的 CPU 亲缘性（affinity），也就是绑定当前线程到用户配置的 CPU 上，在启动 Redis 服务器主线程的时候同样会设置 CPU 亲和性
             - 如果某个CPU Core正在处理Redis的调用，执行到一半时产生了中断，那么CPU不得不停止当前的工作转而处理中断请求
                 - 中断期间Redis也无法转交给其他core继续运行，必须等处理完中断后才能继续运行。
 
-        ![avatar](./Pictures/redis/redis6多线程.avif)
+            ![avatar](./Pictures/redis/redis6多线程.avif)
 
-        - 特点：
-            - 1.IO 线程组要么同时在读，要么同时在写，不会同时读或写。
-            - 2.IO 线程只负责读写 socket 解析命令，不负责命令处理，命令的执行由主线程串行执行 (保持单线程)。
-            - 3.无须担心命令执行的安全问题。
+        - 性能测试：
 
-        - benchmark：[美图技术：正式支持多线程！Redis 6.0与老版性能对比评测]()
+            - 1.[美图技术：正式支持多线程！Redis 6.0与老版性能对比评测]()
 
-            - GET/SET 命令在 4 线程 IO 时性能相比单线程是几乎是翻倍了
-            ![avatar](./Pictures/redis/redis6多线程1.avif)
-            ![avatar](./Pictures/redis/redis6多线程2.avif)
+                - GET/SET 命令在 4 线程 IO 时性能相比单线程是几乎是翻倍了
+                ![avatar](./Pictures/redis/redis6多线程1.avif)
+                ![avatar](./Pictures/redis/redis6多线程2.avif)
+
+            - 2.采用vire-benchmark工具进行压测
+
+                - 测试参数
+
+                    - 1.redis-server
+
+                        | 配置                | 说明                   | 值                |
+                        |---------------------|------------------------|-------------------|
+                        | io-threads          | io线程的数量           | [1,2,3,4,5,6,7,8] |
+                        | io-threads-do-reads | io线程是否负责接收数据 | yes               |
+
+                    - 2.vire-benchmark
+
+                        | 压测项       | 值                                                                                                                                                |
+                        |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+                        | 客户端数量   | [1,10,50]                                                                                                                                         |
+                        | payload大小  | [20,64,256,1024,2048,8192]                                                                                                                        |
+                        | pipeline个数 | [10,50,100,500]                                                                                                                                   |
+                        | 压测命令     | get,set,mget_10,mget_100,mset,lpush,rpush,lpop,rpop,lrange_10,lrange_100,sadd,spop,hset,,hincrby,hget,hmset,hmget,hgetall,zadd,zrem,pfadd,pfcount |
+
+                - 测试结果分析
+
+                    - 1.压测结果不考虑客户端数量，payload大小，pipeline个数，只是直观展现Redis6开启io多线程后，针对各个命令所能达到的极限QPS。
+                        ![avatar](./Pictures/redis/redis6-io多线程-各命令极限qps.avif)
+
+                    - 2.IO线程数量与极限QPS的关系
+                        - 在极限QPS的测试结果中，client个数基本上都为1，不具备实际意义，再结合线上实际业务情况，选取GET，client_count(50)，payload（20），pipeline（50）
+
+                        - 1.由图可知，针对Get等简单命令，IO线程也并不是越多越好，这也符合代码中的自旋锁的实现逻辑。
+                            - 但是IO多线程，确实能够再一定程度上提升QPS，但是效果并不是很明显。
+
+                            ![avatar](./Pictures/redis/redis6-io多线程-get命令与io多线程关系.avif)
+                        - 2.由图可知，IO多线程对payload较大请求，处理效果提升明显，但是当payload提高到2048左右时，提升效果不明显。
+
+                            - Get，client_count（50），pipeline（50）
+
+                            | 描述          | 1       | 2       | 3       | 4       | 5       | 6       | 7       | 8       |
+                            |---------------|---------|---------|---------|---------|---------|---------|---------|---------|
+                            | payload(20)   | 1234567 | 1282051 | 1315789 | 1562499 | 1204819 | 1408450 | 1265822 | 1282051 |
+                            | payload(64)   | 1250000 | 1234567 | 1315789 | 1333333 | 1176470 | 1388889 | 1333333 | 1428571 |
+                            | payload(256)  | 1123595 | 970873  | 1190476 | 1351351 | 1369863 | 1298701 | 1369863 | 1333333 |
+                            | payload(1024) | 694444  | 806451  | 757575  | 793650  | 847457  | 833333  | 900900  | 862069  |
+                            | payload(2048) | 431034  | 357142  | 381679  | 400000  | 446428  | 442477  | 485436  | 467289  |
+                            | payload(4096) | 218818  | 232558  | 264550  | 247524  | 255754  | 237529  | 239808  | 265252  |
+
+                            ![avatar](./Pictures/redis/redis6-io多线程-payload与io多线程关系.avif)
+
+
+                        - 3.对于客户端数量而言，IO多线程针对多个客户端有一定提升，但是效果不是很明显
+                            - Get，client_count（50），payload（20）
+
+                            | 描述       | 1       | 2       | 3       | 4       | 5       | 6       | 7       | 8       |
+                            |------------|---------|---------|---------|---------|---------|---------|---------|---------|
+                            | client(1)  | 1408450 | 1388889 | 1449275 | 1470588 | 1515151 | 1515151 | 1538461 | 1492537 |
+                            | client(20) | 1408450 | 1408450 | 1315789 | 1351351 | 1515151 | 1449275 | 1538461 | 1449275 |
+                            | client(50) | 1234567 | 1282051 | 1315789 | 1562499 | 1204819 | 1408450 | 1265822 | 1282051 |
+                            - 从图也可观察到，当客户端数量提高到50左右时，IO线程越多，QPS反而成下降趋势。
+
+                                ![avatar](./Pictures/redis/redis6-io多线程-客户端数量与io多线程关系.avif)
+
+                        - 4.由图可知，在pipeline个数较少时，qps随着IO线程数量增多缓慢增加，当pipeline个数大于50个以上，随着线程数的增加，QPS成缓慢下降趋势。
+
+                            - Get，client_count（50），payload（20）
+
+                                | 描述          | 1       | 2       | 3       | 4       | 5       | 6       | 7       | 8       |
+                                |---------------|---------|---------|---------|---------|---------|---------|---------|---------|
+                                | pipeline(10)  | 757575  | 869565  | 1010101 | 934579  | 917431  | 1123595 | 1010101 | 1052631 |
+                                | pipeline(50)  | 1234567 | 1282051 | 1315789 | 1562499 | 1204819 | 1408450 | 1265822 | 1282051 |
+                                | pipeline(100) | 1470588 | 1298701 | 1369863 | 1408450 | 1250000 | 1369863 | 1428571 | 1298701 |
+
+                                ![avatar](./Pictures/redis/redis6-io多线程-pipeline个数与io多线程关系.avif)
+
+
+                - 测试结论
+                    - IO线程总体提升效果并不是非常明显，以基准结果为例，当IO线程为4时，较单线程在同条件下，QPS提升25%左右
+
+                    - IO线程，对val与pipeline较大的操作，有明显的提升，当IO线程为4时，较单线程在同条件下，QPS最大提升30%左右，但随着val的增大，提升并不明显
+
+                    - 对于多个客户端，IO多线程的提升并不明显
+
+                    - 通过测试数据，发现Redis的IO多线程，在设置为4个时可达到最佳效率，到达最高QPS
+
+    - Multi-Reactors 模式：不再是单线程的事件循环，而是有多个线程（Sub Reactors）各自维护一个独立的事件循环
+
+        - 类似于Nginx 和 Memcached 等
 
 - 多client命令队列
 
@@ -302,9 +427,48 @@
 
 - [刘Java：Redis的概述以及与memecached的区别](https://juejin.cn/post/7107623464848080932?searchId=2023081400322375A81D3F816B729C969C)
 
-- 1.不依赖操作系统的类库；memcache需要依赖libevent这样的类库
+- redis不依赖操作系统的类库；memcache需要依赖libevent这样的类库
 
-- 2.拥有更多的数据结构，能支持更丰富的数据操作,此外单个 value 的最大限制是 1GB，不像 memcached 只能保存 1MB 的数据
+- 数据类型：
+
+    - Redis支持丰富的数据类型，比如string、hash、list、set、zset。
+    - Memcached只支持简单的key/value数据结构。
+
+    - Redis能支持更丰富的数据操作,此外单个 value 的最大限制是 1GB
+    - memcached 只能保存 1MB 的数据
+
+- 单线程/多线程/承载QPS
+
+    - Redis是单线程请求，所有命令串行执行，并发情况下不需要考虑数据一致性问题；性能受限于CPU，单实例QPS在4-6w。
+    - Memcached是多线程，可以利用多核优势，单实例在正常情况下，可以达到写入60-80w qps，读80-100w qps。
+
+- 持久化/数据迁移
+
+    - Redis支持持久化操作，可以进行aof及rdb数据持久化到磁盘。
+    - Memcached无法进行持久化，数据不能备份，只能用于缓存使用，且重启后数据全部丢失。
+
+- 对热点、bigkey支持的友好度
+
+    - Redis的big key与热key类操作，如果qps较高则容易造成Redis阻塞，影响整体请求。
+    - Memcached因为是多线程，与Redis相比，在big key与热key类操作上支持较好。
+
+- 高可用/HA
+
+    - Redis支持通过Replication进行数据复制，通过master-slave机制，可以实时进行数据的同步复制，
+        - 支持多级复制和增量复制，master-slave机制是Redis进行HA的重要手段。
+
+    - Memcached无法进行数据同步，不能将实例中的数据迁移到其他MC实例中。
+
+- 发布订阅机制
+    - Redis支持pub/sub消息订阅机制，可以用来进行消息订阅与通知。
+    - Memcached不支持发布订阅。
+
+- 周边支持
+
+    - Redis周边工具支持较好，比如迁移、数据分析等方便，目前KCC支持全量和指定前缀等数据分析和删除功能。
+    - Memcched周边支持较少，且原生不支持key分析等操作，目前KCC自研实现针对中小memached集群的key分析和指定前缀数据删除功能。
+
+    - 注：KCC是公司Redis、Memcached、ElasticSearch、Pika管控平台。目前管理70w+Cache实例，3000+ElasticSearch实例的智能化运维。
 
 ### Redis vs Dragonfly
 
@@ -548,7 +712,7 @@ redis keys video* | xargs redis-cli del
 
 ## 数据类型
 
-### redis整体的存储结构
+### redis的hashmap存储结构
 
 - redis内部整体的存储结构是一个大的hashmap，内部是数组实现的hash，key冲突通过挂链表去实现，每个dictEntry为一个key/value对象，value为定义的redisObject。
 
@@ -632,9 +796,37 @@ redis keys video* | xargs redis-cli del
 
 #### rehash
 
-- 扩缩容(rehash)：对于Redis来说，一个哈希数据结构内置了两个哈希表（dictht）
-    - 一个用于使用
-    - 另一个平时闲置，待时机成熟，扩容一倍，然后将数据迁移到另一个哈希表内
+- 扩缩容(rehash)：
+    - 对于Redis来说，一个哈希数据结构内置了两个哈希表（dictht）
+        - 一个用于使用
+        - 另一个平时闲置，待时机成熟，扩容一倍，然后将数据迁移到另一个哈希表内
+
+        - redis7.0去掉了`dictht`
+            - dictht ht[2]用dictEntry **ht_table[2]代替
+            - 原来两个dictht的used用unsigned long ht_used[2]代替
+            - 原来两个dictht的size用signed char ht_size_exp[2]代替，且由8个字节变为1个字节，计算方法如下：
+                ```c
+                #define DICTHT_SIZE(exp) ((exp) == -1 ? 0 : (unsigned long)1<<(exp))
+                #define DICTHT_SIZE_MASK(exp) ((exp) == -1 ? 0 : (DICTHT_SIZE(exp))-1)
+                ```
+
+            - 效果：通过数据结构的优化（96->56字节），必然会在hash|set|zset key较多且为小value时，效果更为明显。
+                - 内存优化
+
+                    | original dict                              | original dict | optimized dict |
+                    |--------------------------------------------|---------------|----------------|
+                    | 1000000 65 byte one field hashes           | 290.38M       | 252.23M        |
+                    | 1000 hashes with 1000 20 byte fields       | 62.22M        | 62.1M          |
+                    | 1000000 sets with 1 1 byte entry           | 214.84M       | 176.69M        |
+                    | dict struct size (theoretical improvement) | 96b           | 56b            |
+
+                - 性能变化：除了get random keys外，其他整体有提升
+
+                    | dict benchmark 10000000 | Inserting | Linear access of existing | 2nd round | Random access of existing | Accessing random keys | Accessing missing | Removing and adding |
+                    |-------------------------|-----------|---------------------------|-----------|---------------------------|-----------------------|-------------------|---------------------|
+                    | original                | 5371      | 2531                      | 2507      | 4135                      | 1447                  | 2893              | 4882                |
+                    | optimized               | 5253      | 2488                      | 2481      | 4076                      | 1600                  | 2841              | 4801                |
+                    | improvement             | 2.20%     | 1.70%                     | 1.04%     | 1.43%                     | -10.57%               | 1.80%             | 1.66%               |
 
     - 数据结构
 
@@ -654,7 +846,7 @@ redis keys video* | xargs redis-cli del
         ```
 
         - `rehashidx`用来标识当前dict是否正在做rehash，如果为-1表示没有做rehash。
-        - 当used > 2^n时候，就需要扩容了
+        - 当ht_used > 2^n时候，就需要扩容了
         - 为了保证Redis单线程的高效性，整个rehash是渐进式（一点点）完成的，但全部迁移完成后，将rehashidx置为-1，表示rehash结束了。
 
 - rehash可能引起的问题？
@@ -878,10 +1070,16 @@ redis keys video* | xargs redis-cli del
 
 #### ziplist编码
 
+- Redis7中ziplist被listpack替代，所以相关配置都变为listpack
+
 - zlplist：
-    - 是一种压缩链表，它的好处是更能节省内存空间，因为它所存储的内容都是在连续的内存区域当中的。
     - 整个ziplist只需要malloc一次，它们在内存中是一块连续的区域。
-    - 当列表对象元素不大，每个元素也不大的时候，就采用ziplist存储。但当数据量过大时就ziplist就不是那么好用了。因为为了保证他存储内容在内存中的连续性，插入的复杂度是O(N)，即每次插入都会重新进行realloc。
+    - 当列表对象元素不多，每个元素也不大的时候，就采用ziplist存储。
+
+    - 优点：是一种压缩链表，它的好处是更能节省内存空间，因为它所存储的内容都是在连续的内存区域当中的。
+    - 缺点：
+        - 当元素过多时就不是那么好用了。为了保证他存储内容在内存中的连续性，插入的复杂度是O(N)，即每次插入都会重新进行realloc。
+        - 连锁更新：向ziplist中增加、删除、修改数据内容、合并ziplist场景。
 
 - 数据结构：
    ![avatar](./Pictures/redis/ziplist.avif)
@@ -902,6 +1100,59 @@ redis keys video* | xargs redis-cli del
     - 命令平均耗时使用`info commandstats`命令获取：包含调用次数、总耗时、平均耗时（微秒）
 
 - 建议长度不超过1000，每个元素大小控制在512字节以内
+
+#### listpack编码
+
+- [Redis开发运维实战：Redis7--ziplist的替代者listpack]()
+
+- Redis7中ziplist被listpack替代，所以相关配置都变为listpack
+
+    ![avatar](./Pictures/redis/ziplist_vs_listpack.avif)
+
+    - 整体的对比图可以看到，其实两者结构相差不大，listpack相对于ziplist，没有了指向末尾节点地址的偏移量，这样也可以解决ziplist内存长度限制的问题。
+
+- 相关配置变更
+    ```
+    * 新增list-max-listpack-size， 是list-max-ziplist-size的别名；
+    * 新增hash-max-listpack-entries， 是hash-max-ziplist-entries的别名；
+    * 新增hash-max-listpack-value， 是hash-max-ziplist-value的别名；
+    * 新增zset-max-listpack-entries， 是zset-max-ziplist-entries的别名；
+    * 新增zset-max-listpack-value， 是zset-max-ziplist-value的别名；
+    ```
+
+- entry结构对比
+    ![avatar](./Pictures/redis/ziplist_vs_listpack-entry结构.avif)
+    - listpack移除了`prevlen`，在data后新增了`backlen`
+        - 在ziplist中，`prevlen`代表前一个entry节点长度的偏移量；
+            - 在实际数据的内存结构前有`prevlen`与`encoding`字段，当其发生变化时可能会导致内存不连续，为了保证内存中数据的连续，所以可能会触发连锁更新。
+        - 在listpack中，`backlen`代表的是本entry节点的回朔起始地址长度的偏移量
+
+    - 优势：
+        - 在遍历最后一个entry时可以通过lp+totallen快速定位到lp尾地址，然后使用backlen快速定位到last entry的起始地址；***并且可以将head中的last offset字段节省出来；
+        - 由于backlen仅代表了回朔本entry起始地址长度的偏移量，所以在增/删/改时，无需再关心前一个节点的长度，仅需要整体移动entry即可，所以不会涉及到内存的连锁更新；具体的代码流程这里不再复述；
+
+- list相关命令性能对比（quicklist with ziplist -> quicklist with listpack)
+
+    | command    | quicklist listpack(rps) | quicklist ziplist(rps) | percentage(positive: performance enhancement | negative: performance degradation) |
+    |------------|-------------------------|------------------------|----------------------------------------------|------------------------------------|-------|
+    | LPUSH      | 106929 rps              | p50=0.223              | 103535.75 rps                                | p50=0.223                          | 3.2%  |
+    | LRANGE_100 | 65737.58 rps            | p50=0.375              | 67333.27 rps                                 | p50=0.375                          | -2.3% |
+    | LRANGE_300 | 30900.44 rps            | p50=0.839              | 31346.00 rps                                 | p50=0.823                          | -1.4% |
+    | LRANGE_500 | 22126.59 rps            | p50=1.175              | 22689.63 rps                                 | p50=1.159                          | -1.4% |
+    | LRANGE_600 | 19443.90 rps            | p50=1.343              | 19690.08 rps                                 | p50=1.327                          | -1.2% |
+    | RPUSH      | 109075.04 rps           | p50=0.223              | 108283.71 rps                                | p50=0.223                          | 0.7%  |
+    | LPOP       | 108636.61 rps           | p50=0.223              | 110778.77 rps                                | p50=0.223                          | 1.9%  |
+    | RPOP       | 109757.44 rps           | p50=0.223              | 109206.08 rps                                | p50=0.223                          | 0.5%  |
+
+    - lpush/rpush/lpop/rpop性能略有提升，这得益于listpack避免了连锁更新的问题
+
+- 低版本的RDB在redis7中加载时，会自动将ziplist转换为listpack，其整体加载耗时会大约增加 9%-54% 左右。
+
+    - 耗时测试
+
+        - List（38%-46%）
+        - hash (29%-54%)
+        - Zset (9%-16%)
 
 #### intset编码
 
@@ -946,7 +1197,7 @@ redis keys video* | xargs redis-cli del
 |--------|----------------------------------------|
 | int    | 8个字节的整型                          |
 | embstr | <=44 字节的字符串型: 分配1次内存. 只读 |
-| raw    | >=44 字节的字符串型: 分配2次内存       |
+| raw    | >=45 字节的字符串型: 分配2次内存       |
 
 - redisObject和sds是连续的内存，查询效率会快很多，也正是因为redisObject和sds是连续在一起，伴随了一些缺点：当字符串增加的时候，它长度会增加，这个时候又需要重新分配内存，导致的结果就是整个redisObject和sds都需要重新分配空间，这样是会影响性能的，所以redis用embstr实现一次分配而后,只允许读，如果修改数据，那么它就会转成raw编码，不再用embstr编码了。
 
@@ -992,6 +1243,16 @@ redis keys video* | xargs redis-cli del
         - 如果大于等于1mb，每次给分配1mb未使用空间
 
     - sds惰性空间释放：对字符串进行缩短操作时，程序不立即使用内存重新分配来回收缩短后多余的字节，而是使用 free 属性将这些字节的数量记录下来，等待后续使用（sds也提供api，我们可以手动触发字符串缩短）
+
+    - Redis 3.0 和 Redis 3.2+的sds有很大不同，新版本的sds会根据字符串长度使用不同的原信息
+        - 3.2+中使用了叫sdshdr8的结构，在该结构下，元数据只需要3个字节；而3.2之前需要8个字节
+            ![avatar](./Pictures/redis/redis3.0_vs3.2-sds区别.avif)
+
+        - 案例：有个同事找我，说他申请两个集群，双写两个集群，但是写满后容量是这样的
+            ![avatar](./Pictures/redis/redis版本不同-sds字符串不同-最后内存不同.avif)
+            - 实验：分别在Redis 3.0.7和Redis 4.0.12，写入10亿个44字节的key和value
+                - Redis 3.0.7的内存消耗：`used_memory_human:177G`
+                - Redis 4.0.12的内存消耗：`used_memory_human:147G`
 
 | 命令        | 时间复杂度       |
 |-------------|------------------|
@@ -3012,7 +3273,13 @@ client pause <time(毫秒)>
     - 输入/输出缓冲区:
 
         - 输入缓冲区: `qbuf`, `qbuf-free`: 将client的发送的命令暂时保存, redis服务器会拉取并执行
-            - 没有相应配置可以规定qbuf、qbuf-free的大小
+
+            - 对单个客户端的输入缓冲区，之前固定为1gb，在4.0之后改为可配置
+                ```redis
+                # 这里是默认配置1gb
+                client-query-buffer-limit: 1073741824
+                ```
+
             - 大小根据输入内容的大小不同动态调整，至少要求每个客户端不能超过1G，超过会被kill掉
 
             - bigkey：如果输入缓冲区的命令包含大量bigkey，会造成redis阻塞，短期内不能处理命令
@@ -3096,6 +3363,15 @@ client pause <time(毫秒)>
 
 - `tcp-keepalive`：检测tcp连接活性的周期（默认值为0，也就是不进行检测）。如果设置，建议设置60秒，那么redis每隔60秒会对它创建的tcp连接进行活性检测，防止大量死连接占用系统资源
 
+- `maxmemory-clients`：所有clients最大内存的限制，当超过该限制后，Redis将会按照一定策略杀掉问题客户端，称为`client eviction`
+    ```redis
+    # 两种配置方法
+
+    # 具体值
+    maxmemory-clients 1g
+    # 百分比：为maxmemory配置的XX%（如果整机部署密度较高，建议配置一定百分比，但会有客户端被干掉的风险。）
+    maxmemory-clients 10%
+    ```
 ### RESP（与服务端通信的字符串格式）
 - `set hello world`命令的RESP格式
     ```
@@ -3537,6 +3813,13 @@ info modules
 info memory
 ```
 
+- `info latencystats`：对应配置文件`latency-tracking-info-percentiles`
+    ```redis
+    # 默认对应p50(中位数)、p99、p99.9每个命令的耗时
+    127.0.0.1:6379> config get latency-tracking-info-percentiles
+    latency-tracking-info-percentiles: 50 99 99.9
+    ```
+
 - rss > used ,且两者的值相差较大时,表示存在（内部或外部的）内存碎片.
 - used > rss ,表示 Redis 的部分内存被操作系统换出到交换空间了,在这种情况下,操作可能会产生明显的延迟.
 
@@ -3785,6 +4068,16 @@ config get dir
 
 - 增量快照：在做一次全量快照后，后续的快照只对修改的数据进行记录，需要记住哪些数据被修改了，可以避免全量快照带来的开销。
 
+- 优点：
+    - 结构紧凑体积小，加载速度快（相比AOF）
+    - 可以做定期备份：例如低峰期（顺便搞个数据分析也行）
+
+- 缺点：
+    - 动作大、消耗大：全量操作对于磁盘、CPU、内存等均有消耗
+    - 无法做到"实时"备份
+    - 格式多变（Redis 3 4 5 6 7版本多次修改）
+        - 最新的redis7为version10，不兼容之前版本
+
 - 查看rdb文件信息
 ```sh
 redis-check-rdb  dump.rdb
@@ -3828,6 +4121,9 @@ config get rdbchecksum
         - 1.3600 秒内最少有 1 个 key 被改动
         - 2.300 秒内最少有 10 个 key 被改动
         - 3.60 秒内最少有 1000 个 key 被改动
+
+        - `save`是性能杀手，所以一般情况下，我们在线上不会用这个功能的
+            - 显示配置关闭save：`config set save ""`
 
     - 执行`shutdown`命令, 并且没有开启AOF持久化
 
@@ -3877,6 +4173,13 @@ config get rdbchecksum
     rdb_last_load_keys_expired:0
     rdb_last_load_keys_loaded:16
     ```
+
+- [Redis开发运维实战：Redis 7持久化优化 -- 1. 使用sync_file_range系统调用.md]()
+
+    - 由于`fsync`与`fdatasync`（当写入文件长度发生变化时）系统调用都会更新元数据信息，而对于RDB这种连续性的写入数据场景，这期间可以不用频繁更新元数据信息，所以可以使用`sync_file_range`系统调用只将数据脏页只写入到文件区中。
+        - sync_file_range系统调用在linux 内核2.6.17版本后支持
+
+    ![avatar](./Pictures/redis/sync_file_range在redis中的简单流程.avif)
 
 ### AOF(append only log)
 
@@ -3936,9 +4239,30 @@ config get rdbchecksum
                     ```
             - 因此: 最多丢失2秒内的数据, 而不是1秒
 
+        - `always`策略并不能保证不丢数据：Redis执行一条写入命令时，会将数据写入`aof_buf`，但写入`aof_buf`和刷盘还是存在一次事件时间差。
+
+            ![avatar](./Pictures/redis/aof-fsync.avif)
+
     - 3.文件重写（rewrite）：AOF文件越来越大，需要定期进行重写
 
     - 4.重启加载（load）：redis服务器重启时，加载AOF文件进行数据恢复
+
+- 优点：
+    - RESP标准格式：无版本兼容性问题
+    - 实时性更高且成本较小
+
+- 缺点：
+    - 体积大：协议 + 明文
+    - 加载慢：利用fakeclient做回放
+    - AOF重写还是动作不小
+
+- master节点故障后Redis怎么恢复？
+    - 1.关闭AOF：slave晋升成master，对外提供服务。原master恢复后变为slave，依赖全量复制获取全部数据
+    - 2.开启AOF：同上...（只不过原master全量复制后做一次AOF重写）
+
+- 我就不想丢理论上最少的数据，怎么办？
+
+    - 开启always，不用主从切换，等待A节点恢复，重新加载AOF在提供服务
 
 #### AOF的实现原理
 
@@ -4090,6 +4414,60 @@ config get rdbchecksum
         - AOFRW限流机制：当AOFRW已经连续失败三次时，下一次的AOFRW会被强行延迟1分钟执行，依次类推延迟4、8、16...，当前最大延迟时间为1小时。
 
             - 在AOFRW限流期间，我们依然可以使用bgrewriteaof命令立即执行一次AOFRW。
+
+#### AOF开和关性能测试
+
+- [Redis开发运维实战：聊一聊Redis持久化开与关]()
+
+- 测试环境：
+    - CPU: Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz
+    - 机械磁盘
+    - Redis版本：4.0.14
+    - 压测工具：redis-benchmark
+    - AOF策略：appendfsync everysec
+
+- 压测方法：在”开和关“AOF情况下，在不同size(64字节、128字节、512字节)的OPS和耗时
+
+- d=64字节
+
+    | 命令  | ops(开AOF) | ops(关AOF) | 耗时(开AOF)                         | 耗时(关AOF)                         |
+    |-------|------------|------------|-------------------------------------|-------------------------------------|
+    | set   | 97352      | 121624     | 100.00% <= 0 milliseconds(总:5.14s) | 100.00% <= 0 milliseconds(总:4.11s) |
+    | get   | 108979     | 109241     | 100.00% <= 0 milliseconds(总:4.59s) | 100.00% <= 0 milliseconds(总:4.58s) |
+    | incr  | 104755     | 113301     | 100.00% <= 0 milliseconds(总:4.77s) | 100.00% <= 0 milliseconds(总:4.41s) |
+    | lpush | 95347      | 110889     | 100.00% <= 0 milliseconds(总:5.24s) | 100.00% <= 0 milliseconds(总:4.51s) |
+    | hset  | 97770      | 113791     | 100.00% <= 0 milliseconds(总:5.11s) | 100.00% <= 0 milliseconds(总:4.39s) |
+
+    ![avatar](./Pictures/redis/开关aof性能测试-d64.avif)
+
+- d=128字节
+
+    | 命令  | ops(开AOF) | ops(关AOF) | 耗时(开AOF)                          | 耗时(关AOF)                         |
+    |-------|------------|------------|--------------------------------------|-------------------------------------|
+    | set   | 108908     | 114077     | 100.00% <= 2 milliseconds (总:4.59s) | 100.00% <= 0 milliseconds(总:4.38s) |
+    | get   | 107388     | 111756     | 100.00% <= 1 milliseconds(总:4.66s)  | 100.00% <= 0 milliseconds(总:4.47s) |
+    | incr  | 105042     | 113430     | 100.00% <= 0 milliseconds(总:4.76s)  | 100.00% <= 0 milliseconds(总:4.41s) |
+    | lpush | 103114     | 114025     | 100.00% <= 0 milliseconds(总:4.85s)  | 100.00% <= 0 milliseconds(总:4.39s) |
+    | hset  | 101440     | 113791     | 100.00% <= 1 milliseconds(总:4.93s)  | 100.00% <= 1 milliseconds(总:4.93s) |
+
+    ![avatar](./Pictures/redis/开关aof性能测试-d128.avif)
+
+- d=512字节
+
+    | 命令  | ops(开AOF) | ops(关AOF) | 耗时(开AOF)                          | 耗时(关AOF)                         |
+    |-------|------------|------------|--------------------------------------|-------------------------------------|
+    | set   | 96581      | 108790     | 100.00% <= 8 milliseconds (总:5.18s) | 100.00% <= 1 milliseconds(总:4.60s) |
+    | get   | 107898     | 105374     | 100.00% <= 0 milliseconds(总:4.63s)  | 100.00% <= 0 milliseconds(总:4.74s) |
+    | incr  | 102438     | 107991     | 100.00% <= 0 milliseconds(总:4.88s)  | 100.00% <= 0 milliseconds(总:4.63s) |
+    | lpush | 93231      | 105064     | 100.00% <= 8 milliseconds (总:5.36s) | 100.00% <= 0 milliseconds(总:4.76s) |
+    | hset  | 96955      | 108225     | 100.00% <= 9 milliseconds (总:5.16s) | 100.00% <= 0 milliseconds(总:4.62s) |
+
+    ![avatar](./Pictures/redis/开关aof性能测试-d512.avif)
+
+- 结论：（注意此处没有考虑AOF重写，只能更差）
+    - 1.开启AOF后：Redis的写性能下降了8~25%，读性能未下降（注意此处测试为非读写混合场景）
+    - 2.开启AOF后：随着数据量的增加相关读写性能会下降。
+    - 3.开启AOF后：实际测试中发现单核CPU也会少量上涨。
 
 ### RDB/AOF重写子进程对性能的影响
 
@@ -4250,6 +4628,298 @@ config get rdbchecksum
 
     - 每个 rdb 文件表示一个时刻的实际，而 aof 文件表示一个时间段数据。
     - 假如要恢复到 t6 时刻，首先我们需要先加载距离 t6 时刻最近的起始时刻 rdb，然后在加载其后连续的 aof 文件，直到加载到包含 t6 时刻的 aof 文件。这样我们就可以实现按时间点恢复功能。
+
+### Async-fork解决fork产生的阻塞
+
+- 父进程调用fork()创建子进程的过程中，虽然使用了写时复制（cow）页表的方式进行优化，但由于要复制父进程的页表，还是会造成父进程出现短时间阻塞，阻塞的时间跟页表的大小有关，页表越大，阻塞的时间也越长。
+
+- 在测试中很容易观察到fork产生的阻塞现象，以及fork造成的Redis访问抖动现象。
+
+    - 1.阻塞现象复现
+
+        - 实验对比：在单机环境下使用Redis-benchmark压测的过程中，手动执行bgsave命令，观察fork耗时和压测指标TP100。
+
+        - 实验结果：
+
+            - 1.压测时未执行bgsave，TP100约1毫秒
+                ```sh
+                # 压测过程中未执行 bgsave
+                [root@xxx bin]# Redis-benchmark -d 256 -t set -n 1000000  -a xxxxxx -p 6380
+                ====== SET ======
+                  1000000 requests completed in 8.15 seconds
+                  50 parallel clients
+                  256 bytes payload
+                  keep alive: 1
+
+                99.90% <= 1 milliseconds
+                100.00% <= 1 milliseconds
+                122669.27 requests per second
+                ```
+
+            - 2.压测过程中，手动执行bgsave命令，触发fork操作，TP100达到187毫秒
+                ```sh
+                # 压测过程中执行 bgsave
+                [root@xxx bin]# Redis-benchmark -d 256 -t set -n 1000000  -a xxxxxx -p 6380
+                ====== SET ======
+                  1000000 requests completed in 13.97 seconds
+                  50 parallel clients
+                  256 bytes payload
+                  keep alive: 1
+
+                86.41% <= 1 milliseconds
+                86.42% <= 2 milliseconds
+                99.95% <= 3 milliseconds
+                99.99% <= 4 milliseconds
+                99.99% <= 10 milliseconds
+                99.99% <= 11 milliseconds
+                99.99% <= 12 milliseconds
+                100.00% <= 187 milliseconds
+                100.00% <= 187 milliseconds
+                71561.47 requests per second
+                ```
+
+            - 使用 `info stats` 返回上次fork耗时：`latest_fork_usec:183632`，可以看到fork耗时*183毫秒*
+
+    - 2.Strace跟踪fork过程耗时
+
+        - `strace` 常用来跟踪进程执行时的系统调用和所接收的信号。
+        ```sh
+        strace -p 32088 -T -tt -o strace00.out
+        14:01:33.623495 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fbe5242fa50) = 37513 <0.183533>
+        14:01:33.807142 open("/data1/6380/6380.log", O_WRONLY|O_CREAT|O_APPEND, 0666) = 60 <0.000018>
+        14:01:33.807644 lseek(60, 0, SEEK_END)  = 8512 <0.000017>
+        14:01:33.807690 stat("/etc/localtime", {st_mode=S_IFREG|0644, st_size=528, ...}) = 0 <0.000010>
+        14:01:33.807732 fstat(60, {st_mode=S_IFREG|0644, st_size=8512, ...}) = 0 <0.000007>
+        14:01:33.807756 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fbe52437000 <0.000009>
+        14:01:33.807787 write(60, "35994:M 21 Mar 14:01:33.807 * Ba"..., 69) = 69 <0.000015>
+        14:01:33.807819 close(60)               = 0 <0.000008>
+        14:01:33.807845 munmap(0x7fbe52437000, 4096) = 0 <0.000013>
+        ```
+
+        - 结论：Linux中通过clone()系统调用实现fork()；我们可以看到追踪到clone系统调用，并且耗时183毫秒，与 info stats 统计的fork耗时一致。
+
+- Async-fork
+
+    - Async-fork设计的核心思想是将fork调用过程中最耗时的页表拷贝工作从父进程移动到子进程
+
+        - 缩短父进程调用fork时陷入内核态的时间，父进程因而可以快速返回用户态处理用户查询，子进程则在此期间完成页表拷贝。
+
+    - Async-fork的挑战：页表的异步复制操作可能导致快照不一致。（快照文件应该记录的是保存拍摄内存快照那一刻的内存数据）
+
+        - 例子：Redis在T0时刻保存内存快照，而某个用户请求在T2时刻向Redis插入了新的键值对（k2, v2)，这将导致父进程修改它的页表项（PTE2）
+
+            - 假如T2时刻这个被修改的页表项（PTE2）还没有被子进程复制完成， 这个修改后的内存页表项及对应内存页后续将被复制到子进程，这个新插入的键值对将被子进程最终写入硬盘，破坏了快照一致性。
+
+            ![avatar](./Pictures/redis/Async-fork异步复制快照不一致问题.avif)
+
+    - Async-fork详解
+
+        - 在默认fork中：父进程遍历每个VMA，将每个VMA复制到子进程，并自上而下地复制该VMA对应的页表项到子进程，对于64位的系统，使用四级分页目录，每个VMA包括PGD、PUD、PMD、PTE，都将由父进程逐级复制完成。
+
+        - 在Async-fork中：父进程同样遍历每个VMA，但只负责将PGD、PUD这两级页表项复制到子进程。
+
+            - 随后，父进程将子进程放置到某个CPU上使子进程开始运行，父进程返回到用户态，继续响应用户请求。由子进程负责每个VMA剩下的PMD和PTE两级页表的复制工作。
+
+            ![avatar](./Pictures/redis/Async-fork流程.avif)
+
+    - 问题：如果在父进程返回用户态后，子进程复制内存页表期间，父进程需要修改还未完成复制的页表项，怎样避免上述提到的破坏快照一致性问题呢？
+
+        - 1.主动同步机制
+
+            - 父进程返回用户态后，父进程的PTE可能被修改。如果在子进程复制内存页表期间，父进程检测到了PTE修改，则会触发主动同步机制。——也就是父进程也加入页表复制工作，来主动完成被修改的相关页表复制，该机制用来确保PTE在修改前被复制到子进程。
+
+                - 当一个PTE将被修改时，父进程不仅复制这一个PTE，还同时将位于同一个页表上的所有PTE（一共512个PTE），连同它的父级PMD项复制到子进程。
+
+                - 问题：父进程中的PTE发生修改时，如果子进程已经复制过了这个PTE，父进程就不需要复制了，否则会发生重复复制。怎么区分PTE是否已经复制过？
+
+                    - 解决方法：Async-fork使用PMD项上的RW位来标记是否被复制。
+
+                        - 当父进程第一次返回用户态时，它所有PMD项被设置为写保护（RW=0），代表这个PMD项以及它指向的512个PTE还没有被复制到子进程。
+
+                        - 当子进程复制一个PMD项时，通过检查这个PMD是否为写保护，即可判断该PMD是否已经被复制到子进程。如果还没有被复制，子进程将复制这个PMD，以及它指向的512个PTE。
+                            - 在完成PMD及其指向的512个PTE复制后，子进程将父进程中的该PMD设置为可写（RW=1），代表这个PMD项以及它指向的512个PTE已经被复制到子进程。
+
+                        - 当父进程触发主动同步时，也通过检查PMD项是否为写保护判断是否被复制，并在完成复制后将PMD项设置为可写。
+
+                        - 同时，在复制PMD项和PTE时，父进程和子进程都锁定PTE表，因此它们不会出现同时复制同一PMD项指向的PTE。
+
+    - 错误处理
+
+        - Async-fork在复制页表时涉及到内存分配，难免会发生错误。例如，由于内存不足，进程可能无法申请到新的PTE表。
+            - 当错误发生时，应该将父进程恢复到它调用Async-fork之前的状态。
+
+        - 在Async-fork中，父进程PMD项目的RW位可能会被修改。因此，当发生错误时，需要将PMD项全部回滚为可写。
+
+- 从fork转换为Async-fork出现的问题：fork耗时正常，但是压测过程中执行bgsave，TP100不正常依然出现了尾延迟
+
+    - 使用 `info stats` 返回上次fork耗时：`latest_fork_usec:426`
+
+    ```sh
+    # 压测过程中执行 bgsave
+    [root@xxx ~]# /usr/bin/Redis-benchmark -d 256 -t set -n 1000000  -a xxxxxx -p 6679
+    ====== SET ======
+      1000000 requests completed in 7.88 seconds
+      50 parallel clients
+      256 bytes payload
+      keep alive: 1
+
+    100.00% <= 411 milliseconds
+    100.00% <= 412 milliseconds
+    100.00% <= 412 milliseconds
+    126871.35 requests per second
+    ```
+
+- 追踪过程
+
+    ```sh
+    $ strace -p 32088 -T -tt -o strace00.out
+    14:18:12.933441 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f461c0daa50) = 13772 <0.000380>
+    14:18:12.933884 open("/data1/6679/6679.log", O_WRONLY|O_CREAT|O_APPEND, 0666) = 60 <0.000019>
+    14:18:12.933948 lseek(60, 0, SEEK_END)  = 11484 <0.000013>
+    14:18:12.933983 stat("/etc/localtime", {st_mode=S_IFREG|0644, st_size=556, ...}) = 0 <0.000016>
+    14:18:12.934032 fstat(60, {st_mode=S_IFREG|0644, st_size=11484, ...}) = 0 <0.000014>
+    14:18:12.934062 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f461c0e4000 <0.358768>
+    14:18:13.292883 write(60, "32088:M 21 Mar 14:18:12.933 * Ba"..., 69) = 69 <0.000032>
+    14:18:13.292951 close(60)               = 0 <0.000014>
+    14:18:13.292980 munmap(0x7f461c0e4000, 4096) = 0 <0.000019>
+    ```
+
+    ```sh
+    $ strace -p 11559 -T -tt -e trace=memory -o trace00.out
+    14:18:12.934062 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f461c0e4000 <0.358768>
+    14:18:13.292980 munmap(0x7f461c0e4000, 4096) = 0 <0.000019>
+    ```
+
+    - clone耗时380微秒，已经大幅降低，也就fork快速返回了用户态响应用户请求。
+
+    - 然而，注意到，紧接着出现了一个mmap耗时358毫秒，与TP100数据接近。
+
+        - 由于mmap系统调用会在当前进程的虚拟地址空间中，寻找一段满足大小要求的虚拟地址，并且为此虚拟地址分配一个虚拟内存区域( `vm_area_struct` 结构)，也就是会触发VMA级虚拟页表变化，也就触发父进程主动同步机制，父进程主动帮助完成相应页表复制动作。VMA级虚拟页表变化，需要将对应的三级和四级所有页目录都复制到子进程，因此，耗时比较高。
+
+- 那么，这个mmap调用又是哪里来的呢？通过perf trace可以看到响应调用堆栈及耗时
+    ```sh
+    $ perf trace -p 11559 -o trace01.out --max-stack 15 -T
+    616821913.647 (358.740 ms): Redis-server_4/32088 mmap(len: 4096, prot: READ|WRITE, flags: PRIVATE|ANONYMOUS            ) = 0x7f461c0e4000
+                                           __mmap64 (/usr/lib64/libc-2.17.so)
+                                           __GI__IO_file_doallocate (inlined)
+                                           __GI__IO_doallocbuf (inlined)
+                                           __GI__IO_file_overflow (inlined)
+                                           _IO_new_file_xsputn (inlined)
+                                           _IO_vfprintf_internal (inlined)
+                                           __GI_fprintf (inlined)
+                                           serverLogRaw (/usr/local/Redis/Redis-server)
+                                           serverLog (/usr/local/Redis/Redis-server)
+                                           rdbSaveBackground (/usr/local/Redis/Redis-server)
+                                           bgsaveCommand (/usr/local/Redis/Redis-server)
+                                           call (/usr/local/Redis/Redis-server)
+                                           processCommand (/usr/local/Redis/Redis-server)
+                                           processInputBuffer (/usr/local/Redis/Redis-server)
+                                           aeProcessEvents (/usr/local/Redis/Redis-server)
+
+    616822272.562 ( 0.010 ms): Redis-server_4/32088 munmap(addr: 0x7f461c0e4000, len: 4096                                ) = 0
+                                           __munmap (inlined)
+                                           __GI__IO_setb (inlined)
+                                           _IO_new_file_close_it (inlined)
+                                           _IO_new_fclose (inlined)
+                                           serverLogRaw (/usr/local/Redis/Redis-server)
+                                           serverLog (/usr/local/Redis/Redis-server)
+                                           rdbSaveBackground (/usr/local/Redis/Redis-server)
+                                           bgsaveCommand (/usr/local/Redis/Redis-server)
+                                           call (/usr/local/Redis/Redis-server)
+                                           processCommand (/usr/local/Redis/Redis-server)
+                                           processInputBuffer (/usr/local/Redis/Redis-server)
+                                           aeProcessEvents (/usr/local/Redis/Redis-server)
+                                           aeMain (/usr/local/Redis/Redis-server)
+                                           main (/usr/local/Redis/Redis-server)
+    ```
+
+    - 在bgsave执行逻辑中，有一处打印日志中的fprintf调用了mmap，很显然这应该是fork返回父进程后，父进程中某处调用。
+
+- 针对找出来的代码位置，可以进行相应优化，针对此处的日志影响，我们可以屏蔽日志或者将日志移动到子进程进行打印，通过同样的分析手段，如果存在其他影响，均可进行对应优化。进行相应适配优化修改后，我们再次进行测试。
+
+    - 测试环境
+        - Redis版本：优化后Redis-Server
+        - 机器操作系统：Tair专属操作系统镜像
+        - 测试数据量：54.38G
+
+        ```redis
+        127.0.0.1:6680> info memory
+        # Memory
+        used_memory:58385641144
+        used_memory_human:54.38G
+        ```
+
+    - 在压测过程中执行bgsave，fork耗时和TP100均正常。
+        ```sh
+        # 压测过程中执行 bgsave
+        [root@xxx Redis]# /usr/bin/Redis-benchmark -d 256 -t set -n 1000000  -a dRedis123456 -p 6680
+        ====== SET ======
+          1000000 requests completed in 7.50 seconds
+          50 parallel clients
+          256 bytes payload
+          keep alive: 1
+
+        99.99% <= 1 milliseconds
+        99.99% <= 2 milliseconds
+        100.00% <= 2 milliseconds
+        133386.69 requests per second
+        ```
+
+    - strace跟踪父进程只看到clone，并且耗时只有378微秒，
+        ```sh
+        strace -p 14697 -T -tt -o strace04.out
+        14:42:00.723224 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fa5340d0a50) = 15470 <0.000378>
+        ```
+
+    - Perf trace跟踪父进程也只看到clone调用
+        ```sh
+        perf trace -p 14697 -o trace04.out --max-stack 15 -T
+        618249694.830 ( 0.423 ms): Redis-server/14697  ... [continued]: clone()) = 15470 (Redis-server)
+                                               __GI___fork (inlined)
+                                               rdbSaveBackground (/usr/local/Redis/Redis-server)
+                                               bgsaveCommand (/usr/local/Redis/Redis-server)
+                                               call (/usr/local/Redis/Redis-server)
+                                               processCommand (/usr/local/Redis/Redis-server)
+                                               processInputBuffer (/usr/local/Redis/Redis-server)
+                                               aeProcessEvents (/usr/local/Redis/Redis-server)
+                                               aeMain (/usr/local/Redis/Redis-server)
+                                               main (/usr/local/Redis/Redis-server)
+        ```
+
+    - 由于我们的优化是将触发mmap的相关日志修改到子进程中，使用Perf trace跟踪fork产生的子进程
+
+        - 父进程strace信息的文件strace05.out.14697
+        - 子进程strace信息的文件strace05.out.15931
+
+        ```sh
+        strace -p 14697 -T -tt -f -ff -o strace05.out
+        14:47:40.878387 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fa5340da000 <0.000008>
+        14:47:40.878415 write(6, "15931:C 21 Mar 14:47:40.878 * Ba"..., 69) = 69 <0.000015>
+        14:47:40.878447 close(6)                = 0 <0.000006>
+        14:47:40.878467 munmap(0x7fa5340da000, 4096) = 0 <0.000010>
+        14:47:40.878494 open("temp-15931.rdb", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 6 <0.000020>
+        14:47:40.878563 fstat(6, {st_mode=S_IFREG|0644, st_size=0, ...}) = 0 <0.000006>
+        14:47:40.878584 mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7fa5340da000 <0.000006>
+        ```
+
+        - 结论：在子进程中看到了mmap调用，子进程中调用不会影响父进程对业务访问的响应。
+
+- fork与优化后的Async-fork性能测试
+
+    - 1.fork()命令耗时：Redis执行 bgsave 命令后，通过Redis提供的 info stats 命令观察到的 latest_fork_usec 用时。
+
+        ![avatar](./Pictures/redis/fork与Async-fork的耗时对比.avif)
+
+        - 使用支持Async-fork的操作系统，fork()操作产生的耗时非常小，不管数据量多大，耗时都非常稳定，基本在200微秒左右
+        - 原生fork产生的耗时会随着数据量增长而增长，而且是从几十毫秒增长到几百毫秒。
+
+    - 2.TP100抖动：在使用Redis-benchmark压测过程中，手动执行bgsave命令，触发操作系统fork()操作
+
+        ![avatar](./Pictures/redis/fork与Async-fork的TP100抖动对比.avif)
+
+        - 使用支持Async-fork的操作系统，fork()操作对Redis压测产生的性能影响非常小，性能提升非常明显，不管数据量多大，耗时都非常稳定，基本在1-2毫秒左右
+        - 原生fork产生的抖动影响时间会随着数据量增长而增长，TP100从几十毫秒增长到几百毫秒。
+
 
 ## master slave replication (主从复制)
 
@@ -4624,6 +5294,122 @@ slaveof no one
                 - 通过 send_file 来提升发送的效率，通过这样的方式避免了master的阻塞。
 
             - slave在接收这些 AOF 的时候，它也是对外可以服务的，只是它的数据相对主库差异的有点多，有些老数据而已，如果业务可以忍受这个方案就可以极大地避免了洪峰流量导致的问题。
+
+### Redis2.8-4.0过期key策略，主从不一致的优化历程
+
+- [Redis开发运维实战：Redis2.8-4.0过期键优化详解]()
+
+- redis2.8，在从节点get hello非空，在主节点get hello为空，之后从节点get hello为空，经排查主从同步offset基本正常，但出现了主从不一致。
+
+![avatar](./Pictures/redis/redis2.8过期键策略的主从不一致.avif)
+
+- 过期key策略：
+
+    - 惰性删除：每次执行key相关的命令时，都会先从expires中查找key是否过期
+
+        - 可以看到每次读写key前，所有的Redis命令在执行之前都会调用`expireIfNeeded`函数：
+
+            ```c
+            int expireIfNeeded(redisDb *db, robj *key) {
+                mstime_t when = getExpire(db,key);
+                mstime_t now;
+                if (when < 0) return 0; /* No expire for this key */
+                now = server.lua_caller ? server.lua_time_start : mstime();
+                if (server.masterhost != NULL) return now > when;
+                /* Return when this key has not expired */
+                if (now <= when) return 0;
+                /* Delete the key */
+                server.stat_expiredkeys++;
+                propagateExpire(db,key);
+                notifyKeyspaceEvent(NOTIFY_EXPIRED,
+                    "expired",key,db->id);
+                return dbDelete(db,key);
+            }
+            ```
+
+            - 代码中可以看出，主从逻辑略有不同：
+                - 1.主库：过期则expireIfNeeded会删除过期键，删除成功返回1，否则返回0。
+                - 2.从库：expireIfNeeded不会删除key，而会返回一个逻辑删除的结果，过期返回1，不过期返回0 。
+                - 但是从库过期键删除由主库的synthesized DEL operations控制。
+
+    - 定时删除：从一定数量的数据库的过期库中取出一定数量的随机键进行检查，不为空则删除。不保证实时删除。
+        ```c
+        if (server->masterhost == NULL) activeExpireCycle();
+        ```
+
+        - 1.主库: 会定时删除过期键
+        - 2.从库: 不执行定期删除
+
+- Redis 2.8~4.0过期键读操作的fix记录
+
+    - Redis2.8主从不一致
+
+        - 读操作中都先调用lookupKeyRead函数：
+            ```c
+            robj *lookupKeyRead(redisDb *db, robs *key) {
+                robj *val;
+                expireIfNeeded(db,key);
+                val = lookupKey(db,key);
+                if (val == NULL)
+                    server.stat_keyspace_misses++;
+                else
+                    server.stat_keyspace_hits++;
+                return val;
+            }
+            ```
+
+        - 对于主库，执行expireIfNeeded时，过期会删除key。lookupKey返回 NULL。
+        - 对于从库，执行expireIfNeeded时，过期不会删除key。lookupKey返回value。
+        - 也就是开篇提到的问题
+
+    - Redis 3.2主从除exists之外都一致
+        - 读操作同样先调用了lookupKeyRead，实际上调用的是lookupKeyReadWithFlags函数
+            ```c
+            robj *lookupKeyReadWithFlags(redisDb *db, robj *key) {
+                robj *val;
+                if (expireIfNeeded(db,key) == 1) {
+                    if (server.masterhost == NULL) return NULL;
+                    if (server.current_client &&  //当前客户端存在
+                        server.current_client != server.master &&  //当前客户端不是master请求建立的（用户请求的客户端）
+                        server.current_client->cmd &&
+                        server.current_client->cmd->flags & REDIS_CMD_READONLY) {  //读命令
+                            return NULL;
+                         }
+                val = lookupKey(db,key,flags);
+                if (val == NULL)
+                    server.stat_keyspace_misses++;
+                else
+                    server.stat_keyspace_hits++;
+                return val;
+                }
+            ```
+
+        - 可以看到，相对于2.8，增加了对expireIfNeeded返回结果的判断：
+            - 对于主库，执行expireIfNeeded时，过期会删除key，返回1。masterhost为空返回NULL。
+            - 对于从库，执行expireIfNeeded时，过期不会删除key，返回1。满足当前客户端不为 master且为读命令时返回NULL。
+
+        - 除非程序异常。正常情况下对于过期键的读操作，主从返回一致。
+
+    - Redis 4.0.11解决exists不一致的情况
+
+- 过期键写操作
+
+    - 在读写分离的场景中，可以使用过期键的机制将从库作为一个缓存，去缓存从库上耗时操作的结果，提升整体性能。
+
+### 内存满后逐出策略，主从不一致
+
+- 错误认知：从节点更新数据完全听从主节点
+
+- 常见的不一致大概几种情况
+    - maxmemory不一致
+    - 数据结构优化参数不一致：查看ziplist相关、quicklist相关等配置一致
+
+- 无论是all-keys、还是volatile，主节点和从节点逐出的key肯定不可能完全一样（因为LRU也是近似算法），但主节点会自己删除的key命令同步给从节点，长此以往master节点数据会slave节点多
+    - 具体可以参考server.c每次处理命令都要做maxemory的检测和处理，直到满足条件，才会执行命令call
+
+- Redis 5.0的新增配置`replica-ignore-maxmemory`（默认yes开启）：从节点不会自己逐出
+    - 配置名：`replica-ignore-maxmemory`
+    - 配置别名：`slave-ignore-maxmemory`
 
 ### 一些问题和注意事项
 
@@ -5036,6 +5822,9 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
             - slot=CRC16(key) & 16383
 
             ![avatar](./Pictures/redis/cluster7.avif)
+
+- 顺序分区：rowkey在每个region顺序分布
+    ![avatar](./Pictures/redis/数据分布-顺序分区.avif)
 
 ### 集群功能限制
 
@@ -5473,6 +6262,8 @@ redis-cli --cluster rebalance 127.0.0.1:6379
     ![avatar](./Pictures/redis/cluster-client重定向.avif)
 
 - `hash-tag`：如果key包含`{}`只计算{}内的hash值。这样可以指定一些key，存储在同一个槽
+
+    - 如果不合理使用，会导致大量的数据可能被集中到一个实例上发生数据倾斜，集群中的负载不均衡。
 
     ```redis
     # 只计算1的hash值
@@ -6138,6 +6929,8 @@ slowlog reset
 `mem_fragmentation_ratio` > 1：说明多出的部分内存没有用于数据存储，而是内存碎片
 `mem_fragmentation_ratio` < 1：操作系统把redis交换（swap）到硬盘
 
+![avatar](./Pictures/redis/used_memory.avif)
+
 - 内存消耗的划分：自身内存 + 对象内存 + 缓冲内存 + 内存碎片
 
     - 对象内存：最大的一块，可以理解为`sizeof(keys) + sizeof(values)`
@@ -6177,13 +6970,56 @@ slowlog reset
         - 3.AOF缓冲区：重写期间保存的写入命令，无法设置
 
     - 内存碎片：默认采用jemalloc（freebsd社区开发），可选的还有glibc、tcmalloc（google开发）
+
+        - [Redis开发运维实战：Redis碎片整理原理解析与实践]()
+
         - jemalloc在64位系统将内存空间划分为：小、大、巨大三个范围
-            - 小：[8byte], [16byte, 32byte, ... 128byte], [256byte, ... 512byte], [768byte, ... 3840byte]
-            - 大：[4KB, 8KB, ... 4072KB]
-            - 巨大：[4MB, 8MB, ...]
+
+            | 类型 | 空间    | 值                            |
+            |------|---------|-------------------------------|
+            | 小   | 8byte   | [8]                           |
+            |      | 16byte  | [16，32，48，...，128]        |
+            |      | 32byte  | [160, 192, 224, 256]          |
+            |      | 64byte  | [320, 384, 448, 512]          |
+            |      | 128byte | [640, 768, 896, 1024]         |
+            |      | 256byte | [1280, 1536, 1792, 2048]      |
+            |      | 512byte | [2560, 3072, 3584]            |
+            | 大   | 4KB     | [4KB，8KB，12KB，...，4072KB] |
+            | 巨大 | 4MB     | [4MB，8MB，12MB，...]         |
+
             - 保存5KB的对象时，jemalloc可能会采用8KB的块，剩下的3KB成为内存碎片，不能再分配给其他对象存储。
 
-        - 正常碎片率`mem_fragmentation_ratio` 在1.03左右
+            - 例子1：从0开始申请6字节、3字节、3字节、3字节，从图中可以看到，开辟了3*8个字节，但实际使用了(6+3+3+3)字节，空闲了9字节
+
+                ![avatar](./Pictures/redis/memory-内存碎片.avif)
+
+            - 例子2：开始是填满的，但是删除后空出了一些小空间，后续就无法使用了
+
+                ![avatar](./Pictures/redis/memory-内存碎片1.avif)
+
+        - 碎片率越高，说明浪费越严重
+
+            - 正常碎片率`mem_fragmentation_ratio` 在1.03左右
+                ```redis
+                info memory
+                used_memory:     4285839160
+                used_memory_rss: 4349640704
+                mem_fragmentation_ratio:1.01
+                mem_allocator:jemalloc-5.1.0
+                ```
+
+            - 假设有一个日常满的100GB（一主一从）集群，不同碎片率的表现
+
+                | 碎片率 | 容量      | 实际占用内存量         |
+                |--------|-----------|------------------------|
+                | 1.05   | 100GB * 2 | 100GB * 2*1.05 = 210GB |
+                | 1.1    | 100GB * 2 | 100GB * 2*1.1 = 220GB  |
+                | 1.2    | 100GB * 2 | 100GB * 2*1.2 = 240GB  |
+                | 1.3    | 100GB * 2 | 100GB * 2*1.3 = 260GB  |
+                | 1.4    | 100GB * 2 | 100GB * 2*1.4 = 280GB  |
+                | 1.5    | 100GB * 2 | 100GB * 2*1.5 = 300GB  |
+                | 2      | 100GB * 2 | 100GB * 2*2 = 400GB    |
+
 
         - 高内存碎片的场景
             - 频繁对已存在的key执行`append`、`setrange`等更新命令
@@ -6193,35 +7029,81 @@ slowlog reset
                 - sentinel或cluster将碎片过高的主节点，转化为从节点，从而安全重启
 
         - 如何清理内存碎片
-            - Redis < 4.0：如果内存碎片率高于 1.5，直接重启 Redis 实例就可以让操作系统恢复之前因碎片而无法使用的内存
+            - Redis < 4.0：
+                - 1.数据对齐：保持键值尽量使用较为固定的长度，说实话这个对业务来说很难做到
+                - 2.安全重启：重启 Redis 实例就可以让操作系统恢复之前因碎片而无法使用的内存
+                    - slave节点：如无流量，可以重启（一主一从的情况要谨慎，万一重启期间，master挂了。）
+                    - master节点：如果当前架构可主从切换（例如redis sentinel、redis cluster等），可以尝试（但通常来说主从切换对业务100%有损）
+                - 3.切换到新集群：新建一个集群，将老集群群整体迁移到新集群（但新集群不久后也会碎片率高）
+
+                - 总结：上述方法要不不合实际，要不治标不治本。
+
             - Redis ≥ 4.0：
-                - redis.conf中相关的配置项：
-                ```
-                # 开启自动内存碎片清理
-                activedefrag yes
 
-                # 内存使用 100MB 以下，不进行碎片整理
-                active-defrag-ignore-bytes 100mb
+                - 碎片整理功能：(仅jemalloc支持)
 
-                # 碎片率超过 10%，开始碎片整理
-                active-defrag-threshold-lower 10
+                    - 一图胜过千言万语：经过整理后24字节变为了16字节
+                        ![avatar](./Pictures/redis/memory-碎片整理.avif)
 
-                # 碎片率超过 100%，尽最大努力碎片整理
-                active-defrag-threshold-upper 100
+                    - redis.conf中相关的配置项：
+                    ```
+                    # 开启自动内存碎片清理（默认关闭）
+                    activedefrag yes
 
-                # 碎片整理占用 CPU 资源最小百分比
-                active-defrag-cycle-min 1
-                # 碎片整理占用 CPU 资源最大百分比
-                active-defrag-cycle-max 25
+                    # 内存使用 100MB 以下，不进行碎片整理
+                    active-defrag-ignore-bytes 100mb
 
-                # 碎片整理期间，对于 List/Set/Hash/ZSet 类型元素一次 Scan 的数量
-                active-defrag-max-scan-fields 1000
-                ```
+                    # 碎片率超过 10%，开始碎片整理
+                    active-defrag-threshold-lower 10
 
-                ```redis
-                # 手动清理内存碎片
-                memory purge
-                ```
+                    # 碎片率超过 100%，尽最大努力碎片整理
+                    active-defrag-threshold-upper 100
+
+                    # 碎片整理占用 CPU 资源最小百分比
+                    active-defrag-cycle-min 1
+                    # 碎片整理占用 CPU 资源最大百分比
+                    active-defrag-cycle-max 25
+
+                    # 碎片整理期间，对于 List/Set/Hash/ZSet 类型元素一次 Scan 的数量
+                    active-defrag-max-scan-fields 1000
+                    ```
+
+                    - 需要注意的是，这两个参数在不同版本的Redis默认值不太一样：
+
+                        | 参数                    | 4.0.14 | 5.0.14 | 6.0.16 | 6.2.7 | 7.0.4 |
+                        |-------------------------|--------|--------|--------|-------|-------|
+                        | active-defrag-cycle-min | 25     | 5      | 1      | 1     | 1     |
+                        | active-defrag-cycle-max | 75     | 75     | 25     | 25    | 25    |
+
+                    ```redis
+                    # 手动清理内存碎片
+                    memory purge
+                    ```
+
+                - 开不开？
+                    - 如果规模不大、碎片率不高、没专职维护建议关闭，ROI低。
+                    - 如果规模大（比如我司100万+个节点），碎片整理的成本效果很明显，”成本优化，降本增效~“
+
+                    - `active-defrag-cycle-min`和`active-defrag-cycle-max`，因为设置不当的话可能会影响Redis的性能或者可用性。
+
+
+                    - 不同版本碎片率
+
+                        | 版本         | 实例数 | 平均碎片率 | jemalloc版本   |
+                        |--------------|--------|------------|----------------|
+                        | Redis 3.0.5  | 2235   | 1.28       | jemalloc-3.6.0 |
+                        | Redis 4.0.14 | 451361 | 1.156      | jemalloc-4.0.3 |
+                        | Redis 6.0.15 | 623632 | 1.112      | jemalloc-5.1.0 |
+
+                        - Redis 3采样较少，可以忽略
+                        - Redis 4、6如无特殊均开启碎片整理
+                        - Redis 6的碎片率比Redis 4确实低了一丢丢
+                        - 不同版本的jemalloc不同，猜测肯定越来越优秀(这块了解不多，正在学习，请了解的大佬指教)
+
+                    - 《Redis开发与运维》作者付磊的线上配置是Redis 6+、`active-defrag-cycle-min`：5、`active-defrag-cycle-max`：10
+
+            - Redis5 大key优化
+                - 碎片整理需要对Redis字典scan，如果在进行中发现set/hash/zset/list/stream的元素个数超过1000，则把这些键值放到一个单独的队列之后进行处理，这样做主要是为了防止碎片整理超时（如果一次scan中包含了很多大的键值，可能在内部已经超时了。）。
 
 - 开启了THP大内存页（2MB）机制，导致内存消耗
 
@@ -6490,200 +7372,419 @@ slowlog reset
 
 - [阿里开发者：一文详解Redis中BigKey、HotKey的发现与处理](https://developer.aliyun.com/article/788271?spm=a2c6h.14164896.0.0.2a3a303akyut8e)
 
+- [Redis开发运维实战：Redis开发规范解析(二)--老生常谈bigkey]()
+
 - [vivo互联网技术：Bigkey问题的解决思路与方式探索]()
 
 - 由于网络的一次传输 MTU 最大为 1500 字节，所以为了保证高效的性能，建议单个 k-v 大小不超过 1KB，一次网络传输就能完成，避免多次网络交互
 
-- bigkey：key对应的value的占用内存较大
-
+- 数据类型最大值
     - 字符串：最大可以512MB
+    - 二级数据结构（例如hash、list、set、zset）：最大2^32-1，40亿个元素
 
-        - string的value值超过1MB，就可以认为是Bigkey。
+- 什么是bigkey？多种说法
 
-    - 列表：最大2^32-1个元素
-        - 非字符串的类型，存储其实也是字符串。元素个数超过2000个，就可以认为是Bigkey。
+    - 1.《redis开发与运维》作者认为：
+        - string类型控制在10KB以内
+        - hash、list、set、zset元素个数不要超过5000。
 
-    - STRING类型的Key，它的值为5MB（数据过大）
+    - 2.[阿里开发者：一文详解Redis中BigKey、HotKey的发现与处理](https://developer.aliyun.com/article/788271?spm=a2c6h.14164896.0.0.2a3a303akyut8e)认为：
 
-    - LIST类型的Key，它的列表数量为20000个（列表数量过多）
+        - string类型控制在10KB以内，hash、list、set、zset元素个数不要超过5000。
 
-    - ZSET类型的Key，它的成员数量为10000个（成员数量过多）
+        - STRING类型的Key，它的值为5MB（数据过大）
 
-    - HASH格式的Key，它的成员数量虽然只有1000个但这些成员的value总大小为100MB（成员体积过大）
+        - LIST类型的Key，它的列表数量为20000个（列表数量过多）
+
+        - ZSET类型的Key，它的成员数量为10000个（成员数量过多）
+
+        - HASH格式的Key，它的成员数量虽然只有1000个但这些成员的value总大小为100MB（成员体积过大）
+
+#### 怎么产生
 
 - Bigkey是怎么产生的：程序设计不当或者对于数据规模预料不清楚造成的
 
-    - 【统计】：遇到一个统计类的key，是记录某网站的访问用户的IP，随着时间的推移，网站访问的用户越来越多，这个key的元素数量也会越来越大，形成Bigkey。
+    - 【社交】：粉丝列表，如果某些明星或者大v不精心设计下，必是bigkey。
+
+    - 【统计】：按天存储某项功能或者网站的用户集合，除非没几个人用，否则必是bigkey。
+        - 例子：记录某网站的访问用户的IP，随着时间的推移，网站访问的用户越来越多，这个key的元素数量也会越来越大，形成Bigkey。
 
     - 【队列】：把Redis当做队列使用，处理任务，如果消费出现不及时情况，将导致队列越来越大，形成Bigkey。
 
-    - 【缓存】： 缓存失效，从数据库查询出来序列化放到Redis里，短时间内会缓存大量的数据到Redis的key中，形成Bigkey。
+    - 【缓存】：
 
-- 危害：
+        - 将数据从数据库load出来序列化放到Redis里，这个方式非常常用。但有两个地方需要注意
+            - 1.是不是有必要把所有字段都缓存
+            - 2.有没有相关关联的数据
 
-    > bigkey的存在并不是致命的，如果bigkey同时还是热点key，才是致命
+        - 例子：缓存失效，从数据库查询出来序列化放到Redis里，短时间内会缓存大量的数据到Redis的key中，形成Bigkey。
 
-    - 1.在cluster中内存使用不均匀（平衡）。不均匀会不利于cluster对内存的统一管理，有数据丢失风险。
+        - 例子：该同学将某明星一个专辑下所有视频信息都缓存一个巨大的json中，造成这个json达到6MB，后来这个明星发了一个官宣。。。这个我就不多说了，领盒饭去吧。
 
-        ![avatar](./Pictures/redis/bigkey1.avif)
+#### 危害
 
-        - 图中的三个节点是同属于一个集群，它们的key的数量比较接近，但内存容量相差比较多
-        - 可以使用使用Daas平台“工具集-操作项管理”，选择对应的slave实例执行分析，找出具体的Bigkey。
+> bigkey的存在并不是致命的，如果bigkey同时还是热点key，才是致命
 
-    - 2.超时阻塞：redis的单线程，操作bigkey比较耗时会阻塞，导致客户端访问超时，更严重的会造成master-slave的故障切换。造成阻塞的操作不仅仅是业务程序的访问，还有key的自动过期的删除、del删除命令
+- 1.在cluster中内存使用不均匀（平衡）。不均匀会不利于cluster对内存的统一管理，有数据丢失风险。
 
-        - 业务方反映程序访问Redis集群出现超时现象，hkeys访问Redis的平均响应时间在200毫秒左右，最大响应时间达到了500毫秒以上，如下图。
+    ![avatar](./Pictures/redis/bigkey1.avif)
 
-        ![avatar](./Pictures/redis/bigkey2.avif)
+    - 图中的三个节点是同属于一个集群，它们的key的数量比较接近，但内存容量相差比较多
+    - 可以使用使用Daas平台“工具集-操作项管理”，选择对应的slave实例执行分析，找出具体的Bigkey。
 
-        - 1.使用Daas平台“服务监控-数据库实例监控”，选择master节点，选择Redis响应时间监控指标`redis.instance.latency.max`，如下图所示，从监控图中我们可以看到
+- 2.超时阻塞：redis的单线程，操作bigkey比较耗时会阻塞，导致客户端访问超时，更严重的会造成master-slave的故障切换。造成阻塞的操作不仅仅是业务程序的访问，还有key的自动过期的删除、del删除命令
 
-            - (1).正常情况下，该实例的响应时间在0.1毫秒左右。
+    - 业务方反映程序访问Redis集群出现超时现象，hkeys访问Redis的平均响应时间在200毫秒左右，最大响应时间达到了500毫秒以上，如下图。
 
-            - (2).监控指标上面有很多突刺，该实例的响应时间到了70毫秒左右，最大到了100毫秒左右，这种情况就是该实例会有100毫秒都在处理Bigkey的访问命令，不能处理其他命令。
+    ![avatar](./Pictures/redis/bigkey2.avif)
 
-            - 我们找到了具体的master实例，然后使用master实例的slave去分析下Bigkey情况。
+    - 1.使用Daas平台“服务监控-数据库实例监控”，选择master节点，选择Redis响应时间监控指标`redis.instance.latency.max`，如下图所示，从监控图中我们可以看到
 
-            ![avatar](./Pictures/redis/bigkey3.avif)
-            ![avatar](./Pictures/redis/bigkey4.avif)
+        - (1).正常情况下，该实例的响应时间在0.1毫秒左右。
 
-        - 2.使用Daas平台“工具集-操作项管理”，选择slave实例执行分析，分析结果如下图，有一个hash类型key有12102218个fields。
+        - (2).监控指标上面有很多突刺，该实例的响应时间到了70毫秒左右，最大到了100毫秒左右，这种情况就是该实例会有100毫秒都在处理Bigkey的访问命令，不能处理其他命令。
 
-            ![avatar](./Pictures/redis/bigkey5.avif)
+        - 我们找到了具体的master实例，然后使用master实例的slave去分析下Bigkey情况。
 
-            - 和业务沟通，这个Bigkey是连续存放了30天的业务数据了，建议根据二次hash方式拆分成多个key，也可把30天的数据根据分钟级别拆分成多个key，把每个key的元素数量控制在5000以内，目前业务正在排期优化中。优化后，监控指标的响应时间的突刺就会消失了。
+        ![avatar](./Pictures/redis/bigkey3.avif)
+        ![avatar](./Pictures/redis/bigkey4.avif)
 
-    - 3.网络拥塞：假设bigkey为1MB，每秒访问1000次，就是1000MB流量，而千兆网卡才128MB/s
-        - vivo的Redis服务器是采用单机多实例的方式来部署Redis实例的，也就是说一个Bigkey可能会对同一个服务器上的其他Redis集群实例造成影响，影响到其他的业务。
+    - 2.使用Daas平台“工具集-操作项管理”，选择slave实例执行分析，分析结果如下图，有一个hash类型key有12102218个fields。
 
-    - 4.迁移困难：
+        ![avatar](./Pictures/redis/bigkey5.avif)
 
-        - cluster水平扩容就会涉及到key的迁移。
+        - 和业务沟通，这个Bigkey是连续存放了30天的业务数据了，建议根据二次hash方式拆分成多个key，也可把30天的数据根据分钟级别拆分成多个key，把每个key的元素数量控制在5000以内，目前业务正在排期优化中。优化后，监控指标的响应时间的突刺就会消失了。
 
-            - (1).通过migrate命令来完成的，migrate实际上是通过dump + restore + del三个命令组合成原子命令完成，它在执行的时候会阻塞进行迁移的两个实例，直到以下任意结果发生才会释放：迁移成功，迁移失败，等待超时。
-            - (2).如果key的迁移过程中遇到Bigkey，会长时间阻塞进行迁移的那两个实例，可能造成客户端阻塞，导致客户端访问超时；也可能迁移时间太长，造成迁移超时导致迁移失败，水平扩容失败。
+- 3.网络拥塞：假设bigkey为1MB，每秒访问1000次，就是1000MB流量，而千兆网卡才128MB/s
 
-            - vivo失败例子：一个Redis集群水平扩容的工单，需要进行key的迁移，当工单执行到60%的时候，迁移失败了。
+    - 一般服务器会采用单机多实例的方式来部署，也就是说一个bigkey可能会对其他实例造成影响，其后果不堪设想。
+        - 例子：vivo的Redis服务器是采用单机多实例的方式来部署Redis实例的，也就是说一个Bigkey可能会对同一个服务器上的其他Redis集群实例造成影响，影响到其他的业务。
 
-                ![avatar](./Pictures/redis/bigkey6.avif)
+- 4.过期删除：
 
-                - 进入工单找到失败的实例，使用失败实例的slave节点，在Daas平台的“工具集-操作项管理”进行Bigkey分析。经过分析找出了hash类型的Bigkey有8421874个fields，正是这个Bigkey导致迁移时间太长，超过了迁移时间限制，导致工单失败了。
+    - 如果没有使用Redis 4.0的过期异步删除(lazyfree-lazy-expire yes)，就会存在阻塞Redis的可能性
+    - 而且这个过期删除不会从主节点的慢查询发现（因为这个删除不是客户端产生的，是内部循环事件，可以从latency命令中获取或者从slave节点慢查询发现）。
 
-                ![avatar](./Pictures/redis/bigkey7.avif)
+- 5.迁移困难：
 
-                - 和业务沟通，这些key是记录用户访问系统的某个功能模块的ip地址的，访问该功能模块的所有ip都会记录到给key里面，随着时间的积累，这个key变的越来越大。同样是采用拆分的方式进行优化，可以考虑按照时间日期维度来拆分，就是一段时间段的访问ip记录到一个key中。Bigkey优化后，扩容的工单可以重试，完成集群扩容操作。
+    - migrate实际上是通过dump + restore + del三个命令组合成原子命令完成，如果是bigkey，可能会使迁移失败，而且较慢的migrate会阻塞Redis。
 
-        - vivo分析了Daas平台的水平扩容时迁移key的过程及影响参数
+    - cluster水平扩容就会涉及到key的迁移。
 
-            - 1.`cluster-node-timeout`：控制集群的节点切换参数，master堵塞超过cluster-node-timeout/2这个时间，就会主观判定该节点下线pfail状态，如果迁移Bigkey阻塞时间超过cluster-node-timeout/2，就可能会导致master-slave发生切换。
+        - (1).通过migrate命令来完成的，migrate实际上是通过dump + restore + del三个命令组合成原子命令完成，它在执行的时候会阻塞进行迁移的两个实例，直到以下任意结果发生才会释放：迁移成功，迁移失败，等待超时。
+        - (2).如果key的迁移过程中遇到Bigkey，会长时间阻塞进行迁移的那两个实例，可能造成客户端阻塞，导致客户端访问超时；也可能迁移时间太长，造成迁移超时导致迁移失败，水平扩容失败。
 
-                - 优化：默认是60秒，在迁移之前设置为15分钟，防止由于迁移Bigkey阻塞导致master-slave故障切换。
+        - vivo失败例子：一个Redis集群水平扩容的工单，需要进行key的迁移，当工单执行到60%的时候，迁移失败了。
 
-            - 2.`migrate timeout`：控制迁移io的超时时间，超过这个时间迁移没有完成，迁移就会中断。
+            ![avatar](./Pictures/redis/bigkey6.avif)
 
-                - 优化：每次重试的超时时间都是10秒，3次重试之间间隔30秒，这样最多只会连续阻塞Redis实例10秒。
+            - 进入工单找到失败的实例，使用失败实例的slave节点，在Daas平台的“工具集-操作项管理”进行Bigkey分析。经过分析找出了hash类型的Bigkey有8421874个fields，正是这个Bigkey导致迁移时间太长，超过了迁移时间限制，导致工单失败了。
 
-            - 3.`迁移重试周期`：迁移的重试周期是由水平扩容的节点数决定的，比如一个集群扩容10个节点，迁移失败后的重试周期就是10次。
+            ![avatar](./Pictures/redis/bigkey7.avif)
 
-            - 4.`一个迁移重试周期内的重试次数`：在一个起迁移重试周期内，会有3次重试迁移，每一次的migrate timeout的时间分别是10秒、20秒、30秒，每次重试之间无间隔。
+            - 和业务沟通，这些key是记录用户访问系统的某个功能模块的ip地址的，访问该功能模块的所有ip都会记录到给key里面，随着时间的积累，这个key变的越来越大。同样是采用拆分的方式进行优化，可以考虑按照时间日期维度来拆分，就是一段时间段的访问ip记录到一个key中。Bigkey优化后，扩容的工单可以重试，完成集群扩容操作。
 
-                - 例子：一个集群扩容10个节点，迁移时候遇到一个Bigkey，第一次迁移的migrate timeout是10秒，10秒后没有完成迁移，就会设置migrate timeout为20秒重试，如果再次失败，会设置migrate timeout为30秒重试，如果还是失败，程序会迁移其他新9个的节点，但是每次在迁移其他新的节点之前还会分别设置migrate timeout为10秒、20秒、30秒重试迁移那个迁移失败的Bigkey。这个重试过程，每个重试周期阻塞（10+20+30）秒，会重试10个周期，共阻塞600秒。其实后面的9个重试周期都是无用的，每次重试之间没有间隔，会连续阻塞了Redis实例。
+    - vivo分析了Daas平台的水平扩容时迁移key的过程及影响参数
 
-                - 优化：迁移失败后，只重试3次，每次重试间隔30秒，重试3次后都失败了，会暂停迁移，日志记录下Bigkey，去掉了其他节点迁移的重试。
+        - 1.`cluster-node-timeout`：控制集群的节点切换参数，master堵塞超过cluster-node-timeout/2这个时间，就会主观判定该节点下线pfail状态，如果迁移Bigkey阻塞时间超过cluster-node-timeout/2，就可能会导致master-slave发生切换。
 
-            - 5.`迁移失败日志`：迁移失败后，记录的日志没有包括迁移节点、solt、key信息，不能根据日志立即定位到问题key。
+            - 优化：默认是60秒，在迁移之前设置为15分钟，防止由于迁移Bigkey阻塞导致master-slave故障切换。
 
-                - 优化：记录迁移失败的节点、solt、key信息，可以立即定位到问题节点及key。
+        - 2.`migrate timeout`：控制迁移io的超时时间，超过这个时间迁移没有完成，迁移就会中断。
+
+            - 优化：每次重试的超时时间都是10秒，3次重试之间间隔30秒，这样最多只会连续阻塞Redis实例10秒。
+
+        - 3.`迁移重试周期`：迁移的重试周期是由水平扩容的节点数决定的，比如一个集群扩容10个节点，迁移失败后的重试周期就是10次。
+
+        - 4.`一个迁移重试周期内的重试次数`：在一个起迁移重试周期内，会有3次重试迁移，每一次的migrate timeout的时间分别是10秒、20秒、30秒，每次重试之间无间隔。
+
+            - 例子：一个集群扩容10个节点，迁移时候遇到一个Bigkey，第一次迁移的migrate timeout是10秒，10秒后没有完成迁移，就会设置migrate timeout为20秒重试，如果再次失败，会设置migrate timeout为30秒重试，如果还是失败，程序会迁移其他新9个的节点，但是每次在迁移其他新的节点之前还会分别设置migrate timeout为10秒、20秒、30秒重试迁移那个迁移失败的Bigkey。这个重试过程，每个重试周期阻塞（10+20+30）秒，会重试10个周期，共阻塞600秒。其实后面的9个重试周期都是无用的，每次重试之间没有间隔，会连续阻塞了Redis实例。
+
+            - 优化：迁移失败后，只重试3次，每次重试间隔30秒，重试3次后都失败了，会暂停迁移，日志记录下Bigkey，去掉了其他节点迁移的重试。
+
+        - 5.`迁移失败日志`：迁移失败后，记录的日志没有包括迁移节点、solt、key信息，不能根据日志立即定位到问题key。
+
+            - 优化：记录迁移失败的节点、solt、key信息，可以立即定位到问题节点及key。
 
 
-- 发现bigkey
+#### 发现bigkey
 
-    - 开发人员对redis的理解不尽相同，bigkey的出现在所难免，重要的是能够通过合理机制发现它们。
+- 开发人员对redis的理解不尽相同，bigkey的出现在所难免，重要的是能够通过合理机制发现它们。
 
-    - `redis-cli --bigkeys`命令分析：
+- 1.`redis-cli --bigkeys`命令分析：
 
-        - 优点：在于方便及安全
-        - 缺点：分析结果不可定制化。只能计算每种数据结构的top1，无法只分析STRING类型或是找出全部成员数量超过10的HASH Key
+    - 优点：在于方便及安全
+    - 缺点：分析结果不可定制化。只能计算每种数据结构的top1，无法只分析STRING类型或是找出全部成员数量超过10的HASH Key
 
-        - Daas平台集成了基于原生--bigkeys代码实现的查询Bigkey的方式，
+    - Daas平台集成了基于原生--bigkeys代码实现的查询Bigkey的方式，
 
-        ```sh
-        # 获取bigkey(内部采用scan)。
-        # bigkeys仅能分别输出Redis六种数据结构中的最大Key，
-        redis-cli --bigkeys
-        ```
+    ```sh
+    # 获取bigkey(内部采用scan)。
+    # bigkeys仅能分别输出Redis六种数据结构中的最大Key，
+    redis-cli --bigkeys
+    ```
 
-    - 可以使用scan + debug object key计算每个key的serializedlength后，进行处理和报警
+    - 注意事项：
+        - 建议在从节点运行
+            -  如果没有从节点，可以使用--i 参数，例如(`--i 0.1` 代表100毫秒执行一次)
+        - 建议在节点本机运行，减少网络开销
 
-        ```redis
-        # serializedlength属性代表编码序列化后的字节大小。值会比strlen key命令偏小
-        debug object key
-        ```
-        ![avatar](./Pictures/redis/bigkey.avif)
+- 2.scan + debug object key遍历计算每个key的serializedlength后，进行处理和报警
+    - 场景：
+        - 1.查redis大于10KB的所有key
+        - 2.查redis长度大于5000的hash key
+        - `redis-cli --bigkeys`就不行了
+
+    ```redis
+    # serializedlength属性代表编码序列化后的字节大小。值会比strlen key命令偏小。
+    debug object keyname
+
+    # 如果是字符串类型，完全看可以执行strlen
+    strlen keyname
+    ```
+    ![avatar](./Pictures/redis/bigkey.avif)
+
+    - 注意事项
+
+        - debug object bigkey本身可能就会比较慢，它本身就会存在阻塞Redis的可能：
+
+            | 类型 | 长度    | 每个item长度 | 耗时    |
+            |------|---------|--------------|---------|
+            | hash | 100000  | 4字节        | 27毫秒  |
+            | hash | 500000  | 4字节        | 137毫秒 |
+            | hash | 1000000 | 4字节        | 255毫秒 |
+            | list | 100000  | 4字节        | 4毫秒   |
+            | list | 500000  | 4字节        | 8毫秒   |
+            | list | 1000000 | 4字节        | 12毫秒  |
+            | set  | 100000  | 4字节        | 16毫秒  |
+            | set  | 500000  | 4字节        | 85毫秒  |
+            | set  | 1000000 | 4字节        | 181毫秒 |
+            | zset | 100000  | 4字节        | 78毫秒  |
+            | zset | 500000  | 4字节        | 355毫秒 |
+            | zset | 1000000 | 4字节        | 733毫秒 |
 
         - 如果键比较多会比较慢，可以使用pipeline机制完成
-        - 如果有从节点，建议在从节点完成
+        - 建议在从节点完成
+        - 建议在节点本机运行，减少网络开销
+        - 如果不关系具体字节数，完全可以使用scan + strlen|hlen|llen|scard|zcard替代，他们都是o(1)
 
-    - RDB文件分析：使用redis-rdb-tools工具以定制化方式找出bigKey
+- 3.memory usage
 
-        - 分析RDB文件为离线工作，因此对线上服务不会有任何影响，这是它的最大优点但同时也是它的最大缺点：离线分析代表着分析结果的较差时效性。
+    - 上面的debug object可能会比较危险、而且不太准确（序列化后的长度）
 
-        - 对于一个较大的RDB文件，它的分析可能会持续很久很久。
+        - 有没有更准确的呢？Redis 4.0开始提供memory usage命令可以计算每个键值的字节数（自身、以及相关指针开销，具体的细节后面有文章会分析）
 
-            - 建议在slave节点执行，因为生成RDB文件会影响节点性能。
+    - 如果你使用Redis 4.0+，你就可以用scan + memory usage(pipeline)了，而且很好的一点是,memory不会执行很慢
 
-        - Daas平台集成了基于RDB文件分析代码实现的查询Bigkey的方式，可以根据实际需求自定义填写N，分析的top N个Bigkey。该方式相对有一定风险，只有DBA有权限执行分析。
+        ```redis
+        127.0.0.1:6379> memory usage keyname
+        (integer) 48
+        ```
+    - 注意事项：建议从节点 + 本地执行
 
-        - 提前解决，避免故障的发生，进行全网Bigkey的巡检：vivo的存储研发组分布式数据库同学计划开发一个高效的RDB解析工具，通过大规模解析RDB文件来分析Bigkey，可以提高分析速度，实现Bigkey的巡检。
+- 4.客户端
+    - 以jedis为例，可以在关键的出入口加上对应的检测机制
+        ```java
+        protected Object readProtocolWithCheckingBroken(){
+          Object o = null;
+          try{
+            o = Protocol.read (inputStream);
+            return o ;
+          } catch (JedisConnectionException exc){
+              UsefulDataCollector.collectException(exc, getHostPort(), System.currentTimeMillis());
+              broken = true;
+              throw exc;
+          } finally{
+            if(o != null){
+              if(o instanceof byte[]){
+                byte[] bytes = (byte[]) o ;
+                if (bytes.length > threshold) {
+                  //做很多事情，例如用ELK完成收集和展示
+                }
+              }
+            }
+          }
+        }
+        ```
 
-- 解决方法：
+- 5.监控报警
 
-    - 1.拆分复制数据结构：
+    - bigkey的大操作，通常会引起客户端输入或者输出缓冲区的异常，Redis提供了`info clients`里面包含的客户端输入缓冲区的字节数以及输出缓冲区的队列长度
 
-        - big list：list1、list2、...listN
-        - 如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
-        - 按照日期拆分多个：key20220310、key20220311、key202203212
+        ```redis
+        # 可以重点关注
+        info clients
+        client_longest_output_list:xxxxx
+        client_biggest_input_buf:xxxxx
+        ```
 
+    - 如果想知道具体的客户端，可以使用client list命令来查找
 
+- 6.改源码：这个其实也是能做的，但是各方面成本比较高，对于一般公司来说不适用。
 
-    - 2.对失效数据进行定期清理：HASH结构中以增量的形式不断写入大量数据而忽略了这些数据的时效性，这些大量堆积的失效数据会造成大Key的产生
+- 7.RDB文件分析：使用redis-rdb-tools工具以定制化方式找出bigkey、hotkey、idlekey等（阿里云的做法）
+    - 读者著：rdb要怎么找到hotkey呢？
 
-        - 建议使用HSCAN并配合HDEL对失效数据进行清理
+    - 分析RDB文件为离线工作，因此对线上服务不会有任何影响，这是它的最大优点但同时也是它的最大缺点：离线分析代表着分析结果的较差时效性。
 
-    - 3.删除
+    - 对于一个较大的RDB文件，它的分析可能会持续很久很久。
 
-        - 通常来说del bigkey会阻塞
+        - 建议在slave节点执行，因为生成RDB文件会影响节点性能。
 
-        - del不同数据类型的耗时统计
+    - Daas平台集成了基于RDB文件分析代码实现的查询Bigkey的方式，可以根据实际需求自定义填写N，分析的top N个Bigkey。该方式相对有一定风险，只有DBA有权限执行分析。
 
-            | 数据类型 | 512KB  | 1MB    | 2MB    | 5MB    | 10MB |
-            |----------|--------|--------|--------|--------|------|
-            | string   | 0.22ms | 0.31ms | 0.32ms | 0.56ms | 1ms  |
+    - 提前解决，避免故障的发生，进行全网Bigkey的巡检：vivo的存储研发组分布式数据库同学计划开发一个高效的RDB解析工具，通过大规模解析RDB文件来分析Bigkey，可以提高分析速度，实现Bigkey的巡检。
 
-            | 数据类型   | 10万个元素（8个字节） | 100万个元素（8个字节） | 10万个元素（16个字节） | 100万个元素（16个字节） | 10万个元素（128个字节） | 100万个元素（128个字节） |
-            |------------|-----------------------|------------------------|------------------------|-------------------------|-------------------------|--------------------------|
-            | hash       | 51ms                  | 950ms                  | 58ms                   | 970ms                  | 96ms                    | 2000ms                   |
-            | list       | 23ms                  | 134ms                  | 23ms                   | 138ms                  | 23                      | 266                      |
-            | set        | 44ms                  | 873ms                  | 58ms                   | 881ms                  | 73ms                    | 1319ms                   |
-            | sorted set | 51ms                  | 845ms                  | 57ms                   | 859ms                  | 59ms                    | 969ms                   |
+- 我个人的最佳实践就是：
+    - 1.Redis端与客户端相结合：`redis-cli --bigkeys`临时用、scan长期做排除隐患（尽可能本地化）、客户端实时监控。
+    - 2.监控报警要跟上
+    - 3.debug object尽量少用
+    - 4.所有数据平台化
+    - 5.要和开发同学强调bigkey的危害
 
-            - 除了string外，其他类型的del速度很慢。使用sscan、hscan、zscan命令进行del，每次del 100个
+#### 解决方法
 
-- vivo例子：
+- 1.拆分复制数据结构：
 
-    - 全网Redis集群有2200个以上，实例数量达到4.5万以上，有的比较大的集群的实例数量达到了1000以上，在当前阶段进行一次全网 Bigkey检查，估计需要以年为时间单位，非常耗时。我们需要新的思路去解决Bigkey问题。
+    - big list：list1、list2、...listN
 
-    - 可以从集群维度选择全部slave进行分析。
+    - 如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
+        ![avatar](./Pictures/redis/bigkey-hash拆分.avif)
 
-    - 同一个集群的相同服务器slave实例串行分析，不同服务器的slave实例并行分析，最大并发度默认10，同时可以分析10个实例，并且可以自定义输入执行分析的并发度。
+        - big hash：可以做二次的hash，例如hash%100
 
-    - 分析出符合Bigkey规定标准的所有key信息：大于1MB的string类型的所有key，如果不存在就列出最大的50个key；hash、list、set、zset等类型元素个数大于2000的所有key，如不存在就给出每种类型最大的50个key。
+    - 按照日期拆分多个：key20220310、key20220311、key202203212
 
-    - 增加暂停、重新开始、结束功能，暂停分析后可以重新开始。
+- 2.对失效数据进行定期清理：HASH结构中以增量的形式不断写入大量数据而忽略了这些数据的时效性，这些大量堆积的失效数据会造成大Key的产生
+
+    - 建议使用HSCAN并配合HDEL对失效数据进行清理
+
+#### 如何删除
+
+- 如果你使用 Redis 4.0+，一条异步删除 `unlink` 就解决，就可以忽略下面内容。
+
+- del不同数据类型的耗时统计
+
+    | 数据类型 | 512KB  | 1MB    | 2MB    | 5MB    | 10MB |
+    |----------|--------|--------|--------|--------|------|
+    | string   | 0.22ms | 0.31ms | 0.32ms | 0.56ms | 1ms  |
+
+    | 数据类型   | 10万个元素（8个字节） | 100万个元素（8个字节） | 10万个元素（16个字节） | 100万个元素（16个字节） | 10万个元素（128个字节） | 100万个元素（128个字节） |
+    |------------|-----------------------|------------------------|------------------------|-------------------------|-------------------------|--------------------------|
+    | hash       | 51ms                  | 950ms                  | 58ms                   | 970ms                  | 96ms                    | 2000ms                   |
+    | list       | 23ms                  | 134ms                  | 23ms                   | 138ms                  | 23                      | 266                      |
+    | set        | 44ms                  | 873ms                  | 58ms                   | 881ms                  | 73ms                    | 1319ms                   |
+    | sorted set | 51ms                  | 845ms                  | 57ms                   | 859ms                  | 59ms                    | 969ms                   |
+
+- 除了string外，其他类型的`del`速度很慢。使用sscan、hscan、zscan命令进行del，每次del 100个
+
+- Hash删除: hscan + hdel
+    ```java
+    public void delBigHash(String host, int port, String password, String bigHashKey) {
+        Jedis jedis = new Jedis(host, port);
+        if (password != null && !"".equals(password)) {
+            jedis.auth(password);
+        }
+        ScanParams scanParams = new ScanParams().count(100);
+        String cursor = "0";
+        do {
+            ScanResult<Entry<String, String>> scanResult = jedis.hscan(bigHashKey, cursor, scanParams);
+            List<Entry<String, String>> entryList = scanResult.getResult();
+            if (entryList != null && !entryList.isEmpty()) {
+                for (Entry<String, String> entry : entryList) {
+                    jedis.hdel(bigHashKey, entry.getKey());
+                }
+            }
+            cursor = scanResult.getStringCursor();
+        } while (!"0".equals(cursor));
+        //删除bigkey
+        jedis.del(bigHashKey);
+    }
+    ```
+
+- List删除: ltrim
+    ```java
+    public void delBigList(String host, int port, String password, String bigListKey) {
+        Jedis jedis = new Jedis(host, port);
+        if (password != null && !"".equals(password)) {
+            jedis.auth(password);
+        }
+        long llen = jedis.llen(bigListKey);
+        int counter = 0;
+        int left = 100;
+        while (counter < llen) {
+            //每次从左侧截掉100个
+            jedis.ltrim(bigListKey, left, llen);
+            counter += left;
+        }
+        //最终删除key
+        jedis.del(bigListKey);
+    }
+    ```
+
+- Set删除: sscan + srem
+    ```java
+    public void delBigSet(String host, int port, String password, String bigSetKey) {
+        Jedis jedis = new Jedis(host, port);
+        if (password != null && !"".equals(password)) {
+            jedis.auth(password);
+        }
+        ScanParams scanParams = new ScanParams().count(100);
+        String cursor = "0";
+        do {
+            ScanResult<String> scanResult = jedis.sscan(bigSetKey, cursor, scanParams);
+            List<String> memberList = scanResult.getResult();
+            if (memberList != null && !memberList.isEmpty()) {
+                for (String member : memberList) {
+                    jedis.srem(bigSetKey, member);
+                }
+            }
+            cursor = scanResult.getStringCursor();
+        } while (!"0".equals(cursor));
+        //删除bigkey
+        jedis.del(bigSetKey);
+    }
+    ```
+
+- SortedSet删除: zscan + zrem
+    ```java
+    public void delBigZset(String host, int port, String password, String bigZsetKey) {
+        Jedis jedis = new Jedis(host, port);
+        if (password != null && !"".equals(password)) {
+            jedis.auth(password);
+        }
+        ScanParams scanParams = new ScanParams().count(100);
+        String cursor = "0";
+        do {
+            ScanResult<Tuple> scanResult = jedis.zscan(bigZsetKey, cursor, scanParams);
+            List<Tuple> tupleList = scanResult.getResult();
+            if (tupleList != null && !tupleList.isEmpty()) {
+                for (Tuple tuple : tupleList) {
+                    jedis.zrem(bigZsetKey, tuple.getElement());
+                }
+            }
+            cursor = scanResult.getStringCursor();
+        } while (!"0".equals(cursor));
+        //删除bigkey
+        jedis.del(bigZsetKey);
+    }
+    ```
+
+#### vivo例子
+
+- 全网Redis集群有2200个以上，实例数量达到4.5万以上，有的比较大的集群的实例数量达到了1000以上，在当前阶段进行一次全网 Bigkey检查，估计需要以年为时间单位，非常耗时。我们需要新的思路去解决Bigkey问题。
+
+- 可以从集群维度选择全部slave进行分析。
+
+- 同一个集群的相同服务器slave实例串行分析，不同服务器的slave实例并行分析，最大并发度默认10，同时可以分析10个实例，并且可以自定义输入执行分析的并发度。
+
+- 分析出符合Bigkey规定标准的所有key信息：大于1MB的string类型的所有key，如果不存在就列出最大的50个key；hash、list、set、zset等类型元素个数大于2000的所有key，如不存在就给出每种类型最大的50个key。
+
+- 增加暂停、重新开始、结束功能，暂停分析后可以重新开始。
 
 ### 寻找热key（hotkey）
 
-- 热门新闻事件或商品会给系统带来巨大的流量
+- 如今，明星们结婚离婚都流行官宣、电商网站也有各种秒杀活动、直播类也有很多大v，对于网站来说是好事儿，可以吸引大量用户关注，但对于做后端技术的同学可不是什么“好事”，因为这意味着同时在某一瞬间或阶段，流量会暴增，而且还会集中在某一个id、表、key等情况，当然换个思路想，也是好事，可以锻炼一下技术。
 
 - hotkey（热点key）：
 
@@ -6697,7 +7798,10 @@ slowlog reset
 
     - cluster为例，会造成整体流量不均衡，个别node出现ops过大的情况，甚至会超过所能承受的ops，造成缓存击穿，大量强求将直接指向后端存储将其打挂并影响到其它业务
 
-- 发现热点key的方法：
+        - 例子：元旦晚上，好像正在看某古老电视剧，突然一票报警和微信通知过来，线上某集群短时间不可用，影响了某重要核心业务（现在就怕听到核心这两个字），快速止损后，经过一晚奋战终于找到原因：某bigkey + hotkey把Redis打爆（CPU），proxy都hang在该节点，造成整个集群不可用。
+            - 但事后，业务同学问我，热点key是哪个，能帮忙查下吗？我也是一脸懵逼，说实话我之前查热点key的通常都是在没有故障的情况下用faina查一下。
+
+- 发现热点key的方法：其实抽象的话就是四个部分：客户端、机器、proxy、redis server
 
     | 方法   | 优点                       | 缺点                                                                     |
     |--------|----------------------------|--------------------------------------------------------------------------|
@@ -6708,41 +7812,219 @@ slowlog reset
 
     - 1.客户端：离key最近的地方
 
-        - 设置全局字典（key的调用次数），每次执行命令，使用这个字典进行记录
+        - 设置全局字典（key的调用次数），每次执行命令，使用字典进行记录，以Jedis为例
+            ```java
+            public static final AtomicLongMap<String> ATOMIC_LONG_MAP = AtomicLongMap.create();
+            public Connection sendCommand(final ProtocolCommand cmd, final byte[]... args) {
+                //从参数中获取key
+                String key = analysis(args);
+                //计数
+                ATOMIC_LONG_MAP.incrementAndGet(key);
+                //ignore
+            }
+            ```
+
+        - 问题：
+            - 1.无法预知key的个数，存在内存泄露的危险。
+            - 2.对于客户端代码有侵入，各个语言的客户端都需要维护此逻辑，维护成本较高。
+            - 3.规模化汇总实现比较复杂。
+
+            - 总结：此种方法基本不靠谱，除非键值个数较少，否则进程有个大对象。
 
     - 2.代理端：如推特开发的[twemproxy](https://github.com/twitter/twemproxy)、豌豆荚开发的[codis](https://github.com/CodisLabs/codis)这些基于代理redis的分布式架构，最适合作为热点key统计
         ![avatar](./Pictures/redis/hotkey-proxy.avif)
 
+        - 客户端对于proxy的访问通常是均匀的，所以理论上只要在一个代理完成热点key的统计即可。但是这样做的不多。一方面并不是所有Redis架构都是proxy模式，另一方面在proxy层做二次开发也需要投入相应的人力和时间。
+
+        - 此种方法不具有普遍性，而且改proxy源码虽然不难，但维护成本和稳定性需要考量。
+
     - 3.服务端：
 
-        ```sh
-        # maxmemory-policy参数必须为allkeys-lfu。返回所有Key的被访问次数，它的缺点同样为不可定制化输出报告
-        redis-cli --hotkeys
-        ```
+        - `redis-cli --hotkeys`命令
+            ```sh
+            # maxmemory-policy参数必须为allkeys-lfu和volatile-lfu（redis4.0以上支持）
+            # 返回所有Key的被访问次数，它的缺点同样为不可定制化输出报告
+            redis-cli --hotkeys
+            ```
+
+            - 问题：
+                - 如果键值较多，执行较慢，和热点的概念的有点背道而驰
+                - 热度定义的不够准确
+
+            - 原理：
+                - [redis4.0之基于LFU的热点key发现机制](https://developer.aliyun.com/article/278922)
+                - 当这24 bits用作LFU时，其被分为两部分：
+
+                    - 高16位用来记录访问时间（单位为分钟）
+                    - 低8位用来记录访问频率，简称counter
+                               16 bits         8 bits
+                          +------------------+--------+
+                          + Last access time | LOG_C  |
+                          +------------------+--------+
+
+                    - 8 bits最大值也就是255，只用8位来记录访问频率够用吗？对于counter，redis用了一个trick的手段，counter并不是一个简单的线性计数器，而是用基于概率的对数计数器来实现
+
+                        ```c
+                          uint8_t LFULogIncr(uint8_t counter) {
+                              if (counter == 255) return 255;
+                              double r = (double)rand()/RAND_MAX;
+                              double baseval = counter - LFU_INIT_VAL;
+                              if (baseval < 0) baseval = 0;
+                              double p = 1.0/(baseval*server.lfu_log_factor+1);
+                              if (r < p) counter++;
+                              return counter;
+                          }
+                        ```
+
+                        - 概率分布计算公式为：`1/((counter-LFU_INIT_VAL)*server.lfu_log_factor+1)`
+
+                        - 下表是不同概率因子server.lfu_log_factor与访问频率counter的对应关系：
+
+                            | factor | 100 hits | 1000 hits | 100K hits | 1M hits | 10M hits |
+                            |--------|----------|-----------|-----------|---------|----------|
+                            | 0      | 104      | 255       | 255       | 255     | 255      |
+                            | 1      | 18       | 49        | 255       | 255     | 255      |
+                            | 10     | 10       | 18        | 142       | 255     | 255      |
+                            | 100    | 8        | 11        | 49        | 143     | 255      |
+
+                        - 默认server.lfu_log_factor为10的情况下，8 bits的counter可以表示1百万的访问频率
+
+                    - counter的衰减因子：
+
+                        - 问题：随着key的访问量增长，counter最终都会收敛为255，这就带来一个问题，如果counter只增长不衰减就无法区分热点key。
+
+                        - 解决方法：redis提供了衰减因子server.lfu_decay_time，其单位为分钟，计算方法也很简单，如果一个key长时间没有访问那么它的计数器counter就要减少，减少的值由衰减因子来控制
+
+                            - 默认为1的情况下也就是N分钟内没有访问，counter就要减N。
+
+                            ```c
+                            unsigned long LFUDecrAndReturn(robj *o) {
+                                unsigned long ldt = o->lru >> 8;
+                                unsigned long counter = o->lru & 255;
+                                unsigned long num_periods = server.lfu_decay_time ? LFUTimeElapsed(ldt) / server.lfu_decay_time : 0;
+                                if (num_periods)
+                                    counter = (num_periods > counter) ? 0 : counter - num_periods;
+                                return counter;
+                            }
+                            ```
+
+                - 热点key发现
+
+                    - 在每次对key进行读写访问时，更新LFU的24 bits域代表的访问时间和counter，这样每个key就可以获得正确的LFU值
+
+                        ```c
+                        void updateLFU(robj *val) {
+                            unsigned long counter = LFUDecrAndReturn(val);
+                            counter = LFULogIncr(counter);
+                            val->lru = (LFUGetTimeInMinutes()<<8) | counter;
+                        }
+                        ```
+
+                    - 那么用户如何获取访问频率呢？redis提供了OBJECT FREQ子命令来获取LFU信息，但是要注意需要先把内存逐出策略设置为allkeys-lfu或者volatile-lfu，否则会返回错误
+
+                        - 为了方便用户使用，redis 4.0.3同时也提供了`redis-cli --hotkeys`
 
         - 使用`monitor`命令进行统计
 
-            - facebook开发的[redis-faina](https://github.com/facebookarchive/redis-faina)就是使用`            monitor`命令进行统计
-            ```sh
-            # 统计10万条命令的热点key
-            redis-cli -p 6490 MONITOR | head -n 100000 | ./redis-faina.py
+            - 利用monitor的结果就可以统计出一段时间内的热点key排行榜，命令排行榜，客户端分布等数据
             ```
+            //伪代码统计了最近10万条命令中的热点key
+            //获取10万条命令
+            List<String> keyList = redis.monitor(100000);
+            //存入到字典中，分别是key和对应的次数
+            AtomicLongMap<String> ATOMIC_LONG_MAP = AtomicLongMap.create();
+            //统计
+            for (String command : commandList) {
+                ATOMIC_LONG_MAP.incrementAndGet(key);
+            }
+            //后续统计和分析热点key
+            statHotKey(ATOMIC_LONG_MAP);
+            ```
+
+            - facebook开发的[redis-faina](https://github.com/facebookarchive/redis-faina)正是利用上述原理使用Python语言实现的
+            ```sh
+            # 获取最近10万条命令的热点key、热点命令、耗时分布等数据。
+            redis-cli -p 6379 MONITOR | head -n 100000 | ./redis-faina.py
+            ```
+
+            - 如果某个集群的某些节点明显不正常，例如QPS明显高于其他节点
+                ![avatar](./Pictures/redis/hotkey导致某个节点qps过高.avif)
+
+                - 那么他就会进入黑名单，进入黑名单的节点，要做的事情就简单多了，执行monitor抓10000条数据，迅速关闭monitor的客户端，然后分析这10000条数据，基本上就能找到热点key
+
+                - 问题：就是如果热点真的就是一瞬间，此方法是抓不到的。
+                    - 此方法都是放在[CacheCloud](https://github.com/sohutv/cachecloud)每分钟自动抓取的，只需要修改一个CacheCloud配置即可，新版本的CacheCloud带有此功能，敬请期待。
+
+            - 为了减少网络开销以及加快输出缓冲区的消费速度，monitor尽可能在本机执行。
+
+            - 问题：
+                - monitor命令在高并发条件下，会存在内存暴增和影响Redis性能的隐患，所以此种方法适合在短时间内使用。
+
+                - 只能统计一个Redis节点的热点key，对于Redis集群需要进行汇总统计。
 
     - 4.机器：对机器上的tcp包进行抓取、分析，最终形成热点key统计。
 
-        - 可以使用ELK体系下的packetbeat插件，实现对redis、mysql等主流服务进行抓包、分析、报表
+        - 此种方法对于Redis客户端和服务端来说毫无侵入，是比较完美的方案
+
+        - 问题：
+            - 需要一定的开发成本，但是一些开源方案实现了该功能，例如ELK(ElasticSearch Logstash Kibana)体系下的packetbeat[2] 插件，可以实现对Redis、MySQL等众多主流服务的数据包抓取、分析、报表展示
+            - 对于高流量的机器抓包，对机器网络可能会有干扰，同时抓包时候会有丢包的可能性
+            - 维护成本过高
+
+        - 不过确实有公司利用上述思路，开发了对应的系统
 
 - 解决热点key：
 
     - 1.拆分复制数据结构：如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
 
+        - 例子：一个key名字叫做"good_100"，那就可以把它拆成四份，“good_100_copy1”、“good_100_copy2”、“good_100_copy3”、“good_100_copy4”，每次更新和新增时都需要去改动这N个key
+
+        - 如何给即将访问的热key上加入后缀？几种办法，根据本机的ip或mac地址做hash，之后的值与拆key的数量做取余，最终决定拼接成什么样的key后缀，从而打到哪台机器上；服务启动时的一个随机数对拆key的数量做取余。
+
     - 2.迁移热点key：cluster为例，热点key所在的slot，迁移到新的redis节点上
 
-    - 3.本地缓存+通知机制：将热点key放在业务端的本地缓存。因为是业务端，处理速度比redis高出数十倍，当数据更新时，数据会不一致，可以使用发布订阅机制解决
+    - 3.本地缓存+热点数据的发现与存储：将热点key放在proxy本地缓存。当数据更新时，数据会不一致，可以使用发布订阅机制解决
+
+        - [京东技术：Redis数据倾斜与JD开源hotkey源码分析揭秘](https://cloud.tencent.com/developer/article/2205845)
+
+        - 首先 Client 也会访问 SLB，并且通过 SLB 将各种请求分发至 Proxy 中，Proxy 会按照基于路由的方式将请求转发至后端的 Redis 中。
+
+          - 在热点 key 的解决上是采用在服务端增加缓存的方式进行。具体来说就是在 Proxy 上增加本地缓存，本地缓存采用 LRU 算法来缓存热点数据，后端节点增加热点数据计算模块来返回热点数据。
+
+            ![avatar](./Pictures/redis/proxy本地缓存.avif)
+
+            - 优点：
+                - Proxy 本地缓存热点，读能力可水平扩展
+                - DB 节点定时计算热点数据集合
+                - DB 反馈 Proxy 热点数据
+                - 对客户端完全透明，不需做任何兼容
+
+        - 热点数据的发现与存储
+
+            - 对于热点数据的发现，首先会在一个周期内对 Key 进行请求统计，在达到请求量级后会对热点 Key 进行热点定位，并将所有的热点 Key 放入一个小的 LRU 链表内，在通过 Proxy 请求进行访问时，若 Redis 发现待访点是一个热点，就会进入一个反馈阶段，同时对该数据进行标记。
+
+            ![avatar](./Pictures/redis/热点数据的发现与存储.avif)
+
+            - 可以使用一个etcd或者zk集群来存储反馈的热点数据，然后本地所有节点监听该热点数据，进而加载到本地JVM缓存中。
+
+        - 热点数据的获取
+
+            - 在热点 Key 的处理上主要分为写入跟读取两种形式，在数据写入过程当 SLB 收到数据 K1 并将其通过某一个 Proxy 写入一个 Redis，完成数据的写入。
+            - 假若经过后端热点模块计算发现 K1 成为热点 key 后， Proxy 会将该热点进行缓存，当下次客户端再进行访问 K1 时，可以不经 Redis。
+
+            ![avatar](./Pictures/redis/热点数据读写示例图.avif)
+
+        - 最后由于 proxy 是可以水平扩充的，因此可以任意增强热点数据的访问能力。
+
+        - [京东hotkey中间件：proxy缓存+热点数据的发现与存储]()
 
 ### linux相关的性能配置
 
+- [Redis开发运维实战：Redis在Linux系统的配置优化]()
+
 - `/proc/sys/vm/overcommit_memory` 调整申请内存是否允许overcommit：默认为0
+
+    - Linux操作系统对大部分申请内存的请求都回复yes，以便能运行更多的程序。因为申请内存后，并不会马上使用内存，这种技术叫做overcommit。
 
     ```sh
     # redis启动时候打印的日志
@@ -6751,7 +8033,7 @@ slowlog reset
 
     - 上面日志表示：redis希望设置为1`sysctl vm.overcommit_memory=1`
 
-        - 如果redis持久化fork子进程时，没有足够内存，就会失败。并输出以下日志
+        - 如果redis持久化fork子进程时，如果vm.overcommit_memory=0，代表如果没有可用内存，就会失败。并输出以下日志
             ```redis
             Cannot allocate memory
             ```
@@ -6795,6 +8077,11 @@ slowlog reset
 
 - linux kernel的Transparent Huge Pages（THP）大内存页（2MB）功能（默认开启）
 
+    - THP开启后。Redis在启动时可能会看到如下日志：
+    ```redis
+    WARNING you have Transparent Huge Pages (THP) support enabled in your kernel. This will create latency and memory usage issues with Redis. To fix this issue run the command 'echo never > /sys/kernel/mm/transparent_hugepage/enabled' as root, and add it to your /etc/rc.local in order to retain the setting after a reboot. Redis must be restarted after THP is disabled.
+    ```
+
     - 可以减少fork的时间，但会增加父进程创建内存页副本的消耗。从4KB变为2MB，每次写命令引起的复制内存页放大了512倍，拖慢写操作的时间，导致写操作慢查询
     ```sh
     # 关闭THP
@@ -6821,7 +8108,9 @@ slowlog reset
 
 - tcp-backlog（tcp三次握手中的accept 全连接队列长度）：
 
-- redis默认的tcp-backlog为511：低于此值时redis启动时会显示
+    - redis默认的tcp-backlog为511
+
+    - 如果Linux的tcp-backlog小于Redis设置的tcp-backlog，那么在Redis启动时会看到如下日志：
     ```
     8625:M 15 Aug 2023 17:45:44.106 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 510.
     ```
@@ -6836,7 +8125,23 @@ slowlog reset
 
 ### 监控
 
+#### 监控指标
+
 - 输出缓冲区：在大流量场景很容易失控，造成redis内存的不稳定
+
+- 内存碎片整理：
+    - `active_defrag_running`：1表示碎片整理正在运行
+    - `active_defrag_key_hits`和`active_defrag_key_misses`：站在每个key的角度看，是否命中碎片整理。
+    - `active_defrag_hits`和`active_defrag_misses`：站在每个key-values(如果是复杂数据结构，就可能多次)，是否命中碎片整理。
+
+    - 例如一个hash键值对，有200个元素，其中有元素要做碎片整理：
+        ```
+        active_defrag_key_hits = 1
+        active_defrag_hits > 1
+        ```
+
+- Redis3后一个新的统计项`total_net_output_bytes`
+    - 该统计指标非常重要：通过对其监控，规划和防止打爆机器网卡（千兆、万兆）、找到bigkey（例如执行大的mget、hgetall、lrange等等）。
 
 #### [cachecloud](https://github.com/sohutv/cachecloud)
 
@@ -6897,197 +8202,244 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
 ### 生产环境排查案例
 
-- [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](https://cloud.tencent.com/developer/article/2334339)
+#### [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](https://cloud.tencent.com/developer/article/2334339)
 
-    - 问题：hotkey 其实就会导致 CPU 变高，而这时，因为大量的 CPU 都在数据切换和存储上，导致其他的请求比较慢。
+- 问题：hotkey 其实就会导致 CPU 变高，而这时，因为大量的 CPU 都在数据切换和存储上，导致其他的请求比较慢。
 
-    - 解决方法：
-        - 1.如果是多实例的话，就是经典的读写分离！
-        - 2.如果是单实例的话，就使用 pipeline 批量写入。
-        - 3.如果pipeline无法满足业务的话，就在业务服务只加一层缓存。
+- 解决方法：
+    - 1.如果是多实例的话，就是经典的读写分离！
+    - 2.如果是单实例的话，就使用 pipeline 批量写入。
+    - 3.如果pipeline无法满足业务的话，就在业务服务只加一层缓存。
 
-        - 基于服务现状，笔者选择了第三种方案：然后，服务耗时降下来了！
+    - 基于服务现状，笔者选择了第三种方案：然后，服务耗时降下来了！
 
-            - 毕竟滑铁卢大学教授 Jay Black 的一句名言：计算机科学中的每个问题都可以用一间接层解决。
+        - 毕竟滑铁卢大学教授 Jay Black 的一句名言：计算机科学中的每个问题都可以用一间接层解决。
 
-    - 排查过程：使用排除法定位
+- 排查过程：使用排除法定位
 
-        - 以下省略了图片，如果需要，要去看原文
+    - 以下省略了图片，如果需要，要去看原文
 
-        - 出现问题：A 模块的 B 阶段的处理耗时突然慢了
+    - 出现问题：A 模块的 B 阶段的处理耗时突然慢了
 
-            - 因为 B 阶段不是 A 模块的第一个阶段，所以基本排除是模块间的网络通信、带宽等问题。
+        - 因为 B 阶段不是 A 模块的第一个阶段，所以基本排除是模块间的网络通信、带宽等问题。
 
-            - 2个思路：
+        - 2个思路：
 
-                - 1.排查这个 A 模块本身的问题
-                - 2.排查数据量的问题
+            - 1.排查这个 A 模块本身的问题
+            - 2.排查数据量的问题
 
-                - 首先排查 A 模块本身的问题，这里的经验是，横向看基础指标，纵向看代码变更。
-                    - 先看 A 模块服务的基础资源数据
-                        - 结果：是CPU、内存、网络 IO、磁盘 IO 几个大的指标没有明显的变化。
-                    - 那是不是最近发布出现的问题呢？
-                        - 结果：经项目成员对齐，A 模块近期也没有进行发布。再排查下数据量的问题。
+            - 首先排查 A 模块本身的问题，这里的经验是，横向看基础指标，纵向看代码变更。
+                - 先看 A 模块服务的基础资源数据
+                    - 结果：是CPU、内存、网络 IO、磁盘 IO 几个大的指标没有明显的变化。
+                - 那是不是最近发布出现的问题呢？
+                    - 结果：经项目成员对齐，A 模块近期也没有进行发布。再排查下数据量的问题。
 
-                - 再看是不是数据量出现问题？
-                    - 结果：确实是。上报量确实增加了5倍，既然这样：扩容、限流、服务降级三板斧搞上，问题解决了！
-                        - 问题当时虽然解决了，但其实并没有真的确认根本原因，数据量也许只是一个引子，这里会不会有性能优化的点呢？
+            - 再看是不是数据量出现问题？
+                - 结果：确实是。上报量确实增加了5倍，既然这样：扩容、限流、服务降级三板斧搞上，问题解决了！
+                    - 问题当时虽然解决了，但其实并没有真的确认根本原因，数据量也许只是一个引子，这里会不会有性能优化的点呢？
 
-        - 定位到是redis的问题
+    - 定位到是redis的问题
 
-            - 到底哪个方法出现了这么就耗时，排查耗时这里也有两个思路：
-                - 1.业务打点进行排查
-                - 2.性能分析工具排查
+        - 到底哪个方法出现了这么就耗时，排查耗时这里也有两个思路：
+            - 1.业务打点进行排查
+            - 2.性能分析工具排查
 
-                - 一般来说，先用业务打点确认大概范围，然后通过性能分析工具精确确认问题点。之所以这样是因为有两个原因：
-                    - 1.业务代码一般是造成问题的主要原因，在业务代码进行有效打点，可以更快地确认问题范围、变更范围、责任范围，从而可以有明确的责任人去跟进。
-                    - 2.一般来说性能分析工具排查都会定位到一些组件函数、系统函数，所以可能有很多个调用者、先用耗时打点的方式确认范围，可能更小的范围确认调用者，也就是疑似点，这样组合起来会比较顺畅。
-                - 先打点确定业务范围：
-                    - 1.首先是修改了一下指标上报的代码，在监控面板上查看。
-                    - 2.然后是在模块的日志中进行耗时采集和输出
-                    - 结果：基本上定位到函数是 Redis 的计数自增逻辑。
-                        - 至于为什么采用两种方法进行确认，是因为，实际业务会比较复杂，很多函数并不是线性调用，获取正确且精确耗时并不容易，需要多种方案去确认。
+            - 一般来说，先用业务打点确认大概范围，然后通过性能分析工具精确确认问题点。之所以这样是因为有两个原因：
+                - 1.业务代码一般是造成问题的主要原因，在业务代码进行有效打点，可以更快地确认问题范围、变更范围、责任范围，从而可以有明确的责任人去跟进。
+                - 2.一般来说性能分析工具排查都会定位到一些组件函数、系统函数，所以可能有很多个调用者、先用耗时打点的方式确认范围，可能更小的范围确认调用者，也就是疑似点，这样组合起来会比较顺畅。
+            - 先打点确定业务范围：
+                - 1.首先是修改了一下指标上报的代码，在监控面板上查看。
+                - 2.然后是在模块的日志中进行耗时采集和输出
+                - 结果：基本上定位到函数是 Redis 的计数自增逻辑。
+                    - 至于为什么采用两种方法进行确认，是因为，实际业务会比较复杂，很多函数并不是线性调用，获取正确且精确耗时并不容易，需要多种方案去确认。
 
-            - 再用性能分析工具去定位精确函数：
-                - 这里主要用的 pprof 工具（生成火焰图）
-                    - 紫色部分就是 Redis 相关命令的调用耗时，基本上占了总耗时的大头 Double check！
-                    - 这里笔者只是拿了一个函数作为例子，在这个场景下，基本上所有的 Redis 相关的命令都慢到秒级，也就是说，Redis 可用性出现了问题。
+        - 再用性能分析工具去定位精确函数：
+            - 这里主要用的 pprof 工具（生成火焰图）
+                - 紫色部分就是 Redis 相关命令的调用耗时，基本上占了总耗时的大头 Double check！
+                - 这里笔者只是拿了一个函数作为例子，在这个场景下，基本上所有的 Redis 相关的命令都慢到秒级，也就是说，Redis 可用性出现了问题。
 
-        - Redis 服务排障的基本方法：
+    - Redis 服务排障的基本方法：
 
-            - 一般来说业务出现问题的可能性 > 服务本身出现问题的可能性。但由于，业务模块没有太多变动，所以这次先查服务本身。
+        - 一般来说业务出现问题的可能性 > 服务本身出现问题的可能性。但由于，业务模块没有太多变动，所以这次先查服务本身。
 
-            - 我们的问题是：Redis 服务请求的回包慢。3种思路
-                - 1.Redis 服务本身问题
-                - 2.Redis 数据存储问题
-                - 3.请求 Redis 的问题
+        - 我们的问题是：Redis 服务请求的回包慢。3种思路
+            - 1.Redis 服务本身问题
+            - 2.Redis 数据存储问题
+            - 3.请求 Redis 的问题
 
-            - 1.Redis 服务本身问题——Redis 所在节点网路延迟问题确认
-                - kevine 一篇文章的一段话
+        - 1.Redis 服务本身问题——Redis 所在节点网路延迟问题确认
+            - kevine 一篇文章的一段话
 
-                    > 业务服务器到 Redis 服务器之间的网络存在问题，例如网络线路质量不佳，网络数据包在传输时存在延迟、丢包等情况。
-                    >
-                    > 网络和通信导致的固有延迟：
-                    >
-                    > 客户端使用 TCP/IP 连接或 Unix 域连接连接到 Redis，在 1 Gbit/s 网络下的延迟约为200 us，而 Unix 域 Socket 的延迟甚至可低至 30 us，这实际上取决于网络和系统硬件；在网络通信的基础之上，操作系统还会增加了一些额外的延迟（如线程调度、CPU 缓存、NUMA 等）；并且在虚拟环境中，系统引起的延迟比在物理机上也要高得多。
-                    >
-                    > 结果就是，即使 Redis 在亚微秒的时间级别上能处理大多数命令，网络和系统相关的延迟仍然是不可避免的。
+                > 业务服务器到 Redis 服务器之间的网络存在问题，例如网络线路质量不佳，网络数据包在传输时存在延迟、丢包等情况。
+                >
+                > 网络和通信导致的固有延迟：
+                >
+                > 客户端使用 TCP/IP 连接或 Unix 域连接连接到 Redis，在 1 Gbit/s 网络下的延迟约为200 us，而 Unix 域 Socket 的延迟甚至可低至 30 us，这实际上取决于网络和系统硬件；在网络通信的基础之上，操作系统还会增加了一些额外的延迟（如线程调度、CPU 缓存、NUMA 等）；并且在虚拟环境中，系统引起的延迟比在物理机上也要高得多。
+                >
+                > 结果就是，即使 Redis 在亚微秒的时间级别上能处理大多数命令，网络和系统相关的延迟仍然是不可避免的。
 
-                - 在这个案例中，基本排除是节点网络的问题
-                    - 1.当数据量下降的时候，Redis 的回包耗时减少。
-                    - 2.Redis 服务是集群内服务，通过监控发现，内网带宽并没有突破限制。
+            - 在这个案例中，基本排除是节点网络的问题
+                - 1.当数据量下降的时候，Redis 的回包耗时减少。
+                - 2.Redis 服务是集群内服务，通过监控发现，内网带宽并没有突破限制。
 
-            - 2.Redis 服务本身问题——Redis 自身服务网路延迟问题确认
+        - 2.Redis 服务本身问题——Redis 自身服务网路延迟问题确认
 
-                - 执行`redis-cli -h 127.0.0.1 -p 6379 --intrinsic-latency 60`命令，在 Redis server 上测试实例的响应延迟情况。
+            - 执行`redis-cli -h 127.0.0.1 -p 6379 --intrinsic-latency 60`命令，在 Redis server 上测试实例的响应延迟情况。
 
-                    - 结果：响应还是挺快的。不过，这个是瞬时速度，需要现场抓，所以在复现问题上来说不是那么好用，所以可以稍微调整下命令。
+                - 结果：响应还是挺快的。不过，这个是瞬时速度，需要现场抓，所以在复现问题上来说不是那么好用，所以可以稍微调整下命令。
 
-                - 执行`redis-cli -h 127.0.0.1 -p 6379 --latency-history -i 1`命令，查看一段时间内 Redis 的最小、最大、平均访问延迟
-                    - 结果：没啥问题。
+            - 执行`redis-cli -h 127.0.0.1 -p 6379 --latency-history -i 1`命令，查看一段时间内 Redis 的最小、最大、平均访问延迟
+                - 结果：没啥问题。
 
-                - 执行`info stat`命令，查看吞吐量
-                    ```redis
-                    # 从Rdis上一次启动以来总计处理的命令数
-                    total_commands_processed:2255
-                    # 当前Redis实例的OPS，redis内部较实时的每秒执行的命令数
-                    instantaneous_ops_per_sec:12
-                    # 网络总入量
-                    total_net_input_bytes:34312
-                    # 网络总出量
-                    total_net_output_bytes:78215
-                    # 每秒输入量，单位是kb/s
-                    instantaneous_input_kbps:1.20
-                    # 每秒输出量，单位是kb/s
-                    instantaneous_output_kbps:2.62
-                    ```
+            - 执行`info stat`命令，查看吞吐量
+                ```redis
+                # 从Rdis上一次启动以来总计处理的命令数
+                total_commands_processed:2255
+                # 当前Redis实例的OPS，redis内部较实时的每秒执行的命令数
+                instantaneous_ops_per_sec:12
+                # 网络总入量
+                total_net_input_bytes:34312
+                # 网络总出量
+                total_net_output_bytes:78215
+                # 每秒输入量，单位是kb/s
+                instantaneous_input_kbps:1.20
+                # 每秒输出量，单位是kb/s
+                instantaneous_output_kbps:2.62
+                ```
 
-                    - 这个吞吐量要是有时序图好了，嗯，事实上，这也就是为啥很多服务要配置 Prometheus 的原因：
+                - 这个吞吐量要是有时序图好了，嗯，事实上，这也就是为啥很多服务要配置 Prometheus 的原因：
 
-                - 对于多实例：还要考虑主从同步的问题。主要关注：master_link_down_since_seconds、master_last_io_seconds_ago、master_link_status 等指标。执行`info Replication` 命令
+            - 对于多实例：还要考虑主从同步的问题。主要关注：master_link_down_since_seconds、master_last_io_seconds_ago、master_link_status 等指标。执行`info Replication` 命令
 
-            - 3.Redis 服务本身问题——CPU、Memory、磁盘 IO
-                - 执行 info memory；info CPU；info Persistence 命令来查看
-                    - 结果：CPU 比较高，快到了90%。其他都没有问题
+        - 3.Redis 服务本身问题——CPU、Memory、磁盘 IO
+            - 执行 info memory；info CPU；info Persistence 命令来查看
+                - 结果：CPU 比较高，快到了90%。其他都没有问题
 
-                - memory主要关注三个指标：used_memory_rss_human、used_memory_peak_human、mem_fragmentation_ratio
-                - 磁盘：
+            - memory主要关注三个指标：used_memory_rss_human、used_memory_peak_human、mem_fragmentation_ratio
+            - 磁盘：
 
-                    - 持久化是一个比较容易忽略的问题，但其实在集群模式下，持久化可能也会从侧面发现问题，关注如下几个点：
+                - 持久化是一个比较容易忽略的问题，但其实在集群模式下，持久化可能也会从侧面发现问题，关注如下几个点：
 
-                        | 参数                                                                                           |
-                        |------------------------------------------------------------------------------------------------|
-                        | rdb_last_bgsave_time_sec（最近一次rdb是否成功）                                                |
-                        | rdb_last_bgsave_time_sec（最近一次rdb的耗时）                                                  |
-                        | rdb_changes_since_last_save（最近一次的rdb文件，写命令的个数，可查看有多少个写命令没有持久化） |
-                        | rdb_last_save_time（离最近一次生成rdb的秒数）                                                  |
+                    | 参数                                                                                           |
+                    |------------------------------------------------------------------------------------------------|
+                    | rdb_last_bgsave_time_sec（最近一次rdb是否成功）                                                |
+                    | rdb_last_bgsave_time_sec（最近一次rdb的耗时）                                                  |
+                    | rdb_changes_since_last_save（最近一次的rdb文件，写命令的个数，可查看有多少个写命令没有持久化） |
+                    | rdb_last_save_time（离最近一次生成rdb的秒数）                                                  |
 
-                    - 内存交换主要关注的点是：maxmemory、maxmemory-policy、evicted_keys（超过内存后删除的key数）
+                - 内存交换主要关注的点是：maxmemory、maxmemory-policy、evicted_keys（超过内存后删除的key数）
 
-            - 1.Redis 数据存储的问题——key 的总数
-                - 这里单实例建议控制在 1kw 内；单实例键个数过大，可能导致过期键的回收不及时。
-                - 执行info keyspace命令：主要是 Redis 实例包含的键个数。
-                    - 结果：没有问题
+        - 1.Redis 数据存储的问题——key 的总数
+            - 这里单实例建议控制在 1kw 内；单实例键个数过大，可能导致过期键的回收不及时。
+            - 执行info keyspace命令：主要是 Redis 实例包含的键个数。
+                - 结果：没有问题
 
-            - 2.Redis 数据存储的问题——Bigkey、内存大页
-                - 执行`redis-cli -h 127.0.0.1 -p 6379 --bigkeys -i 0.01`命令
-                    - 结果：没有 bigkey，内存大页也没开启
+        - 2.Redis 数据存储的问题——Bigkey、内存大页
+            - 执行`redis-cli -h 127.0.0.1 -p 6379 --bigkeys -i 0.01`命令
+                - 结果：没有 bigkey，内存大页也没开启
 
-            - 3.Redis 数据存储的问题——key 集中过期
-                - 结果：因为如果是过期问题，不会仅出现在数据量大的情况发生，应该是“周期性出现”，所以问题点也不在这里。
+        - 3.Redis 数据存储的问题——key 集中过期
+            - 结果：因为如果是过期问题，不会仅出现在数据量大的情况发生，应该是“周期性出现”，所以问题点也不在这里。
 
-            - 1.请求 Redis 的问题——客户端连接数、阻塞客户端的数
-                - 执行`info clients`命令。
-                    - 结果：连接数430个、阻塞数0个，没有超过限制，所谓问题不在这里。阻塞的经典函数包括： BLPOP, BRPOP, BRPOPLPUSH。
+        - 1.请求 Redis 的问题——客户端连接数、阻塞客户端的数
+            - 执行`info clients`命令。
+                - 结果：连接数430个、阻塞数0个，没有超过限制，所谓问题不在这里。阻塞的经典函数包括： BLPOP, BRPOP, BRPOPLPUSH。
 
-            - 2.请求 Redis 的问题——慢命令
-                - 执行`slowlog get 1、2、3等`
-                    - 结果：这里对几个慢命令的时间进行了查询，发现与 Redis 回包慢的时间不相符，而且并没有太慢，故问题也不在这里
+        - 2.请求 Redis 的问题——慢命令
+            - 执行`slowlog get 1、2、3等`
+                - 结果：这里对几个慢命令的时间进行了查询，发现与 Redis 回包慢的时间不相符，而且并没有太慢，故问题也不在这里
 
-            - 3.请求 Redis 的问题——缓存未命中
-                - 执行`info stats`
-                    - 结果：keyspace_hits:87（命中次数）、keyspace_misses:17（未命中次数）。通过梳理业务逻辑得知，并没有未命中就去持久化数据库再去查询的逻辑。
+        - 3.请求 Redis 的问题——缓存未命中
+            - 执行`info stats`
+                - 结果：keyspace_hits:87（命中次数）、keyspace_misses:17（未命中次数）。通过梳理业务逻辑得知，并没有未命中就去持久化数据库再去查询的逻辑。
 
-            - 4.请求 Redis 的问题——Hotkey
-                - 结果：hotkey 的问题确实存在
+        - 4.请求 Redis 的问题——Hotkey
+            - 结果：hotkey 的问题确实存在
 
-    - 复现问题和测试的基本方法
+- 复现问题和测试的基本方法
 
-        - 问题：CPU 高、hotkey 明显。
+    - 问题：CPU 高、hotkey 明显。
 
-        - 既然是网络 IO 多，那怎么减少网络 IO 呢？两个方案：一个是 pipeline、一个是 Lua 脚本。
-            - 做了 pipline 的测试，并用 perf 做了检测，发现上下文切换次数却是少了！
+    - 既然是网络 IO 多，那怎么减少网络 IO 呢？两个方案：一个是 pipeline、一个是 Lua 脚本。
+        - 做了 pipline 的测试，并用 perf 做了检测，发现上下文切换次数却是少了！
 
-        - 线上模拟
+    - 线上模拟
 
-            - 从质量同学的角度上看：压测讲究的是全链路模拟，不然就无法做上线前的最后的质量守护。
+        - 从质量同学的角度上看：压测讲究的是全链路模拟，不然就无法做上线前的最后的质量守护。
 
-            - 从开发同学的角度上看：复现问题最好用到最低的资源，因为更多的资源意味着更多的人力成本、时间成本、沟通成本。
+        - 从开发同学的角度上看：复现问题最好用到最低的资源，因为更多的资源意味着更多的人力成本、时间成本、沟通成本。
 
-            ![avatar](./Pictures/redis/线上模拟.avif)
+        ![avatar](./Pictures/redis/线上模拟.avif)
 
-            - 笔者主要用的开发角度尽快的复现问题，所以选择模拟 kafka 的数据消费，然后给到服务 Y 压力，最终将压力传导到 Redis 中，具体工具使用 kaf。
-                - 1.首先将 kaf 装在了 kafka 的一个服务中。
-                - 2.然后抓取线上的数据30条（之所以抓的这么少，是因为线上就是 hotkey 的问题，这里模拟的就是大量相似数据访问的场景）。
-                - 3.使用 kaf 给到10000次的生产数据。
+        - 笔者主要用的开发角度尽快的复现问题，所以选择模拟 kafka 的数据消费，然后给到服务 Y 压力，最终将压力传导到 Redis 中，具体工具使用 kaf。
+            - 1.首先将 kaf 装在了 kafka 的一个服务中。
+            - 2.然后抓取线上的数据30条（之所以抓的这么少，是因为线上就是 hotkey 的问题，这里模拟的就是大量相似数据访问的场景）。
+            - 3.使用 kaf 给到10000次的生产数据。
 
-                - 执行`cat xxx-test | kaf produce kv__0.111 -n 10000 -b qapm-tencent-cp-kafka:9092`
-                    - 结果：压力不够。
+            - 执行`cat xxx-test | kaf produce kv__0.111 -n 10000 -b qapm-tencent-cp-kafka:9092`
+                - 结果：压力不够。
 
-                - 提高压力执行`for i in {0..8};do cat xxx-test | kaf produce kv__0.111 -n 10000 -p ${i} -b qapm-tencent-cp-kafka:9092 ; done`
-                    - 结果：压力还是不够。
+            - 提高压力执行`for i in {0..8};do cat xxx-test | kaf produce kv__0.111 -n 10000 -p ${i} -b qapm-tencent-cp-kafka:9092 ; done`
+                - 结果：压力还是不够。
 
-                - 那就将 kaf 装在每一个 kafka 的服务中。
-                    - 结果：有效果，但 Redis 的 CPU 还是不是很高。服务 Y 的 CPU 一直也不高，看来，服务 Y 并没有感受到压力。
+            - 那就将 kaf 装在每一个 kafka 的服务中。
+                - 结果：有效果，但 Redis 的 CPU 还是不是很高。服务 Y 的 CPU 一直也不高，看来，服务 Y 并没有感受到压力。
 
-                - 给服务 Y 加协程
-                    - 结果：CPU 上来了。但内存提前满了。
+            - 给服务 Y 加协程
+                - 结果：CPU 上来了。但内存提前满了。
 
-                - 加内存。这里其实也是一个资源调优的经验，事实上，一个服务的内存和 CPU 的比例关系需要结合线上的负载来看，而且要定期看，不然也会导致资源浪费。
+            - 加内存。这里其实也是一个资源调优的经验，事实上，一个服务的内存和 CPU 的比例关系需要结合线上的负载来看，而且要定期看，不然也会导致资源浪费。
 
-                    - 结果：终于，Redis 的 CPU 上去了！执行`info stats命令`查看OPS为20346
+                - 结果：终于，Redis 的 CPU 上去了！执行`info stats命令`查看OPS为20346
 
-                - 结论：hotkey 其实就会导致 CPU 变高，而这时，因为大量的 CPU 都在数据切换和存储上，导致其他的请求比较慢。
+            - 结论：hotkey 其实就会导致 CPU 变高，而这时，因为大量的 CPU 都在数据切换和存储上，导致其他的请求比较慢。
+
+#### 记一次Ziplist导致Redis Core Dump分析
+
+- [Redis开发运维实战：记一次Ziplist导致Redis Core Dump分析]()
+
+- Redis的版本是3.2.12
+
+- 1.Redis的crash log还是非常给力的，里面包含了info、client list、当时堆栈信息、当前客户端的一些信息
+
+    - 堆栈：Redis在处理zadd命令后发生了core，最后一个方法栈就是zsetConvert，其中1129行就在这里面。
+    - info：并没有发现明显异常
+    - 当前客户端：客户端正在执行如下操作：`zadd fpgn_622094516 1.554459526619E9 9909414677`
+        - 并且给出key的一些信息，譬如它是有序集合，ziplist(encoding=5), 很重要的一个信息就是它的长度是257，这个数字非常敏感，因为我们知道Redis提供了ziplist的相关优化，针对有序集合有一个配置是zset-max-ziplist-entries。
+    - 内存测试：Redis提供了--test-memory功能用来测试内存分配，从测试结果看没有出现内存分配不足（譬如OOM）这类问题。
+
+- 2.源码分析
+    - 初步分析是：zadd后当有序集合需要从ziplist转成skiplist这个期间造成了core，其中最奇怪的是dictAdd插入失败，造成core：
+        - 看下什么原因会造成dictAdd会造成失败，很明显如果哈希表包含了元素，则插入失败。
+
+- 3.内存分析：
+
+    - 最好的方法就是分析下当前ziplist里都是什么就比较清楚了
+
+        - 在朋友的帮助下使用GDB完成了ziplist的分析
+
+    - 从结果可以看出，这个ziplist的数据，第134个和第7个key一样了。至此问题发现了，但是就没有但是了，为什么会出现这种情况就不知道了，我也提交了issue(#5995)暂时没有回复，看看哪位大佬知道怎么进一步分析。还有一些信息：当时core的是slave节点，master节点正常，slave重启后就恢复了。
+
+#### 集群在做了一个前缀删除后，耗时涨了3倍
+
+- [Redis开发运维实战：Redis碎片整理原理解析与实践]()
+
+- Redis平台提供了各种删除数据的自助工单（每天数十个工单）
+    - 全部删除
+    - 按前缀删除
+    - 按过期时间删除
+    - 按空闲时间删除
+    - 按类型删除
+    - 上述的排列组合。
+
+- 某天下午，有个业务突然找到我说，他的集群在做了一个前缀删除后，耗时涨了3倍，工单如下：做了一个前缀删除，数据量从2.9亿->6千万。
+
+- 带着疑问快速过了下相关指标，得到以下结论：
+    - 确实是删除数据后，耗时上涨了3倍（avg:1ms->3ms），删除期间整体还好（略诡异，脑子瞬间想到碎片整理，但这个集群的碎片整理cpu参数控制在10%-20%）
+    - 主调机器确实有异常，但是之前也有问题（可排除）
+    - Redis Server cpu消耗涨了3倍，但是max=24%，依据经验是没问题的，除非业务对耗时极度敏感。
+
+- 综合看，流量无上涨、主调方无变动、删除大量数据、CPU上涨但可容忍（但业务可能不容忍），立刻做了关掉碎片整理的决定，服务瞬间恢复。
 
 ## 缓存（cache）
 
@@ -7239,47 +8591,59 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
         - sleep 时间要考虑大于另一个请求读取数据库旧数据 + 写缓存的时间，以及如果有 redis 主从同步、数据库分库分表，还要考虑数据同步的耗时，在 Sleep 之后再次尝试删除缓存（无论新的还是旧的）。
 
-- 无底洞优化：更多的节点不代表更高的性能
+### 缓存无底洞问题：更多的节点不代表更高的性能
 
-    - 例子：2010年，facebook的memcache已经有3000个节点了，承载着TB级别的缓存。但为了满足业务继续添加了新节点。但是发现性能非但没有好转反而下降了。这种现象叫：缓存无底洞现象
+- [Redis开发运维实战：缓存无底洞问题优化]()
 
-        - 大量新节点，造成水平扩容，导致键值分布到更多的节点上，因此`mget`等分布式批量操作命令，需要访问更多的的节点和网络往返时间，相比之下单机只需要1次网络往返
+- 为什么redis集群规模扩大了，性能反而不如以前了？主要体现在批量操作，比如`mset`和`pipeline`的一些操作
+    - 这个其实就是典型的缓存无底洞问题
 
-    - 优化：
-        - 1.命令本身的优化：如sql语句等
-        - 2.客户端连接：使用长连接、连接池、NIO（非阻塞IO）等
-        - 3.降低网络通信的次数
+- 例子：2010年，facebook的memcache已经有3000个节点了，承载着TB级别的缓存。但为了满足业务继续添加了新节点。但是发现性能非但没有好转反而下降了。这种现象叫：缓存无底洞现象
 
-        - 以下假设前两点已经优化好了，重点看待第3点。对比有4种实现方法：
+    - 大量新节点，造成水平扩容，导致键值分布到更多的节点上，因此`mget`等分布式批量操作命令，需要访问更多的的节点和网络往返时间，相比之下单机只需要1次网络往返
+        ![avatar](./Pictures/redis/缓存无底洞.avif)
+        ![avatar](./Pictures/redis/缓存无底洞1.avif)
 
-            | 方法     | 优点                             | 缺点                           | 网络IO的时间复杂度 |
-            |----------|----------------------------------|--------------------------------|--------------------|
-            | 串行命令 | 实现简单；少量key，性能可以满足  | 大量的key延迟严重              | O(keys)           |
-            | 串行IO   | 实现简单；少量节点，性能可以满足 | 大量的node延迟严重             | O(nodes)          |
-            | 并行IO   | 延迟取决于最慢的node             | 实现复杂；由于多线程，定位麻烦 | O(max_slow(node)) |
-            | hash_tag | 性能最高                         | 维护成本高；容易出现数据倾斜   | O(1)              |
+- 优化：
+    - 1.命令本身的优化：如sql语句等
+    - 2.客户端连接：使用长连接、连接池、NIO（非阻塞IO）等
+    - 3.降低网络通信的次数
 
-            - 1.串行命令：client n次get：n次网络 + n次get命令
+    - 以下假设前两点已经优化好了，重点看待第3点。对比有4种实现方法：
 
-                ![avatar](./Pictures/redis/cache-串行命令.avif)
+        | 方法     | 优点                             | 缺点                           | 网络IO的时间复杂度 |
+        |----------|----------------------------------|--------------------------------|--------------------|
+        | 串行命令 | 实现简单；少量key，性能可以满足  | 大量的key延迟严重              | O(keys)           |
+        | 串行IO   | 实现简单；少量节点，性能可以满足 | 大量的node延迟严重             | O(nodes)          |
+        | 并行IO   | 延迟取决于最慢的node             | 实现复杂；由于多线程，定位麻烦 | O(max_slow(node)) |
+        | hash_tag | 性能最高                         | 维护成本高；容易出现数据倾斜   | O(1)              |
 
-                - 在redis cluster无法使用`mget`命令，最简单的方法就是逐个`get`，时间复杂度
+        - 1.串行命令：client n次get：n次网络 + n次get命令
 
-            - 2.串行IO：client 1次pipeline get：1次网络 + n次get命令
+            ![avatar](./Pictures/redis/cache-串行命令.avif)
 
-                ![avatar](./Pictures/redis/cache-串行IO.avif)
+            - 在redis cluster无法使用`mget`命令，最简单的方法就是逐个`get`，时间复杂度
 
-                - Smart客户端会保存slot和节点的关系，得到每个节点的key子列表，之后对节点执行`mget`或者pipeline操作：操作时间 = node次网络时间 + n次命令
+        - 2.串行IO：client 1次pipeline get：1次网络 + n次get命令
 
-            - 3.并行IO：根据方法2基础上，加入多线程执行，由于多线程网络时间为O(1)，所以max_slow(node网络时间) + n次命令时间
+            ![avatar](./Pictures/redis/cache-串行IO.avif)
 
-                ![avatar](./Pictures/redis/cache-并行IO.avif)
+            - 以Redis Cluster为例，Smart客户端会保存slot和节点的关系，得到每个节点的key子列表，之后对节点执行`mget`或者pipeline操作：操作时间 = node次网络时间 + n次命令
 
-            - 4.hash_tag实现：cluster的hash_tag可以强制将多个key分配到1个node上
+                - 比第一种要好很多，但是如果节点数足够多，还是有一定的性能问题。
 
-                - 操作时间 = 1次网络时间 + n次命令时间
+            - 相比于Redis Cluster，代理模式（proxy）的串行IO会更加智能，客户端无需关心这些，整个操作在代理上完成
+                ![avatar](./Pictures/redis/cache-串行IO-proxy.avif)
 
-                ![avatar](./Pictures/redis/cache-hash_tag.avif)
+        - 3.并行IO：根据方法2基础上，加入多线程执行，由于多线程网络时间为O(1)，所以max_slow(node网络时间) + n次命令时间
+
+            ![avatar](./Pictures/redis/cache-并行IO.avif)
+
+        - 4.hash_tag实现：cluster的hash_tag可以强制将多个key分配到1个node上
+
+            - 操作时间 = 1次网络时间 + n次命令时间
+
+            ![avatar](./Pictures/redis/cache-hash_tag.avif)
 
 ### 缓存一致性问题
 
@@ -7517,9 +8881,101 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
         - 专门更新缓存的服务订阅 MQ 消息维护所有相关 Key 的缓存操作
         ![avatar](./Pictures/redis/cache-consistency-mutlikey1.avif)
 
-## 键值设计
+## redis正确使用
 
-### 登录系统。用户表
+- [阿里官方 Redis 开发规范](https://developer.aliyun.com/article/1009125)
+    > 作者是《redis开发与运维》的付磊
+
+### 命令使用
+
+- 1.【推荐】 O(N)命令关注N的数量：例如hgetall、lrange、smembers、zrange、sinter等并非不能使用，但是需要明确N的值。有遍历的需求可以使用hscan、sscan、zscan代替。
+
+- 2.【推荐】：禁用命令：禁止线上使用keys、flushall、flushdb等，通过redis的rename机制禁掉命令，或者使用scan的方式渐进式处理。
+
+- 3.【推荐】合理使用select：redis的多数据库较弱，使用数字进行区分，很多客户端支持较差，同时多业务用多数据库实际还是单线程处理，会有干扰。
+
+- 4.【推荐】使用批量操作提高效率
+
+    - 原生命令：例如mget、mset。
+    - 非原生命令：可以使用pipeline提高效率。
+        - 但要注意控制一次批量操作的元素个数 (例如500以内，实际也和元素字节数有关)。
+
+    - 注意两者不同：
+        - 1.原生是原子操作，pipeline是非原子操作。
+        - 2.pipeline可以打包不同的命令，原生做不到
+        - 3.pipeline需要客户端和服务端同时支持。
+
+- 5.【建议】Redis事务功能较弱，不建议过多使用
+    - Redis的事务功能较弱(不支持回滚)，而且集群版本(自研和官方)要求一次事务操作的key必须在一个slot上(可以使用hashtag功能解决)
+
+- 6.【建议】Redis集群版本在使用Lua上有特殊要求：
+    - 1.所有key都应该由 KEYS 数组来传递，redis.call/pcall 里面调用的redis命令，key的位置，必须是KEYS array, 否则直接返回error，"-ERR bad lua script for redis cluster, all the keys that the script uses should be passed using the KEYS array"
+    - 2.所有key，必须在1个slot上，否则直接返回error, "-ERR eval/evalsha command keys must in same slot"
+
+- 7.【建议】必要情况下使用monitor命令时，要注意不要长时间使用。
+
+### 客户端使用
+
+- 1.【推荐】避免多个应用使用一个Redis实例
+
+    - 不相干的业务拆分，公共数据做服务化。
+
+- 2.【推荐】使用带有连接池的数据库，可以有效控制连接，同时提高效率，标准使用方式：
+    ```java
+    Jedis jedis = null;
+    try {
+        jedis = jedisPool.getResource();
+        //具体的命令
+        jedis.executeCommand()
+    } catch (Exception e) {
+        logger.error("op key {} error: " + e.getMessage(), key, e);
+    } finally {
+        //注意这里不是关闭连接，在JedisPool模式下，Jedis会被归还给资源池。
+        if (jedis != null)
+            jedis.close();
+    }
+    ```
+
+- 3.【建议】高并发下建议客户端添加熔断功能(例如netflix hystrix)
+- 4.【推荐】设置合理的密码，如有必要可以使用SSL加密访问（阿里云Redis支持）
+
+### 键值设计
+
+- key名设计
+
+    - 1.【建议】：可读性和可管理性。以业务名(或数据库名)为前缀(防止key冲突)，用冒号分隔，比如业务名:表名:id
+
+        ```
+        ugc:video:1
+        ```
+
+    - 2【建议】：简洁性。保证语义的前提下，控制key的长度，当key较多时，内存占用也不容忽视
+        ```
+        user:{uid}:friends:messages:{mid}
+        ```
+        简化为
+        ```
+        u:{uid}:fr:m:{mid}
+        ```
+
+    - 3.【强制】：不要包含特殊字符（空格、换行、单双引号以及其他转义字符）
+
+- value设计
+
+    - 1.【强制】：拒绝bigkey(防止网卡流量、慢查询)
+        - string类型控制在10KB以内，hash、list、set、zset元素个数不要超过5000。
+        - 非字符串的bigkey，不要使用del删除，使用hscan、sscan、zscan方式渐进式删除，同时要注意防止bigkey过期时间自动删除问题(例如一个200万的zset设置1小时过期，会触发del操作，造成阻塞，而且该操作不会不出现在慢查询中(latency可查))，查找方法和删除方法
+
+    - 2.【推荐】：选择适合的数据类型。
+        - 例如：实体类型(要合理控制和使用数据结构内存编码优化配置,例如ziplist，但也要注意节省内存和性能之间的平衡)
+        - 反例：
+            ```
+            set user:1:name tom
+            set user:1:age 19
+            set user:1:favor football
+            ```
+
+#### 登录系统。用户表
 
 - 关系型数据库的设计
 
@@ -7636,7 +9092,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
             ```py
             ret = r.zrevrange("login:login_times", 0, N-1)
             ```
-### TAG系统。book表
+#### tag系统。book表
 
 - tag在互联网应用里尤其多见，如果以传统的关系型数据库来设计有点不伦不类。
 
@@ -7855,6 +9311,159 @@ docker run -d -p 6379:6379 -v $PWD/conf/redis.conf:/usr/local/etc/redis/redis.co
 ## Redis Enterprise
 
 - 提供了一个管理层，允许我们的用户大规模运行Redis，并默认启用高可用性、即时故障切换、数据持久性和备份。
+
+## 实现方案对比
+
+- 从存储设计来看可以分为几类:
+
+    - 1.基于磁盘 KV 存储引擎(比如 RocksDB/LevelDB) 实现 Redis 协议
+
+        - 绝大多数的本地磁盘 KV 只提供最简单的 Get/Set/Delete 方法，对于 Hash/Set/ZSet/List/Bitmap 等数据结构需要基于磁盘 KV 之上去实现。优点是可以规避下面方案 2 里提到的大 Key 问题，缺点是实现工作量大一些。
+
+    - 2.基于 Redis 存储之上将冷数据交换到磁盘(类似早期 Redis VM 的方案)
+
+        - 基于 Redis 把冷数据交换磁盘是以 Key 作为最小单元，在大 Key 的场景下会有比较大的挑战。交换大 Key 到磁盘会有严重读写放大，如果是读可能会导致整个服务不可用，所以这种实现只能限制 Value 大小，优点在于实现简单且可按照 Key 维度来做冷热数据分离。
+
+    - 3.基于分布式 KV(比如 TiKV) 实现 Redis 协议代理，本地不做存储
+
+        - 最大的区别在于所以的操作都是通过网络。这种实现方式最大优点是只需要实现 Redis 协议的部分，服务本身是无状态的，无须考虑数据复制以及扩展性的问题。缺点也比较明显，因为所有的命令都是通过网络 IO，对于非 String 类型的读写一般都是需要多次网络 IO 且需要通过事务来保证原子，从而在延时和性能上都会比方案 1 和 2 差不少。
+
+    ![avatar](./Pictures/redis/存储设计3种方案.avif)
+
+## [Kvrocks](https://github.com/KvrocksLabs/kvrocks)
+
+- [高可用架构：Kvrocks: 一款开源的企业级磁盘KV存储服务]()
+
+![avatar](./Pictures/redis/kvrocks架构.avif)
+
+- Kvrocks 是基于 RocksDB 之上兼容 Redis 协议的 NoSQL 存储服务
+    - 兼容 Redis 协议
+        - [支持的redis命令](https://github.com/KvrocksLabs/kvrocks/blob/unstable/docs/support-commands.md)
+    - 支持主从复制
+    - 支持通过 Namespace 隔离不同业务的数据
+    - 高可用，支持 Redis Sentinel 自动主从切换
+    - 集群模式
+
+- 大部分命令由于可多线程并行执行，从 QPS 的维度来看会比 Redis 更好一些，但延时肯定会比 Redis 略差。
+
+    ![avatar](./Pictures/redis/kvrocks不同命令的qps.avif)
+
+    - Kvrocks 主要有两类线程:
+        - 1.Worker 线程：主要负责收发请求，解析 Redis 协议以及请求转为 RocksDB 的读写
+        - 2.后台线程：目前包含一下几种后台线程
+            - Cron 线程，负责定期任务，比如自动根据写入 KV 大小调整 Block Size、清理 Backup 等
+            - Compaction Checker 线程，如果开启了增量 Compaction 检查机制，那么会定时检查需要 Compaction 的 SST 文件
+            - Task Runner 线程，负责异步的任务执行，比如后台全量 Compaction，Key/Value 数量扫描
+            - 主从复制线程，每个 slave 都会对应一个线程用来做增量同步
+
+- Kvrocks 会将 Redis 数据类型编码成 Key-Value 数据写入 RocksDB 的不同 Column Family
+
+    - Metadata CF：主要存储 String 类型的数据，以及 Hash/Set/List 这些复杂类型的元数据 (长度，过期时间等)，不存储具体元素内容
+    - Subkey CF：存储复杂类型元素内容
+    - ZSetScore CF：存储 ZSet Score 信息
+    - Pub/Sub CF：Pub/Sub 相关信息
+    - Propagated CF: 作为主从同步和存放数据之外的内容，比如  Lua 脚本
+
+- 以Hash 为例来说明 Kvrocks 是如何将复杂的数据结构转为 RocksDB 对应的 KV
+
+    - [更多的数据结构设计](https://github.com/KvrocksLabs/kvrocks/blob/unstable/docs/metadata-design.md)
+
+    - 最简单的方式是将 Hash 所有的字段进行序列化之后写到同一个 Key 里面，每次修改都需要将整个 Value 读出来之后修改再写入
+        - 当 Value 比较大时会导致严重的读写方法问题。
+
+    - blackwidow 的实现：把 Hash 拆分成 Metadata 和 Subkey 两个部分
+
+        - Hash 里面的每个字段都是独立的 KV，再使用 Metadata 来找到这些 Subkey:
+
+        - Metadata
+            - flags ：来标识当前 Value 的类型，比如是 Hash/Set/List 等。
+            - expire ：是 Key 的过期时间，size 是这个 Key 包含的字段数量，这两个比较好理解。
+            - version ：是在 Key 创建时自动生成的单调递增的 id，每个 Subkey 前缀会关联上 version。
+                - 当 metadata 本删除时，这个 version 就无法被找到，也意味着关联这个 version 的全部 subkey 也无法找到，从而实现快速删除，而这些无法找到的 subkey 会在后台 compact 的时候进行回收。
+
+        ```
+                +----------+------------+-----------+-----------+
+        key =>  |  flags   |  expire    |  version  |  size     |
+                | (1byte)  | (4byte)    |  (8byte)  | (8byte)   |
+                +----------+------------+-----------+-----------+
+                                    (hash metadata)
+
+                             +---------------+
+        key|version|field => |     value     |
+                             +---------------+
+                      (hash subkey)
+        ```
+
+        ```
+        HSET key, field, value:
+          // 先根据 hash key 找到对应的 metadata 并判断是否过期
+          // 如果不存在或者过期则创建一个新的 metadata
+          metadata = rocksdb.Get(key)
+          if metadata == nil || metadata.Expired() {
+             metadata = createNewMetadata();
+          }
+          // 根据 metadata 里面的版本组成 subkey
+          subkey = key + metadata.version+field
+            if rocksdb.Get(subkey) == nil {
+             metadata.size += 1
+          }
+          // 写入 subkey 以及更新 metadata
+            rocksdb.Set(subkey, value)
+          rocksdb.Set(key, metadata)
+        ```
+
+- 如何进行数据复制?
+
+    - 采用了类似 Redis 的主从异步复制模型。考虑到需要应对更多的业务场景，后续会支持半同步复制模型。
+
+    - 全量复制利用 RocksDB 的 CheckPoint 特性
+    - 增量复制采用直接发送 WAL 的方式，从库接收到WAL直接操作后端引擎，相比于 Binlog 复制方式（回放从客户端接收到的命令），省去了命令解析和处理的开销，复制速度大幅提升，这样也就解决了其它采用 Binlog 复制方式的存储服务所存在的复制延迟问题。
+
+- 如何实现分布式集群？
+
+    - Kvrocks 集群方案选择了类似 Codis 中心化的架构，集群元数据存储在配置中心，但不依赖代理层，配置中心为存储节点推送元数据，对外提供 Redis Cluster 集群协议支持，对于使用 Redis Cluster SDK 或者 Proxy 的用户不需要做任何修改。同时也可以避免类似Redis Cluster 受限于 Gossip 通信的开销而导致集群规模不能太大的问题。
+
+    - 单机版的 Kvrocks 和 Redis 一样可以直接支持 Twmeproxy，通过Sentinel实现高可用，对于 Codis 通过简单的适配也能够比较快的支持。
+
+- 如何实现弹性伸缩的？
+
+    - 整个扩缩容拆分为迁移全量数据、迁移增量数据、变更拓扑三个阶段。
+
+        - 迁移全量数据利用 RocksDB的 Snapshot 特性，生成 Snapshot 迭代数据发送到目标节点。同时，为了加快迭代效率数据编码上Key 增加 SlotID 前缀。
+        - 迁移增量数据阶段直接发送 WAL。当待迁移的增量 WAL 小于设定的阈值则开始阻写，等发送完剩余的 WAL 切换拓扑之后解除阻写，这个过程通常是毫秒级的。
+
+- 最常见的问题是磁盘的吞吐和延时带来的毛刺点问题。除了通过慢日志命令来确认是否有慢请求产生之外，还提供了 perflog 命令用来定位 RocksDB 访问慢的问题
+    ```
+    # 第一条命令设定只对 SET 命令收集 profiling 日志
+    # 第二条命令设定随机采样的比例
+    # 第三条命令设定超过多长时间的命令才写到 perf 日志里面(如果是为了验证功能可以设置为 0)
+    127.0.0.1:6666> config set profiling-sample-commands set
+    OK
+    127.0.0.1:6666> config set profiling-sample-ratio 100
+    OK
+    127.0.0.1:6666> config set profiling-sample-record-threshold-ms 1
+    OK
+
+    # 执行 Set 命令，在去看 perflog 命令就可以看到对应的耗时点
+    127.0.0.1:6666> set a 1
+    OK
+    127.0.0.1:6666> perflog get 2
+    1) 1) (integer) 1
+       2) (integer) 1623123739
+       3) "set"
+       4) (integer) 411
+       5) "user_key_comparison_count = 7, write_wal_time = 122300, write_pre_and_post_process_time = 91867, write_memtable_time = 47349, write_scheduling_flushes_compactions_time = 13028"
+       6) "thread_pool_id = 4, bytes_written = 45, write_nanos = 46030, prepare_write_nanos = 21605"
+    ```
+
+    - 之前通过这种方式发现了一些 RocksDB 参数配置不合理的问题，比如之前 SST 文件大小默认是 256MiB，当业务的 KV 比较小的时候可能会导致一个 SST 文件里面可能有百万级别的 KV，从而导致 index 数据块过大(几十 MiB)，每次从磁盘读取数据需要耗费几十 ms。
+    - 但线上不同业务的 KV 大小可能会差异比较大，通过 DBA 手动调整的方式肯定不合理，所以有了根据写入 KV 大小在线自动调整 SST 和 Block Size 的功能
+
+    - 另外一个就是 RocksDB 的全量 Compact 导致磁盘 IO 从而造成业务访问的毛刺点问题，之前策略是每天凌晨低峰时段进行一次，过于频繁会导致访问毛刺点，频率过低会导致磁盘空间回收不及时。所以增加另外一种部分 Compact 策略，优先对那些比较老以及无效 KV 比较多的 SST进行 Compact。开启只需要在配置文件里面增加一行，那么则会在凌晨 0 到 7 点之间去检查这些 SST 文件并做 Compact
+
+        ```
+        compaction-checker-range 0-7
+        ```
 
 ## 阿里云的[Tair](https://github.com/alibaba/tair)
 
@@ -8875,7 +10484,43 @@ RedKV部分兼容Redis协议，string/hash/zset等主要数据类型
     - 有必要的话，中心节点也可以把热点区域放到集群的所有节点上，所有的热点读请求就能均衡的分到所有节点上。
     - 通过这种实时的热点数据复制，我们很好地解决了类似客户端缓存热点 KV 方案造成的一致性问题。
 
+## 得物的redis
+
+- [得物技术：得物 Redis 设计与实践](https://zhuanlan.zhihu.com/p/662888646)
+
 # 第三方 redis 软件
+
+## 服务端
+
+### [京东hotkey中间件方案：proxy缓存+热点数据的发现与存储](https://gitee.com/jd-platform-opensource/hotkey?_from=gitee_search)
+
+- [京东技术：Redis数据倾斜与JD开源hotkey源码分析揭秘](https://cloud.tencent.com/developer/article/2205845)
+
+![avatar](./Pictures/redis/京东hotkey中间件架构.avif)
+
+- 流程
+
+    - 客户端通过引用hotkey的client包，在启动的时候上报自己的信息给worker，同时和worker之间建立长连接。定时拉取配置中心上面的规则信息和worker集群信息。
+
+    - 客户端调用hotkey的ishot()的方法来首先匹配规则，然后统计是不是热key。
+
+    - 通过定时任务把热key数据上传到worker节点。
+
+    - worker集群在收取到所有关于这个key的数据以后（因为通过hash来决定key 上传到哪个worker的，所以同一个key只会在同一个worker节点上），在和定义的规则进行匹配后判断是不是热key，如果是则推送给客户端，完成本地缓存。
+
+- 角色构成
+
+    - 1.etcd集群：etcd作为一个高性能的配置中心，可以以极小的资源占用，提供高效的监听订阅服务。主要用于存放规则配置，各worker的ip地址，以及探测出的热key、手工添加的热key等。
+
+    - 2.client端jar包：就是在服务中添加的引用jar，引入后，就可以以便捷的方式去判断某key是否热key。同时，该jar完成了key上报、监听etcd里的rule变化、worker信息变化、热key变化，对热key进行本地caffeine缓存等。
+
+    - 3.worker端集群：worker端是一个独立部署的Java程序，启动后会连接etcd，并定期上报自己的ip信息，供client端获取地址并进行长连接。之后，主要就是对各个client发来的待测key进行累加计算，当达到etcd里设定的rule阈值后，将热key推送到各个client。
+
+    - 4.dashboard控制台：控制台是一个带可视化界面的Java程序，也是连接到etcd，之后在控制台设置各个APP的key规则，譬如2秒20次算热。然后当worker探测出来热key后，会将key发往etcd，dashboard也会监听热key信息，进行入库保存记录。同时，dashboard也可以手工添加、删除热key，供各个client端监听。
+
+- 此处省略：大量代码
+
+## 客户端
 
 [一键安装脚本](https://github.com/ztoiax/userfulscripts/blob/master/awesome-redis.sh)
 
