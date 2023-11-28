@@ -1165,6 +1165,13 @@ Nested-Loop Join(嵌套循环连接)
 
         - 更新一行, 需要更新每一列
 
-## SQL工具
+## 第三方工具
 
 - [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
+
+- [Migrate：数据库迁移/变更工具](https://github.com/golang-migrate/migrate)
+
+    - 支持 MySQL、MariaDB、PostgreSQL、SQLite、Neo4j、ClickHouse 等不同类型的数据库。
+
+- [sqlmap: 自动检测和利用 SQL 注入漏洞，获得数据库服务器的权限。](https://github.com/sqlmapproject/sqlmap)
+

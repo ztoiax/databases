@@ -10968,7 +10968,9 @@ watch -d -n 2 rma
 
 ![avatar](./Pictures/redis/redis-gui.avif)
 
-### [RedisLive: 可视化](https://github.com/nkrode/RedisLive)
+### [tiny-rdm：gui](https://github.com/tiny-craft/tiny-rdm)
+
+### [RedisLive: 监控可视化](https://github.com/nkrode/RedisLive)
 
 ### [dbatools](https://github.com/xiepaup/dbatools)
 
