@@ -1,6 +1,6 @@
 # mongodb
 
-# 基本概念
+## 基本概念
 
 - 文档（document）：是mongodb的基本单元，类似于关系数据库的行。
 
@@ -47,6 +47,27 @@
 - mongosh是一个功能齐全的javascript解释器，并且包含了一些扩展语法（语法糖）
 
 ### 基本命令
+
+- 开启mongodb实例
+    ```sh
+    mongod --port 27017 --dbpath ~/mongodb
+    ```
+
+- 配置文件开启mongodb实例
+
+    - `~/mongodb/mongodb.conf`配置文件
+
+        ```
+        dbpath=/home/tz/mongodb/
+        port=27017
+        # 目录为dbpath下
+        logpath=log.log
+        ```
+
+    - 配置文件开启实例
+        ```sh
+        mongod --config ~/mongodb/mongodb.conf &
+        ```
 
 - 连接数据库
 ```sh
@@ -2554,6 +2575,861 @@ db.users.dropIndex({"name": 1})
 
     - `oplog`条目大小限制：每条`oplog`条目必须小于16MB的BSON
 
+## 副本集（replica set）
+
+- 副本集：只能有一个主节点（primary），多个保存主节点数据副本的从节点（secondary）
+
+- 在生产环境中
+    - 1.每个节点应该对应一个服务器，实现单个服务器故障，可以隔离
+    - 2.应该使用DNS种子列表连接（seedlist connection）格式，指定应用如何连接副本集。
+        - 优点：可以轮流更改托管mongodb副本集成员的服务器，无须重新配置客户端（尤其是它们连接的字符串）
+
+- 所有mongodb驱动程序都遵守服务器发现和监控（SDAM）规范。驱动程序会持续监视副本集的拓扑结构，以检测应用程序对成员的访问是否有变化。并且维护哪个成员是主节点的信息
+
+- 实验：在单机服务器上，建立一个3节点的副本集
+
+    - 1.为每个节点单独创建数据目录
+        ```sh
+        mkdir -p ~/mongodb/rs{1,2,3}
+        ```
+
+    - 2.启动mongod
+        ```sh
+        # 启动3个mongod
+        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &
+        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &
+
+        # 默认情况下绑定到localhost(127.0.0.1)。--bind_ip参数可以指定ip，也可以在配置文件使用bind_ip
+        # 在192.51.100.1服务器上运行mongod
+        # 在绑定到非localhost的ip。应该启用授权控制，并指定身份验证机制
+        mongod --bind_ip localhost,192.51.100.1 --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+        ```
+
+    - 3.初始化副本集
+
+        - 每个mongod都不知道其他mongod的存在。因此需要创建一个包含每个成员的配置，并发送给其中一个mongod进程，由它负责将配置传递给其他成员。
+
+        ```sh
+        # 连接其中一个mongod
+        mongosh --port 27017
+
+        // 创建配置文档
+        rsconf = {
+            _id: "mdDefGuide",
+            members: [
+                {_id:0, host: "localhost:27017"},
+                {_id:1, host: "localhost:27018"},
+                {_id:2, host: "localhost:27019"}
+            ]
+        }
+
+        // 传递rsconf实现初始化。提示符变成mdDefGuide [direct: primary] test>
+        // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
+        rs.initiate(rsconf)
+
+        // 查看副本集状态。members数组有3个成员
+        rs.status()
+        ```
+
+    - 4.自动故障转移
+
+        - 关闭27017主节点
+
+            ```mongodb
+            db.adminCommand({"shutdown": 1})
+
+            // 查看副本集状态。比rs.status()函数更简洁
+            db.isMaster()
+            primary: 'localhost:27018',
+            me: 'localhost:27018',
+            ```
+
+        - 恢复27017
+
+            ```sh
+            # 重新启动27017
+            mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+            # 连接27017
+            mongosh --port 27017
+
+            // 查看副本集状态。27017已经变成从节点了
+            db.isMaster()
+            secondary: true,
+            primary: 'localhost:27018',
+            me: 'localhost:27017',
+            ```
+
+    - 5.开启从节点读取（默认情况下，拒绝从节点读取）：
+
+        - 开启从节点读取的问题：
+
+            - 从节点可能落后于主节点的时间通常在几毫秒之内。但这是无法保证的，由于负载、错误配置、网络等原因，从节点可能延迟几分钟、几小时、甚至几天。
+
+            - 客户端无法知道从节点的数据有多新，因此要读取最新数据，就不该在从节点读取。
+
+            - 客户端发出请求的速度可能快于复制操作的执行速度
+
+            - 除非使用`writeConcern`将写操作复制多个从节点才算成功
+                ```mongodb
+                db.users.insertOne(
+                    {"_id": 10, "name": "joe"},
+                    { writeConcern: {"w": "majority", "wtimeout": 100}}
+                );
+                ```
+
+            - 结论：从落后的从节点读取数据，就必须牺牲一致性；写操作复制多个成员，就必须牺牲写入速度
+
+
+        - 在主节点插入测试数据：
+            ```monggodb
+            use test
+            // 插入数据
+            for (i=0; i<1000; i++) {db.coll.insertOne({count: i})}
+            // 查看文档插入数量
+            db.coll.countDocuments()
+            ```
+
+        - 2种方法连接从节点：
+
+            - 1.mongosh连接从节点
+                ```mongodb
+                mongosh --port 27018
+
+                // 读取报错
+                db.coll.find()
+                MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
+
+                // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
+                db.getMongo().setReadPref('secondary')
+
+                // 成功读取
+                db.coll.find()
+
+                // 关闭从节点读取
+                db.getMongo().setReadPref()
+
+                // 写入报错
+                db.coll.insertOne({"count": 1001})
+                MongoServerError: not primary
+                ```
+
+            - 2.在连接了主节点的mongosh上，连接从节点
+                ```mongodb
+                // 使用构造函数实例化connection对象
+                secondaryConn = new Mongo("localhost:27018")
+                secondaryDB = secondaryConn.getDB("test")
+
+                // 读取报错
+                secondaryDB.coll.find()
+                MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
+
+                // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
+                secondaryConn.setReadPref('secondary')
+
+                // 成功读取
+                secondaryDB.coll.find()
+
+                // 关闭从节点读取
+                secondaryConn.setReadPref()
+
+                // 写入报错
+                secondaryDB.coll.insertOne({"count": 1001})
+                MongoServerError: not primary
+                ```
+
+- 读偏好：
+
+    - `primary`（默认值）：始终发送给主节点，没有主节点就报错
+    - `primaryPreferred`：当主节点停止运行时，副本集会进入一个临时的只读模式
+    - `nearest`：在延迟最低的从节点上读取。适合低延迟需求大于一致性需求的场景
+        - 基于驱动程序对副本集成员的平均ping，将路由请求到延迟最低的成员
+        - 如果应用程序需要低延迟读和低延迟写，由于副本集只允许主节点写，因此需要分片
+
+    - `secondary`：如果可以接受旧数据。总是发送给从节点；如果没有从节点就报错，不会发送给主节点
+    - `secondaryPreferred`：如果可以接受旧数据。总是发送给从节点；没有从节点，就发送给主节点
+
+### 更改副本集配置：优先级、隐藏成员、索引复制、仲裁者
+
+- `rs`辅助函数，大部分是数据库命令的封装。
+    - 最好同时熟悉这两个，因为使用命令形式代替辅助函数可能会更简单
+    ```mongodb
+    // 两者等效
+    rs.initiate(config)
+    db.adminCommand({"replSetInitiate": config})
+    ```
+
+- 基本命令
+    ```mongodb
+    // 查看副本集配置。每次修改时version字段会增加
+    rs.config()
+    // 等同于上。配置实际上保存在local数据库的db.system.replset中
+    use local
+    db.system.replset.find()
+
+    // 添加成员。第一次添加的成员，对于的目录应该是空的
+    rs.add("localhost:27020")
+    // 删除成员
+    rs.remove("localhost:27017")
+
+    // 把主节点变为从节点（除了修改priority优先级外）可以使用rs.stepDown()
+    // 使主节点降级从节点，并维持60秒。如果这段时间内没有其他主节点被选举出来。该节点可以尝试重新选举
+    rs.stepDown(60) // 60秒
+
+    // 阻止选举。如果需要对主节点维护，但不想在此期间，有其他成员选举为主节点。可以对每个成员执行rs.freeze()，强制保持从节点
+    rs.freeze(60) // 60秒
+    // 如果完成主节点维护，释放其他成员。对每个成员执行
+    rs.freeze(0)
+    ```
+
+- 复杂的配置更改，如一次性添加/删除多个成员。可以使用`rs.reconfig()`重新加载配置
+    ```mongodb
+    // 修改配置
+    var config = rs.config()
+    config.members[0].host = "localhost:27017"
+    config.members[1].host = "localhost:27018"
+    config.members[2].host = "localhost:27019"
+
+    // 重新加载配置
+    rs.reconfig(config)
+    ```
+
+- 优先级：范围0-100，默认为1
+
+    - 0值：永远不能成为主节点。被称为被动（passive）成员
+    - 更高优先级成员总是会被选举为主节点
+
+    ```mongodb
+    // 设置优先级为2
+    var config = rs.config()
+    config.members[0].priority = 2;
+    rs.reconfig(config)
+
+    // 查看优先级
+    rs.config()
+
+    // 查看27018是否变为主节点
+    rs.status()
+    ```
+
+- 隐藏成员
+    - 客户端不会向隐藏成员发送请求。
+    - 隐藏成员不会优先作为副本集的数据源
+        - 当其他复制源不可用时，隐藏成员也会被使用
+    - 隐藏成员适合性能较弱的服务器、备份服务器
+
+    ```mongodb
+    // 当前主节点不能设置为hidden
+    cfg = rs.conf()
+    cfg.members[1].priority = 0
+    cfg.members[1].hidden = true
+    rs.reconfig(cfg)
+    ```
+
+- 索引复制：从节点默认复制主节点相同的索引。`buildIndexes`为`true`
+
+    ```mongodb
+    // 关闭从节点复制主节点的索引
+    rs.remove("localhost:27018")
+    rs.add({"host": "localhost:27018", "buildIndexes": false, "priority": 0})
+    ```
+
+- 选举仲裁者
+
+    - 最好使用没有仲裁者的部署
+
+    - 如果成员数量是奇数，就不需要配置仲裁者
+
+        - 假设有3个成员的副本集，需要2个成员才能选举。这时添加一个仲裁者，副本集就有4个成员，需要3个成员才能选举。反而降低的稳定性：现在需要75%可用，而之前只需67%
+
+        - 如果添加仲裁者后的数量为偶数，反而导致平票，而不是避免平票
+
+    - 仲裁者（arbiter）：只是满足“大多数”的条件。不为客户端提供服务，不保存数据
+        - 部署应该将仲裁者与其他成员分开
+        - 适合场景：许多小型部署不希望保存3份数据副本集，觉得2份就够了
+            - 可以运行在性能较差的服务器
+
+        - 成员一旦配置为仲裁者，便无法重新变为非冲裁者
+
+        - 缺点：
+
+            - 假设：副本集有2个数据成员+1个仲裁者。如果其中一个数据成员停止运行并且不恢复，就需要一个新的从节点。
+
+                - 主节点仅剩1份完好数据，不仅要处理应用程序请求，还要复制数据到新的从节点
+                    - 通常几个GB的数据复制很简单；但如果是100GB以上就不太现实了，导致很大的服务器压力，从而降低应用程序的速度。
+
+
+            - 如果是3个数据成员，1台服务器彻底停止运行，副本集还有喘息的空间
+
+        ```mongodb
+        // mongodb4.0以后需要执行此命令
+        db.adminCommand({
+           "setDefaultRWConcern" : 1,
+           "defaultWriteConcern" : {
+             "w" : 1
+           }
+         })
+
+        // 将27019加入副本集，并设置为仲裁者
+        rs.addArb("localhost:27019")
+        // 或者
+        rs.add({"host": "localhost:27018", "arbiterOnly": true})
+        ```
+
+- 不能直接修改，而是需要`rs.remove()`后，再`rs.add()`的才能修改的配置
+    - 成员的`"_id"`字段
+    - 仲裁者不能变为非仲裁者，反之亦然
+    - 不能将主节点的`priority`优先级设置为0（就算`rs.remove()`在`rs.add()`也不行）
+    - 不能修改`buildIndexes`索引复制设置
+
+        - 直接修改索引复制为false的报错例子
+            ```mongodb
+            cfg = rs.conf()
+            cfg.members[2].priority = 0
+            cfg.members[2].buildIndexes = false
+            rs.reconfig(cfg)
+            MongoServerError: New and old configurations differ in the setting of the buildIndexes field for member localhost:27018; to make this change, remove then re-add the member
+            ```
+
+### 管理
+
+- 副本集最多只能有50个成员，其中只有7个成员拥有投票权
+    - 这是为了减少每个成员的心跳产生的网络流量
+    - 超过7个成员的副本集，额外成员必须赋予0投票权
+        ```mongodb
+        rs.add({"_id": 7, "hosts": "server-7:27017", "votes": 0})
+        ```
+
+- 单机模式启动进行维护：维护任务不能在从节点上执行（涉及写操作），也不应该在主节点上执行，因为会对性能造成影响。
+
+    ```mongodb
+    // 查看要维护成员的启动命令
+    db.serverCmdLineOpts()
+    {
+      argv: [
+        'mongod',
+        '--replSet',
+        'mdDefGuide',
+        '--dbpath',
+        '/home/tz/mongodb/rs1',
+        '--port',
+        '27017',
+        '--oplogSize',
+        '200'
+      ],
+
+    // 关闭主节点服务器。副本集的其他成员，发现连接主节点27017失败后便会选举主节点
+    db.shutdownServer()
+
+    # 以单机模式运行。从另一个端口启动该服务器
+    mongod --port 30000 --dbpath ~/mongodb &
+
+    // 完成维护后。以命令的原始选项重启，会自动连接副本集成为从节点，并从新的主节点复制维护期间的操作，如果该节点的priority优先级最高，会重新选举为主节点
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+    ```
+
+- 强制重新配置命令：`rs.reconfig(config, {"force": true})`
+
+    - 强制重新配置会使`version`字段数字会显著增加，甚至是数万、数十万。这些都是正常的
+
+    - 适合场景：无法发送给主节点的情况下，在从节点强制重新配置副本集。当从节点受到重新配置时，会更新自身，并传递给其他成员
+
+        - 如果一些成员已经改变了主机名，那应该在还保持着旧主机名的成员上进行强制重新配置。
+
+        - 如果所有成员都已经改变了主机名，则应该关闭副本集中的所有成员，然后在单机模式下启动，手动修改`local`数据库的`db.system.replset`文档（也就是`rs.config()`保存的内容），然后重新启动成员
+
+- 从节点上运行`rs.status().syncSourceHost`：可以查看复制源
+
+    - 复制源链：server0是server1的复制源，server1是server2的复制源，server2是server4的复制源
+
+    - mongodb会根据ping的时间决定复制源。维护心跳ping的滑动平均值，查找离它最近，数据比它新的成员作为复制源，因此不会出现循环复制（复制源只能是主节点和比它新的从节点）
+
+    - 问题：每加入一个成员，复制源链可能会变长，导致复制到所有服务器需要更长时间。
+
+        - 解放方法1：手动修改复制源。注意这可能会导致出现循环复制
+
+            ```mongodb
+            rs.syncFrom("localhost:27017")
+            ```
+
+        - 解放方法2：禁用复制源链，强制每个成员从主节点同步
+            ```mongodb
+            var config = rs.config()
+            // 如果设置子对象不存在，则进行创建
+            config.settings = config.settings || {}
+            config.settings.chainingAllowed = false
+            rs.reconfig(config)
+            ```
+
+- 如果所有从节点同时创建索引时：
+    - 副本集的大部分成员将处于离线状态，直到索引创建完成
+    - 在创建`unique`索引时，必须停止所有写操作，不然副本集成员数据可能会不一致
+
+    - 解决方法：只在一个成员上创建索引，从而最小化影响
+        - 1.关闭1个从节点
+        - 2.单机模式重新启动
+        - 3.在单机服务器上创建索引
+        - 4.索引创建完后，以副本集成员的身份重新启动。
+            - 如果命令航选项或配置文件有`disableLogicalSessionCacheRefresh`参数，则需要移除
+
+        - 5.对副本集的每个从节点重复步骤1到4
+
+        - 完成后，除了主节点外的成员都成功创建索引。接下来有2个选择，根据场景选择对生产环境影响最小的
+            - 1.在主节点创建索引。
+                - 如果系统有一段流量较少的空闲期，则是创建索引的好时机。
+                - 可能需要修改读偏好，从而在创建索引过程中，负载到从节点
+            - 2.将主节点退位从节点，重复2到4的步骤。
+                - 这会发生故障转移，在旧主节点创建索引时，有一个正常运行的主节点。
+
+        - 注意：创建唯一索引，要确保主节点没有插入重复数据，或者首先在主节点创建索引。否则会导致从节点复制错误，如果发生这种情况，从节点会自动关闭。必须以单机模式重新启动，删除唯一索引后，在重新启动
+
+- 如果预算有限，不能购买多台高性能服务器
+
+    - 从节点的只用于灾难恢复。这样就不需要更好的ram和cpu和磁盘io。
+
+        | 设置以下选项 | 值    | 说明                                                                                                                            |
+        |--------------|-------|---------------------------------------------------------------------------------------------------------------------------------|
+        | priority     | 0     | 永远不会成为主节点                                                                                                              |
+        | hidden       | true  | 客户端不会向从节点发送读请求                                                                                                    |
+        | buildIndexes | false | 可选选项。如果需要在该节点进行恢复，则需要重新创建索引                                                                          |
+        | votes        | 0     | 如果只有2台机器：votes:0可以在从节点停止运行后，主节点仍能保持主节点。如果有3台机器：应该在该机器运行仲裁者，而不是设置votes:0 |
+
+    - 主节点始终用高性能服务器
+
+### 如何设计副本集
+
+- 不同的需求，有不同的配置，应该考虑如何在不利条件下满足大多数（majority）
+
+- 大多数（majority）：副本集一半以上成员
+
+    | 副本集成员总数 | 副本集成员大多数 |
+    |----------------|------------------|
+    | 1              | 1                |
+    | 2              | 2                |
+    | 3              | 2                |
+    | 4              | 3                |
+    | 5              | 3                |
+    | 6              | 4                |
+    | 7              | 4                |
+
+- 选取主节点需要大多数决定
+
+    - 问题：假设有一个5个成员的副本集，3个成员不可用。剩下2个成员不满足大多数，因此无法选举出一个主节点。如果剩下的2个成员其中一个是主节点，几秒后会变成从节点。最后变成2个从节点3个无法访问的副本集
+        - 为什么不能让剩下2个成员选举主节点？问题在于：其他3个成员可能没有崩溃，只是网络故障不可达，它们3个满足大多数，会选举出1个主节点。在网络分区情况下，mongodb不希望各自出现1个主节点，因为2个主节点都可以写入数据会造成混乱
+
+- 2种推荐配置：
+
+    - 1.大多数成员放在同一个数据中心：适合有一个主数据中心
+        - 优点：主数据中心只要正常运作，就会有一个主节点
+        - 缺点：如果主数据中心不可用，备份数据中心的成员，无法选举主节点
+
+    - 2.两个数据中心各自放数量相等的成员，在第三个地方放一个打破僵局的成员：适合两个数据中心一样重要
+        - 优点：两个数据中心的任意一个，都可以达到大多数
+        - 缺点：需要将服务器分散到3个地方
+
+    - 如果一个副本集允许多个主节点，上面问题就迎刃而解了。但需要处理写入冲突（有人在主节点1上更新一个文档，另一个人在主节点2删除这个文档）
+        - 在支持多线程写入的系统中：有2种处理方法
+            - 1.手动解决
+            - 2.让系统选择一个胜利者
+            - 但这2种方法都不容易实现，因为无法保证写入的数据不会被其他节点修改。因此mongodb只支持一个主节点
+
+### 如何选举
+
+- 主节点会一直处于（PRIMARY状态），直到不能满足大多数的要求：停止运行、降级、副本集被重新配置
+
+- 选举过程中主节点会短暂不可用
+
+    - 选举过程大概几毫秒；网络问题或服务器过载响应慢，可能需要更多时间，甚至几分钟。
+    - 必要情况下，可以配置驱动程序将读请求路由到从节点
+
+- 副本集成员每个2秒发送1次心跳（ping)。如果10秒内没有反馈，则会被标记为无法访问。
+    ```mongodb
+    cfg = rs.conf();
+    // 设置ping为3秒
+    cfg.settings.heartbeatIntervalMillis = 3000;
+    // 设置timeout为15秒
+    cfg.settings.heartbeatTimeoutSecs = 15;
+
+    rs.reconfig(cfg);
+    ```
+
+- 心跳间隔时间内（默认2秒）有成员发现主节点不可用，就会立即开始选举：选举流程
+
+    - 当一个从节点与主节点无法连接时：会通知并请求其他成员，将自己选举为主节点。
+
+    - 其他成员会做几项健全性检查：
+
+        - 1.它们能否连接到主节点，这个主节点是发起选举的节点无法连接的？
+
+        - 2.发起选举的从节点是否有最新数据？
+            - 被选举的成员必须拥有最高优先级
+
+        - 3.有没有更高优先级的成员，可以被选举为主节点？
+            - 优先级高的会比低的更快发起选举，继而成为主节点；就算低优先级短暂成为主节点，副本集成员会继续发起选举，直到最高优先级的成员为主节点
+
+        - 被选举成员从副本集获得大多数选票后，选举成功成为主节点（PRIMARY状态）
+            - 如果没有获得大多数选票，继续处于从节点（SECONDARY状态），以后可能会试图再次成为主节点
+
+- mongodb3.2版本引入第1版复制协议：
+
+    - 基于RAFT共识协议，开发的类RAFT协议
+
+    - 包含一些特定于monogdb副本集的概念：
+
+        - 仲裁节点、优先级、非选举成员、写入关注点（write concern）等
+        - 使用term ID防止重复投票
+
+- 问题：
+    - 驱动程序操作失败时，不知道主节点在是否在停止运行之前处理该操作？
+    - 如果出现网络分区，选举出一个新主节点，是否在新的主节点重新尝试该操作？
+
+    - 假设该操作为递增计数器
+
+        | 错误类型                         | 不重试             | 重试一定次数策略                 |
+        |----------------------------------|--------------------|----------------------------------|
+        | 短暂的网络错误                   | 可能会发生计数过少 | 计数过多（如果操作是幂等则不会） |
+        | 持续的中断（网络或服务器）       | 正确策略           | 浪费资源                         |
+        | 服务器拒绝错误命令（比如未授权） | 正确策略           | 浪费资源                         |
+
+    - 结论：利用幂等操作，最多重试一次是最有可能正确处理3种类型的错误
+        - mongodb3.6之后，`可重试写`选项：就是最多重试一次策略。
+            - 命令错误会返回应用程序，让客户端进行处理。
+            - 服务器会为每个写操作维护唯一标识符：从而确定驱动程序什么时候重试一个已经成功的命令。它会简单返回一条消息表示写入成功，从而客服短暂的网络故障，而不会再次进行写入
+
+### oplog日志同步
+
+- 启动mongod时，可以指定oplog大小
+    ```sh
+    mongod --config ~/mongodb/mongodb.conf --oplogSize 200 &
+    ```
+
+- oplog（日志）：包含主节点的每一次写操作。存在于主节点local数据库中的一个固定集合（类似于环形队列）。
+
+    - 从节点通过查询此集合获取需要复制的操作
+    - oplog的每个操作都是幂等的：无论是应用1次，还是多次结果都一样
+        - 例子：set a 10是幂等的，add a 1则不是幂等
+
+- 每个从节点都维护着自己的oplog（日志），记录主节点复制的每个操作
+
+    - 使得每个成员都可以被用作其他成员的同步源
+    - 流程：
+        - 1.从节点从同步源获取操作
+        - 2.应用到自己的数据集上
+        - 3.再写入oplog
+
+    - 从节点重启，会从oplog的最后一个操作开始同步。由于oplog的每个操作是幂等的，所以不存在一致性问题
+
+- oplog使用空间的速度与写入的速度差不多
+    - 主节点每分钟写入1KB数据，那么oplog就会以每分钟1KB的速度填满
+    - 特殊情况：如果一个操作影响多份文档（删除/更新多个文档），那么会被分解为多条oplog条目。
+        - 如果执行大量批量操作，oplog很快被填满
+        - 例子：`db.coll.remove()`从集合删除1000个文档，oplog就会有1000条操作日志
+
+- 查看oplog
+    ```mongodb
+    rs.printReplicationInfo()
+    actual oplog size
+    '200 MB'
+    ---
+    configured oplog size
+    '200 MB'
+    ---
+    log length start to end
+    '89240 secs (24.79 hrs)'
+    ---
+    oplog first event time
+    'Wed Nov 29 2023 23:35:39 GMT+0800 (China Standard Time)'
+    ---
+    oplog last event time
+    'Fri Dec 01 2023 00:22:59 GMT+0800 (China Standard Time)'
+    ---
+    now
+    'Fri Dec 01 2023 00:23:00 GMT+0800 (China Standard Time)'
+    ```
+
+    - 大小200MB，可以包含24.79个小时的操作
+
+        - 大小应该和进行一次完整的重新同步所花费的时间一样长
+
+    ```mongodb
+    // 获取每个成员的syncTo值，以及最后一条oplog被写入从节点的时间
+    rs.printSecondaryReplicationInfo()
+    source: localhost:27018
+    {
+      syncedTo: 'Fri Dec 01 2023 00:28:19 GMT+0800 (China Standard Time)',
+      replLag: '0 secs (0 hrs) behind the primary '
+    }
+    ---
+    source: localhost:27019
+    {
+      syncedTo: 'Fri Dec 01 2023 00:28:19 GMT+0800 (China Standard Time)',
+      replLag: '0 secs (0 hrs) behind the primary '
+    }
+    ```
+
+    - 在写入频率低的系统中，可能会造成延迟很大的幻觉。假设每小时执行1次写入，在没有完成复制时，从节点看上去比主节点落后1小时。但它能几毫秒追上这“1小时”的操作
+
+- 大多数情况下，默认的oplog大小就足够了。
+
+     - 小于默认oplog的场景：应用程序多读，少写。
+
+     - 大于默认oplog的场景：
+
+        - 1.一次更新多个文档：为了保持幂等性，需要将一个多文档更新，转换为多个单独操作
+            - 可能会占用大量oplog空间，但相应的数据大小和数据磁盘使用量不会增加
+
+        - 2.删除的数据量与插入的数据量相同
+            - oplog的大小可能会非常大，但数据库磁盘使用量不会显著增加
+
+        - 3.大量的就地（in-place）更新：不增加文档更新的大小
+            - oplog的大小可能会非常大，但数据库磁盘使用量不会显著增加
+
+    - 修改oplog大小：
+        - 不幸的是，oplog被写满之前，没有简单的方法计算长度。
+        - WiredTiger存储引擎允许在线调整oplog大小
+            - 应该先在从节点上调整，在对主节点调整
+
+        ```mongodb
+        // 查看大小
+        // 如果启动的身份验证，要确保使用的用户具有修改local数据库的权限
+        use local
+        db.oplog.rs.stats(1024*1024).maxSize
+
+        // oplog必须大于990MB，不然会报错。除非mongod启动时设置
+        db.adminCommand({replSetResizeOplog: 1, size: 300})
+        MongoServerError: BSON field 'size' value must be >= 990, actual value '300'
+
+        // 修改大小为16000MB（16G）
+        db.adminCommand({replSetResizeOplog: 1, size: 16000})
+
+        // 如果减少了oplog的大小，可以使用compact命令回收被分配的磁盘空间。但不要对主节点使用该命令。一般来说不应该减少oplog的大小，即使有几个月那么长，因为oplog不会占用ram和cpu资源，但要有足够的磁盘空间容纳它
+        ```
+
+- 初始化同步
+
+    - 副本集成员启动时，会检查自身的有效状态，以缺点是否可以开始从其他成员同步数据
+
+    - 状态有效：会从另一个成员中复制数据的完整副本。几个步骤：
+
+        - 1.克隆除`local`数据库以外的所有数据库
+            - 克隆前会删除目标成员的所有数据
+
+        - 2.mongodb3.4版本后：每个集合复制文档时，会创建集合中的所有索引
+            - 此过程还会在数据复制期间，添加新的oplog记录。因此确保目标成员在`local`数据库中有足够的磁盘空间
+
+        - 3.克隆完成后，更新同步源的oplog（插入、更新、删除）
+            - 必须重新克隆某些被克隆程序移动导致丢失的文档
+
+            - 这个过程后：初始化完成，成为从节点，数据与主节点的数据集完全相同
+
+    - 然而，更推荐从备份中恢复（`mongodump`和`mongorestore`）。因为更快
+    - 克隆可能会破坏同步源的工作集：某些被经常访问的数据子集，存在于内存中。
+        - 执行初始化同步会强制此成员的所有数据分页加载到内存中，驱逐那些经常访问的数据。导致原先可以在内存进行处理，被迫变为磁盘，速度大幅下降
+
+    - 最常见的问题是时间过长：新成员可能从同步源的oplog末尾脱离。——落后于同步源，并且无法再跟上
+        - 除了不要在太忙的时候，执行初始化同步或从备份进行恢复。没有其他方法解决这个问题。
+
+- 第二种同步：复制
+
+    - 初始化同步后，从同步源复制oplog。在一个异步进程完成这些操作
+    - 从节点会自动更改同步源，以应对ping时间，以及其他成员复制状态的变化。
+        - 有一些规则可以设置指定同步源：
+            - 1.有投票权的成员，不能从没有投票权的成员同步
+            - 2.从节点不能从延迟成员和隐藏成员同步数据
+
+- 过时从节点：
+
+    - 如果从节点远远落后于同步源的操作，就是过时。如果继续同步，从节点就需要跳过一些操作
+
+    - 会发生的场景：从节点服务器停止运行、写操作超过自身处理能力、忙于过多的读操作
+
+    - 从节点过期时：会尝试从副本集中的每个成员进行复制，看看是否有成员有更长的oplog以继续进行同步。如果没有一个成员有足够长的oplog，那么复制就会停止。需要重新进行完全同步或从最近备份中恢复
+        - 为避免出现不同步的从节点：可以让主节点拥有一个比较大的oplog，保存足够多的操作日志。
+            - oplog应该可以覆盖2到3天的正常操作（复制窗口）
+
+- 成员通过心跳传达自己的副本集状态：
+
+    - `PRIMARY`：主节点
+    - `SECONDARY`：从节点
+    - `ARBITER`：仲裁者节点
+
+    - `STARTUP`：成员第一次启动的状态。尝试加载副本集配置，加载完成后进入`STARTUP2`
+    - `STARTUP2`：初始化同步，处于这个状态，通常只需几秒。成员会创造出几个线程来处理复制和选举，然后进入下一个状态`RECOVERING`
+    - `RECOVERING`：成员运行正常，但不能处理读请求。可能因为以下情况
+        - 1.在启动时，成员需要做一些自我检查，确保自己是有效状态
+        - 2.处理一些耗时命令（压缩、`replSetMaintenance`命令）
+        - 3.远远落后其他成员，无法跟上。
+            - 这需要重新进行完全同步或从最近备份中恢复
+
+    - 有问题的状态
+        - `DOWN`：成员被正常启动，但后来变为不可访问
+            - 有可能只是网络问题，成员依然在运行
+        - `UNKNOWN`：如果一个成员未能访问另一个成员
+            - 成员要么已经停止运行，要么是网络问题
+
+        - `REMOVED`：成员已经从副本集移除。
+            - 如果该成员重新添加到副本集，会转换为“正常”状态
+
+        - `ROLLBACK`：成员正在回滚数据
+
+### 回滚
+
+- 因网络分区出现多主节点的回滚例子：
+
+    - 假设有一个5成员的副本集，oplog日志的操作到了125号
+
+    - 此时出现网络分区：
+
+        | 数据中心1 | 数据中心 |
+        |-----------|----------|
+        | 1主+1从   | 2：3从   |
+
+    - 数据中心1：继续处理自己的写操作。假设oplog到了126号
+    - 数据中心2成员满足大多数：因此其中一个从节点会选举成为主节点。这个新的主节点会开始处理写操作。假设oplog到了128号
+
+    - 网络恢复后：数据中心1会寻找oplog126号开始同步，但找不到这个操作。就会开始回滚（rollback）过程
+        - 发现125号为最后一个同步操作。在数据中心2期间的126号到128号写操作会回滚。将这些操作的每个文档写入.bson文件，保存砸rollback目录。
+
+    - 回滚完成后会转换为`RECOVERING`状态，并进行正常同步
+
+- 手动使用`mongorestore`命令把回滚的操作应用到当前主节点
+    ```sh
+    mongorestore --db stage --collection stuff /data/db/rollback/import.stuff.2018-12-19T18-27-14.0.bson
+    ```
+
+    - 如果有人在被回滚的成员上创建一个普通索引，而在当前主节点创建了一个唯一索引，就要确保回滚数据没有重复文档
+
+    - 如果希望保留staging集合中的某个版本，可以将它加载到主集合中
+        ```mongodb
+        staging.stuff.find().forEach(function(doc) {
+            prod.stuff.insert(doc);
+        })
+        ```
+
+    - 对于那些之运行插入操作的集合，可以直接回滚。然而，如果集合中执行更新操作，则需要小心对回滚数据进行合并处理
+
+- mongodb4.0以前回滚内容太多，可能会失败：
+    - 回滚数量超过300MB
+    - 回滚时间超过30分钟
+
+    - mongodb4.0以后，取消这些限制
+
+#### 写操作确保大多数成员写入；自定义更复杂的规则
+
+- 单主节点崩溃恢复后的回滚例子：
+
+    - 应用程序发送一个写操作到主节点，主节点写入后，还没来得及同步到从节点就崩溃了
+
+        - 应用程序认为能够访问这个写操作
+
+    - 其中一个从节点选举出新主节点，开始接受新的写入
+
+    - 主节点恢复后：发现一些新主节点不存在的写操作
+
+        - 为了纠正，会把这些写入操作，写入到回滚文件。需要手动恢复（`mongorestore`命令），不能自动操作因为可能与崩溃后的写操作冲突。
+
+- 解决方法：设置写操作必须写入指定数量成员，操作才算成功
+
+    ```mongodb
+    // writeConcern参数，w的值包含主节点（n个从节点，就是n+1）。
+    // 直接使用数字的缺点是，如果副本集配置发生改变，也需要改变
+    db.users.insertOne(
+        {"_id": 10, "name": "joe"},
+        { writeConcern: {"w": "2", "wtimeout": 100}}
+    );
+
+    // majority为大多数成员
+    try {
+        db.users.insertOne(
+            {"_id": 10, "name": "joe"},
+            { writeConcern: {"w": "majority", "wtimeout": 100}}
+        );
+    } catch (e) {
+        print(e);
+    }
+    ```
+
+- 自定义规则：可以确保写操作，复制到指定服务器
+
+    - 最好保证复制每个数据中心的至少1台服务器。如果数据中心掉线了，其他数据中心至少都有一个数据副本
+
+        ```mongodb
+        var config = rs.config()
+        // 通过tags字段，实现按数据中心分类。
+        config.members[0].tags = {"dc": "us-east"}
+        config.members[1].tags = {"dc": "us-east"}
+
+        config.members[2].tags = {"dc": "us-west"}
+        config.members[3].tags = {"dc": "us-west"}
+
+        // 也可以加入多个标签
+        config.members[0].tags = {"dc": "us-east", "quality": "high"}
+        ```
+
+        - 通过`getLastErrorModes`参数自定义规则
+
+            ```mongodb
+            config.settings = {}
+            config.settings.getLastErrorModes = {
+              "eachDC": {
+                "dc": 2
+              }
+            };
+            rs.reconfig(config)
+
+            // 现在可以对写操作应用这条规则
+            db.users.insertOne(
+                {"_id": 10, "name": "joe"},
+                { writeConcern: {"w": "eachDC", "wtimeout": 100}}
+            );
+            ```
+
+    - 保证写操作被复制到大多数非隐藏节点
+
+        - 隐藏节点是二等公民。发生故障时不会转移到隐藏节点，也无法执行任何读操作
+
+        ```mongodb
+        // 假设有5个成员host0-host4，host4是隐藏成员。
+        // 写操作同步大多数非隐藏成员至少host0、host1、host2、host3中的3个；没有为hosts4添加tags
+        var config = rs.config()
+        config.members[0].tags = {"normal": "A"}
+        config.members[1].tags = {"normal": "B"}
+        config.members[2].tags = {"normal": "C"}
+        config.members[3].tags = {"normal": "D"}
+
+        // 设置规则
+        config.settings.getLastErrorModes = {"visibleMajority": {"normal": 3}}
+        rs.reconfig(config)
+
+        // 现在可以对写操作应用这条规则
+        db.users.insertOne(
+            {"_id": 11, "name": "joe"},
+            { writeConcern: {"w": "visibleMajority", "wtimeout": 100}}
+        );
+        ```
+
+#### 防止回滚
+
+- 对于一些场景少量回滚写操作，不是大问题
+    - 在博客场景中：回滚某位读者的一两条评论，不会有什么问题
+
+- 不要更改成员的投票数量
+    - 改变投票数量，会导致大量回滚
+
+### 负载问题
+
+- 许多用户会将读请求，发送到从节点分配负载
+
+    - 如果服务器每秒只能处理10000次查询，而你需要的查询有30000次。选择设置多个从节点承担负载：创建4个成员的副本集（因为是偶数，所以其中一个没有投票权，以防止平票）
+
+    - 问题：其中一个从节点崩溃了。剩下每个成员就都100%负载，而当成员恢复时，还要从其他成员复制数据，进一步加剧负载。过载可能会导致主节点的复制速度变慢，使得从节点都落后于主节点，恶性循环。
+
+    - 解决方法：使用5台服务器，而不是4台。就算1台崩溃，也不会出现过载。前提是你很清楚1台服务器的负载能力。
+        - 但即使如此，依然可能会出现超出预期的服务器崩溃，导致过载
+
+    - 最佳解决方法：分片
+
+## 分片
 ## GridFS
 
 - [官方文档](https://www.mongodb.com/docs/manual/core/gridfs/)
@@ -2678,6 +3554,32 @@ db.users.dropIndex({"name": 1})
 
 - `$where`：可以在查询中执行javascript代码
     - 为了安全起见，应该严格限制，禁止终端用户随意使用`$where`
+
+## 监控
+
+### 副本集
+
+- `rs.status()`：查看状态
+
+    | 最有用的字段  | 说明                                                                                            |
+    |---------------|-------------------------------------------------------------------------------------------------|
+    | self          | 属于那个副本集成员                                                                              |
+    | stateStr      | 副本集状态（PRIMARY、SECONDRAY等）                                                              |
+    | uptime        | 启动时间（单位：秒）                                                                            |
+    | optimeDate    | 每个成员的oplog中最后一个操作发生的时间（由于有心跳机制可能会慢几秒）                           |
+    | lastHeartbeat | 最后一次受到来自"self"这个成员的心跳时间。如果出现网络故障或服务器过载，这个时间可能是两秒之前 |
+    | pingMs        | 心跳达到此服务器的平均时间                                                                      |
+    | errmsg        | 不是错误信息。是成员在心跳请求中选择返回的状态信息                                              |
+
+- 从节点上运行`rs.status().syncSourceHost`：可以查看复制源
+
+```mongodb
+// oplog大小和可以包含的多少时间的操作
+rs.printReplicationInfo()
+
+// 获取每个成员的syncTo值，以及最后一条oplog被写入从节点的时间
+rs.printSecondaryReplicationInfo()
+```
 
 ## 命令行工具
 
