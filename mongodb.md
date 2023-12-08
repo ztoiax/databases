@@ -110,6 +110,7 @@ use dbname
 db.movies
 
 // 删除当前整个数据库
+use test
 db.dropDatabase()
 ```
 
@@ -2586,158 +2587,6 @@ db.users.dropIndex({"name": 1})
 
 - 所有mongodb驱动程序都遵守服务器发现和监控（SDAM）规范。驱动程序会持续监视副本集的拓扑结构，以检测应用程序对成员的访问是否有变化。并且维护哪个成员是主节点的信息
 
-- 实验：在单机服务器上，建立一个3节点的副本集
-
-    - 1.为每个节点单独创建数据目录
-        ```sh
-        mkdir -p ~/mongodb/rs{1,2,3}
-        ```
-
-    - 2.启动mongod
-        ```sh
-        # 启动3个mongod
-        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
-        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &
-        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &
-
-        # 默认情况下绑定到localhost(127.0.0.1)。--bind_ip参数可以指定ip，也可以在配置文件使用bind_ip
-        # 在192.51.100.1服务器上运行mongod
-        # 在绑定到非localhost的ip。应该启用授权控制，并指定身份验证机制
-        mongod --bind_ip localhost,192.51.100.1 --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
-        ```
-
-    - 3.初始化副本集
-
-        - 每个mongod都不知道其他mongod的存在。因此需要创建一个包含每个成员的配置，并发送给其中一个mongod进程，由它负责将配置传递给其他成员。
-
-        ```sh
-        # 连接其中一个mongod
-        mongosh --port 27017
-
-        // 创建配置文档
-        rsconf = {
-            _id: "mdDefGuide",
-            members: [
-                {_id:0, host: "localhost:27017"},
-                {_id:1, host: "localhost:27018"},
-                {_id:2, host: "localhost:27019"}
-            ]
-        }
-
-        // 传递rsconf实现初始化。提示符变成mdDefGuide [direct: primary] test>
-        // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
-        rs.initiate(rsconf)
-
-        // 查看副本集状态。members数组有3个成员
-        rs.status()
-        ```
-
-    - 4.自动故障转移
-
-        - 关闭27017主节点
-
-            ```mongodb
-            db.adminCommand({"shutdown": 1})
-
-            // 查看副本集状态。比rs.status()函数更简洁
-            db.isMaster()
-            primary: 'localhost:27018',
-            me: 'localhost:27018',
-            ```
-
-        - 恢复27017
-
-            ```sh
-            # 重新启动27017
-            mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
-            # 连接27017
-            mongosh --port 27017
-
-            // 查看副本集状态。27017已经变成从节点了
-            db.isMaster()
-            secondary: true,
-            primary: 'localhost:27018',
-            me: 'localhost:27017',
-            ```
-
-    - 5.开启从节点读取（默认情况下，拒绝从节点读取）：
-
-        - 开启从节点读取的问题：
-
-            - 从节点可能落后于主节点的时间通常在几毫秒之内。但这是无法保证的，由于负载、错误配置、网络等原因，从节点可能延迟几分钟、几小时、甚至几天。
-
-            - 客户端无法知道从节点的数据有多新，因此要读取最新数据，就不该在从节点读取。
-
-            - 客户端发出请求的速度可能快于复制操作的执行速度
-
-            - 除非使用`writeConcern`将写操作复制多个从节点才算成功
-                ```mongodb
-                db.users.insertOne(
-                    {"_id": 10, "name": "joe"},
-                    { writeConcern: {"w": "majority", "wtimeout": 100}}
-                );
-                ```
-
-            - 结论：从落后的从节点读取数据，就必须牺牲一致性；写操作复制多个成员，就必须牺牲写入速度
-
-
-        - 在主节点插入测试数据：
-            ```monggodb
-            use test
-            // 插入数据
-            for (i=0; i<1000; i++) {db.coll.insertOne({count: i})}
-            // 查看文档插入数量
-            db.coll.countDocuments()
-            ```
-
-        - 2种方法连接从节点：
-
-            - 1.mongosh连接从节点
-                ```mongodb
-                mongosh --port 27018
-
-                // 读取报错
-                db.coll.find()
-                MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
-
-                // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
-                db.getMongo().setReadPref('secondary')
-
-                // 成功读取
-                db.coll.find()
-
-                // 关闭从节点读取
-                db.getMongo().setReadPref()
-
-                // 写入报错
-                db.coll.insertOne({"count": 1001})
-                MongoServerError: not primary
-                ```
-
-            - 2.在连接了主节点的mongosh上，连接从节点
-                ```mongodb
-                // 使用构造函数实例化connection对象
-                secondaryConn = new Mongo("localhost:27018")
-                secondaryDB = secondaryConn.getDB("test")
-
-                // 读取报错
-                secondaryDB.coll.find()
-                MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
-
-                // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
-                secondaryConn.setReadPref('secondary')
-
-                // 成功读取
-                secondaryDB.coll.find()
-
-                // 关闭从节点读取
-                secondaryConn.setReadPref()
-
-                // 写入报错
-                secondaryDB.coll.insertOne({"count": 1001})
-                MongoServerError: not primary
-                ```
-
 - 读偏好：
 
     - `primary`（默认值）：始终发送给主节点，没有主节点就报错
@@ -2748,6 +2597,160 @@ db.users.dropIndex({"name": 1})
 
     - `secondary`：如果可以接受旧数据。总是发送给从节点；如果没有从节点就报错，不会发送给主节点
     - `secondaryPreferred`：如果可以接受旧数据。总是发送给从节点；没有从节点，就发送给主节点
+
+### 启动副本集
+
+- 实验：在单机服务器上，建立一个3节点的副本集
+
+- 1.为每个节点单独创建数据目录
+    ```sh
+    mkdir -p ~/mongodb/rs{1,2,3}
+    ```
+
+- 2.启动mongod
+    ```sh
+    # 启动3个mongod
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &
+
+    # 默认情况下绑定到localhost(127.0.0.1)。--bind_ip参数可以指定ip，也可以在配置文件使用bind_ip
+    # 在192.51.100.1服务器上运行mongod
+    # 在绑定到非localhost的ip。应该启用授权控制，并指定身份验证机制
+    mongod --bind_ip localhost,192.51.100.1 --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+    ```
+
+- 3.初始化副本集
+
+    - 每个mongod都不知道其他mongod的存在。因此需要创建一个包含每个成员的配置，并发送给其中一个mongod进程，由它负责将配置传递给其他成员。
+
+    ```sh
+    # 连接其中一个mongod
+    mongosh --port 27017
+
+    // 创建配置文档
+    rsconf = {
+        _id: "mdDefGuide",
+        members: [
+            {_id:0, host: "localhost:27017"},
+            {_id:1, host: "localhost:27018"},
+            {_id:2, host: "localhost:27019"}
+        ]
+    }
+
+    // 传递rsconf实现初始化。提示符变成mdDefGuide [direct: primary] test>
+    // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
+    rs.initiate(rsconf)
+
+    // 查看副本集状态。members数组有3个成员
+    rs.status()
+    ```
+
+- 4.自动故障转移
+
+    - 关闭27017主节点
+
+        ```mongodb
+        db.adminCommand({"shutdown": 1})
+
+        // 查看副本集状态。比rs.status()函数更简洁
+        db.isMaster()
+        primary: 'localhost:27018',
+        me: 'localhost:27018',
+        ```
+
+    - 恢复27017
+
+        ```sh
+        # 重新启动27017
+        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+        # 连接27017
+        mongosh --port 27017
+
+        // 查看副本集状态。27017已经变成从节点了
+        db.isMaster()
+        secondary: true,
+        primary: 'localhost:27018',
+        me: 'localhost:27017',
+        ```
+
+- 5.开启从节点读取（默认情况下，拒绝从节点读取）：
+
+    - 开启从节点读取的问题：
+
+        - 从节点可能落后于主节点的时间通常在几毫秒之内。但这是无法保证的，由于负载、错误配置、网络等原因，从节点可能延迟几分钟、几小时、甚至几天。
+
+        - 客户端无法知道从节点的数据有多新，因此要读取最新数据，就不该在从节点读取。
+
+        - 客户端发出请求的速度可能快于复制操作的执行速度
+
+        - 除非使用`writeConcern`将写操作复制多个从节点才算成功
+            ```mongodb
+            db.users.insertOne(
+                {"_id": 10, "name": "joe"},
+                { writeConcern: {"w": "majority", "wtimeout": 100}}
+            );
+            ```
+
+        - 结论：从落后的从节点读取数据，就必须牺牲一致性；写操作复制多个成员，就必须牺牲写入速度
+
+
+    - 在主节点插入测试数据：
+        ```monggodb
+        use test
+        // 插入数据
+        for (i=0; i<1000; i++) {db.coll.insertOne({count: i})}
+        // 查看文档插入数量
+        db.coll.countDocuments()
+        ```
+
+    - 2种方法连接从节点：
+
+        - 1.mongosh连接从节点
+            ```mongodb
+            mongosh --port 27018
+
+            // 读取报错
+            db.coll.find()
+            MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
+
+            // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
+            db.getMongo().setReadPref('secondary')
+
+            // 成功读取
+            db.coll.find()
+
+            // 关闭从节点读取
+            db.getMongo().setReadPref()
+
+            // 写入报错
+            db.coll.insertOne({"count": 1001})
+            MongoServerError: not primary
+            ```
+
+        - 2.在连接了主节点的mongosh上，连接从节点
+            ```mongodb
+            // 使用构造函数实例化connection对象
+            secondaryConn = new Mongo("localhost:27018")
+            secondaryDB = secondaryConn.getDB("test")
+
+            // 读取报错
+            secondaryDB.coll.find()
+            MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
+
+            // 开启从节点读取。新版setSlaveOk()已经被抛弃，使用setReadPref()代替
+            secondaryConn.setReadPref('secondary')
+
+            // 成功读取
+            secondaryDB.coll.find()
+
+            // 关闭从节点读取
+            secondaryConn.setReadPref()
+
+            // 写入报错
+            secondaryDB.coll.insertOne({"count": 1001})
+            MongoServerError: not primary
+            ```
 
 ### 更改副本集配置：优先级、隐藏成员、索引复制、仲裁者
 
@@ -3429,7 +3432,1022 @@ db.users.dropIndex({"name": 1})
 
     - 最佳解决方法：分片
 
-## 分片
+## 分片（shard)
+
+- 分片类似于集群
+    - 可以使用性能较弱的机器实现负载
+    - 可以基于地理位置拆分文档，让靠近它们的客户端更快的访问
+
+- config配置服务器：将元数据持久化。
+    - 如果元数据丢失，分片将无法使用
+        - 因此在生产环境中应该配置3台单独的物理机器，最好是跨地理位置分布
+        - 机器最好是有充分的cpu和网络资源，存储只需少量资源
+
+    - `--configsvr`选项：设置为config配置服务器。
+
+    - 除了`config`和`admin`外，不会向其他数据库写入数据
+        - `config`：保存分片集群的元数据，当数据块迁移、拆分，就会写入`config`数据库
+        - `admin`：身份验证和授权相关
+
+    - config配置服务器写入和读取时
+        - 写入：mongodb会使用`majority`的`writeConcern`级别
+        - 读取：mongodb会使用`majority`的`readConcern`级别
+        - 这确保在分片元数据一致性。
+            - 元数据在不发生回滚时，才会被提交到config配置服务器的副本集
+            - 只会读取不受config配置服务器故障影响的元数据
+
+- mongos：路由进程，负责将客户端的操作路由到具体的分片上。因此它需要从`config配置服务器`获取元数据（分片的情况）
+
+    - 默认端口为27017
+
+    - 应该启动一定数量的mongos进程，并尽量放在靠近所有分片的位置
+        - 可以提高访问多个分片的查询性能
+        - 确保高可用：应该创建2个mongos进程
+        - 如果运行数十上百个mongos进程，会争夺config配置服务器资源。应该使用一个小型路由节点池
+
+- 分片：
+    - 添加分片要确保副本集的名字不同
+    - 添加分片还要确保副本集相互之间没有同名数据库
+        - 如果有同名mongos会拒绝添加到分片中
+
+- 块与分片
+
+    - 会将集合才分成多个块块，对于大型集合来说可能需要几个小时
+        ```mongodb
+        sh.shardCollection("crm.users", {"name": 1})
+        ```
+
+    - 一个文档总是仅属于一个块。因此不能使用数组字段作为片键——因为数组会创建多个索引项
+
+    - mongodb会用一个较小的表来维护块与分片的映射，保存在`config`数据库的`chunks`集合中
+
+        - 如果假设片键为{"age": 1}
+            - 某个块就可能是在age字段3和17之间的文档组成
+            - 假设mognos查询{"age": 5}，就会将查询路由到该块的分片上
+
+    - 写操作会改变一个块中的文档数量和大小
+        - 删除会使块包含更少的文档
+        - 插入会使块包含更多的文档
+        - 拆分：
+            - 块增长到一定大小，会拆分成2个更小的块
+
+                - 例子：有一个`3 <= "age" < 17`的块被拆分时，会分成`3 <= "age" < 12`和`12 <= "age" < 17`。12被成为拆分点（split point）
+
+                - 步骤：
+
+                    - 1.分片的主节点mongod会向config配置服务器请求`全局块大小配置值`
+                    - 2.mongod收到`全局块大小配置值`向均衡器发送拆分请求；均衡器会进行数据迁移
+                    - 3.mongod将拆分后的块的元数据，更新到config配置服务器
+
+                - 如果在拆分时，一个配置服务器停止运行，那么mongod将无法更新元数据，也就无法拆分
+                    - 拆分风暴：mongod不断收到对一个块的写操作，则会不断尝试拆分，并失败（配置服务器没有正常运行）。这些拆分请求会拖慢mongod
+
+
+            - 然而拆分方法有限，可能会出现一个块很大了，但无法找到拆分点。因此片键值很重要
+                ```mongodb
+                {"age": 12, "name": "joe"}
+                {"age": 12, "name": "joe1"}
+                {"age": 12, "name": "joe2"}
+                {"age": 12, "name": "joe3"}
+                ...
+                ```
+
+    - 复合片键：假设有一个复合片键`{"name": 1, "age": 1}`
+        - 如果查询是name或name和age的文档，很容易找到对应的块
+        - 如果说age，就需要检查大部分甚至所有的块。因此应使用`{"age": 1, "name": 1}`作为复合片键
+
+
+- 均衡器：负责数据迁移
+
+    - 是config配置服务器的主节点的后台进程：监视每个分片的块数量，只要块达到阈值大小，才会被激活
+
+    - 定期检查分片之间是否存在不均衡，如果存在就迁移
+
+        - mongodb3.4之后，可以并发执行迁移，并发的最大数量是分片总数的一半
+
+    - 达到阈值时，会开始对块进行迁移：从负载较大的分片中选一个块，并询问分片是否在迁移之前进行拆分，拆分完成后，就会将块迁移到较少块的机器上
+        - 这对客户端不可见
+            - 1.mongos会将所有读写请求路由到旧的块上
+            - 2.mongos会收到一个错误（日志中可能会有unable to setShardVersion），然后从config配置服务器查找数据的新位置，并更新块分布表
+                - 如果config配置服务器不可用，无法获取新块的位置，就会向客户端返回一个错误。
+            - 3.mongos重新发送请求，成功检索数据后返回客户端
+
+    - 如果迁移过程影响性能，可以在`config.settings`集合中指定一个时间窗口：只允许在下午1点到4点执行均衡
+
+        ```mongodb
+        // 开启均衡器
+        sh.setBalancerState(true)
+
+        // 设置activeWindow字段
+        use config
+        db.settings.update(
+            {_id: "balancer"},
+            {$set: { activeWindow: { start: "13:00", stop: "16:00" }}},
+            {upsert: true}
+        )
+        ```
+
+- 变更流（change stream）：允许应用追踪数据库中数据的实时变更
+    - mongodb3.6之后：只能通过追踪`oplog`实现，是一个复杂且容易出错的操作
+    - 变更流可以为一个集合、一组集合、一个数据库、整个集群的所有数据的变更提供订阅机制
+        - 使用了聚合框架：允许用户自定义过滤
+    - 所有变更流操作，都必须针对mongos发出
+    - 如果开启变更流的分片，并运行带有`mulit:true`的集合的更新操作，会出现向孤儿文档发送通知
+    - 如果一个分片被删除，那么打开的变更流游标被关闭，并且无法恢复
+
+### 启动分片
+
+- `ShardingTest()`的创建分片的方式，已经被抛弃
+
+- 实验：通过配置文件启动分片：
+
+- 所有配置文件在`mongodb/shard`目录下的`start.conf`
+
+- 启动顺序：config配置服务器->所有分片->mongos
+    - 重启分片的顺序也一样，只是不需要初始化
+    - 如果不按照顺序启动，可能会出现内部通信问题
+
+- 1.启动config配置服务器：37017、37018、37019
+    ```sh
+    # 启动config配置服务器
+    mongod --config ~/mongodb/shard/config-primary/start.conf &
+    mongod --config ~/mongodb/shard/config-secondary1/start.conf &
+    mongod --config ~/mongodb/shard/config-secondary2/start.conf &
+
+    # 连接
+    mongosh --port 37017
+    ```
+
+    ```mongosh
+    // 初始化副本集
+    // 创建配置文档。_id名字要与配置文件的replSetName名字一样
+    rsconf = {
+        _id: "rsconfig",
+        members: [
+            {_id:0, host: "localhost:37017"},
+            {_id:1, host: "localhost:37018"},
+            {_id:2, host: "localhost:37019"}
+        ]
+    }
+
+    // 传递rsconf实现初始化。提示符变成rsconfig [direct: primary] test>
+    // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
+    rs.initiate(rsconf)
+
+    // 查看副本集状态。members数组有3个成员
+    rs.status()
+    ```
+
+- 2.启动分片1：27017、27018、27019
+
+    ```sh
+    # 启动分片1
+    mongod --config ~/mongodb/shard/shard1-primary/start.conf &
+    mongod --config ~/mongodb/shard/shard1-secondary1/start.conf &
+    mongod --config ~/mongodb/shard/shard1-secondary2/start.conf &
+
+    # 连接
+    mongosh --port 27017
+    ```
+
+    ```mongosh
+    // 初始化副本集
+    // 创建配置文档。_id名字要与配置文件的replSetName名字一样
+    rsconf = {
+        _id: "rs0",
+        members: [
+            {_id:0, host: "localhost:27017"},
+            {_id:1, host: "localhost:27018"},
+            {_id:2, host: "localhost:27019"}
+        ]
+    }
+
+    // 传递rsconf实现初始化。提示符变成rs0 [direct: primary] test>
+    // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
+    rs.initiate(rsconf)
+
+    // 查看副本集状态。members数组有3个成员
+    rs.status()
+    ```
+
+- 3.启动分片2：27020、27021、27022
+
+    ```sh
+    # 启动分片2
+    mongod --config ~/mongodb/shard/shard2-primary/start.conf &
+    mongod --config ~/mongodb/shard/shard2-secondary1/start.conf &
+    mongod --config ~/mongodb/shard/shard2-secondary2/start.conf &
+
+    # 连接
+    mongosh --port 27020
+    ```
+
+    ```mongosh
+    // 初始化副本集
+    // 创建配置文档。_id名字要与配置文件的replSetName名字一样
+    rsconf = {
+        _id: "rs1",
+        members: [
+            {_id:0, host: "localhost:27020"},
+            {_id:1, host: "localhost:27021"},
+            {_id:2, host: "localhost:27022"}
+        ]
+    }
+
+    // 传递rsconf实现初始化。提示符变成rs1 [direct: primary] test>
+    // 应该总是使用rs.initiate()初始化，否则mongodb会尝试自动生成一个单成员的副本集配置。
+    rs.initiate(rsconf)
+
+    // 查看副本集状态。members数组有3个成员
+    rs.status()
+    ```
+
+- 4.启动mongos路由进程：不需要指定数据目录
+    ```sh
+    # 启动mongos路由进程。记得是mongos命令，而不是mongod，不然会报错Unrecognized option: sharding.configDB
+    mongos --config ~/mongodb/shard/mongos/start.conf &
+
+    # 连接mongos
+    mongosh --port 47017
+    ```
+
+    ```mongodb
+    // 初始化mongos
+    // 将副本集加入到分片
+    sh.addShard("rs0/localhost:27017")
+    sh.addShard("rs1/localhost:27020")
+
+    // 查看分片信息
+    sh.status()
+    //输出
+    shardingVersion
+    { _id: 1, clusterId: ObjectId("656c82ba589edf4797d528fc") }
+    ---
+    shards //能看到有两个成员。此时开未开启分片
+    [
+      {
+        _id: 'rs0',
+        host: 'rs0/localhost:27017,localhost:27018,localhost:27019',
+        state: 1,
+        topologyTime: Timestamp({ t: 1701611067, i: 2 })
+      },
+      {
+        _id: 'rs1',
+        host: 'rs1/localhost:27020,localhost:27021,localhost:27022',
+        state: 1,
+        topologyTime: Timestamp({ t: 1701611073, i: 2 })
+      }
+    ]
+    ---
+    active mongoses
+    [ { '7.0.4': 1 } ]
+    ---
+    autosplit
+    { 'Currently enabled': 'yes' }
+    ---
+    balancer // 默认开启均衡器
+    {
+      'Currently enabled': 'yes',
+      'Currently running': 'no',
+      'Failed balancer rounds in last 5 attempts': 0,
+      'Migration Results for the last 24 hours': 'No recent migrations'
+    }
+    ---
+    databases
+    [
+      {
+        database: { _id: 'config', primary: 'config', partitioned: true },
+        collections: {}
+      }
+    ]
+    ```
+
+- 5.测试
+    ```mongodb
+    // 创建crm数据库
+    use crm
+    // 创建users集合
+    db.users.insertOne({"_id": 0, "name": "joe"})
+    // 查看分片。
+    sh.status()
+      {
+        database: {
+          _id: 'crm',
+          primary: 'rs1', // 表示crm数据库所有未分片的集合保存在rs1副本集上
+          partitioned: false, // 此时还没有开启分片功能
+          version: {
+            uuid: new UUID("6ed56c4e-c051-4e72-bdb7-86f077e92814"),
+            timestamp: Timestamp({ t: 1701611557, i: 1 }),
+            lastMod: 1
+          }
+        },
+        collections: {}
+      }
+
+    # 进入rs1
+    mongosh --port 27020
+
+    // 选择crm数据库
+    use crm
+
+    // 读取会报错。报错信息和在副本集的从节点读取一样
+    db.users.find()
+    MongoServerError: not primary and secondaryOk=false - consider using db.getMongo().setReadPref() or readPreference in the connection string
+
+    // 开启从节点读取
+    db.getMongo().setReadPref('secondary')
+
+    // 再次读取
+    db.users.find()
+    [ { _id: 0, name: 'joe' } ]
+
+    // 由于没有开启分片功能的crm数据库保存在rs1；如果进入rs0，开启从节点读取，执行db.users.find()，什么也读取不到
+    ```
+
+- 6.开启分片功能
+    ```mongodb
+    // 回到mongos
+    // 插入更多数据
+    for (var i=1; i<10000; i++) {
+        db.users.insertOne({'_id': i, "name": "joe"+i});
+    }
+
+    // 对crm数据库开启分片功能
+    sh.enableSharding("crm")
+
+    // 分片需要选择一个片键，需要创建索引
+    db.users.ensureIndex({"name": 1})
+    // 按片键分片存储
+    sh.shardCollection("crm.users", {"name": 1})
+    // partitioned依然没有true??分片之前是单独的块，分片之后会被分为多个块
+    sh.status()
+      {
+        database: {
+          _id: 'crm',
+          primary: 'rs1',
+          partitioned: false,
+          version: {
+            uuid: new UUID("6ed56c4e-c051-4e72-bdb7-86f077e92814"),
+            timestamp: Timestamp({ t: 1701611557, i: 1 }),
+            lastMod: 1
+          }
+        },
+        collections: {
+          'crm.users': {
+            shardKey: { name: 1 },
+            unique: false,
+            balancing: true,
+            chunkMetadata: [ { shard: 'rs1', nChunks: 1 } ],
+            chunks: [
+              { min: { name: MinKey() }, max: { name: MaxKey() }, 'on shard': 'rs1', 'last modified': Timestamp({ t: 1, i: 0 }) }
+            ],
+            tags: []
+          }
+        }
+      },
+
+    // 查询name字段作为条件的文档。只有一个shardName
+    db.users.find({"name": "joe10"}).explain()
+    // 查询所有文档。有两个shardName
+    db.users.find().explain()
+    ```
+
+- 7.关闭分片
+    ```mongodb
+    // 关闭分片没有捷径，要连接所有节点执行以下命令。要先关闭secondary节点，在关闭primary
+    use admin
+    db.shutdownServer()
+    ```
+
+### 副本集转换为分片
+
+- 实验：有一个名为mdDefGuide，地址为localhost:27017、localhost:27018、localhost:27019的副本集
+
+- 需要主节点和从节点都需要使用`--shardsvr`选项全部重新启动
+
+```sh
+# 先关闭从节点。我这里是27018和27019
+mongosh --port 27018
+db.shutdownServer()
+
+mongosh --port 27019
+db.shutdownServer()
+
+# 加入--shardsvr选项后，重新启动从节点
+mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 --shardsvr &
+mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 --shardsvr &
+
+# 再关闭主节点。我这里是27017
+mongosh --port 27017
+rs.stepDown()
+db.shutdownServer()
+
+# 加入--shardsvr选项后，重新启动主节点
+mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 --shardsvr &
+```
+
+- 启动config配置服务器（我这里使用上一个实验的配置文件。如果像上一个实验那样启动过，则需要删除data目录里的数据）
+
+    - 所有配置文件在`mongodb/shard`目录下的`start.conf`
+
+```sh
+# 启动config配置服务器
+mongod --config ~/mongodb/shard/config-primary/start.conf &
+mongod --config ~/mongodb/shard/config-secondary1/start.conf &
+mongod --config ~/mongodb/shard/config-secondary2/start.conf &
+
+// 初始化副本集
+mongosh --port 37017
+rsconf = {
+    _id: "rsconfig",
+    members: [
+        {_id:0, host: "localhost:37017"},
+        {_id:1, host: "localhost:37018"},
+        {_id:2, host: "localhost:37019"}
+    ]
+}
+rs.initiate(rsconf)
+rs.status()
+```
+
+- 启动mongos路由进程
+    - 添加分片后，客户端的请求需要发送到mongos而不是副本集
+```sh
+# 启动mongos路由进程。记得是mongos命令，而不是mongod，不然会报错Unrecognized option: sharding.configDB
+mongos --config ~/mongodb/shard/mongos/start.conf &
+
+# 连接mongos
+mongosh --port 47017
+
+// 初始化mongos
+// 将mdDefGuide副本集加入到分片
+sh.addShard("mdDefGuide/localhost:27017")
+
+// 查看分片信息
+sh.status()
+```
+
+### 选择片键
+
+- 片键：对集合进行分片时，需要对一两个字段进行数据拆分，这个键（这些键）就是片键
+
+- 对于分片的每个集合，首先要回答以下问题
+
+    - 多少个分片？
+        - 3个分片比1000个分片的有更大灵活性
+        - 集群的分片不断增长，不应该使用会触发所有分片的查询
+
+    - 分片是为了减少读写延迟吗？一个写操作是20毫秒，但你希望是10毫秒
+    - 分片是为了提高吞吐量吗？20毫秒完成1000次写操作，但你希望是20毫秒完成5000次写操作
+    - 分片是为了增加系统资源吗？增加更多的ram
+
+- 片键和索引概念是相似的：你的片键可能就是你最常使用的索引（或者索引的一些变体）
+
+- 片键的限制：
+
+    - 不能是数组。如果是`sh.shardCollection()`会失败。
+    - 特殊类型不能作为片键：地理空间索引
+    - 插入文档后，片键的值可能会被修改，除非是不可变的如`_id`字段。在mongodb4.2之前不能修改文档的片键值
+
+- 片键的基数：和索引一样，基数越高，分片性能越好。
+    - 如果logLevel只有DEBUG、WARN、ERROR三个值，则mongodb无法分出超过三个以上的块
+        - 解决方法：可以使用该键和另一个拥有多样值的键组成复合片键。——比如loglevel和timestamp。总之键的组合要有很高的基数
+
+- 单独的mongod服务器，执行升序写操作时效率最高。分片则与之相反，写操作分发在集群中时，分片效率最高
+
+- 升序片键：类似于`data`或`objectid类型的_id`——随着时间稳步增长的字段。
+
+    - 每次新插入的文档，都会出现在最大块（包含$maxKey键）
+    - 所有写操作都会路由到保存最大块的分片上。随着数据的增长，块会被拆分
+
+    - mongodb很难保持块的均衡：所有块都是由一个分片创建的，需要不断将块移动到其他分片上
+        - mongodb4.2之后，自动拆分功能被移动到分片的主节点。均衡器会决定在哪个分片中放置顶部块。有助于避免一个分片创建所有新块
+
+- 随机分发的片键：可以是用户名、电子邮件、UUID、MD5哈希值等（没有可识别模式的键）
+    - 由于写操作是随即分发：分片应该以大致相同的速度增长，从而减少进行迁移操作的数量
+    - 哈希片键：如果不打算执行范围查询，哈希片键就是一个很好的选择
+        - 不能使用`unique`选项；不能使用数组字段；浮点型会在哈希前取整（1和1.9会被哈希为同样的值）
+        - 对于有一个不存在的集合创建哈希片键，`sh.shardCollection()`会立即创建一些空的块分发到分片集群中。
+        ```mongodb
+        // 创建哈希索引
+        db.users.createIndex({"name": "hashed"})
+
+        // 对集合进行分片
+        sh.shardCollection("app.users", {"name": "hashed"})
+        ```
+
+- 基于范围的片键：ip、经纬度、地址。在mongodb4.0.3之后，可以定义区域
+
+    | 函数                     | 说明                                 |
+    |--------------------------|--------------------------------------|
+    | sh.addShardToZone()      | 通过对分片添加标签，从而定义分区范围 |
+    | sh.removeShardFromZone() | 取消标签                             |
+    | sh.updateZoneKeyRange()  | 将集合分发到标签所在的分区           |
+    | sh.removeRangeFromZone() | 移除某个集合的范围                     |
+
+    - 均衡器移动块时，会尝试将这些访问的块移动到指定分片上。但不是立即完成。未被划分区域的块仍会正常移动
+
+        - `sh.updateZoneKeyRange()`不会立即生效，而是给均衡器一条命令。运行时，可以将集合移动到这些目标分片。
+
+    - 例子：基于ip范围的分片
+
+        ```mongodb
+        // 对于USPS美国邮政局的ip出现在shard0000分片上
+        sh.addShardToZone("shard0000", "USPS")
+        // 对于苹果公司的ip出现在shard0000分片和shard0002上
+        sh.addShardToZone("shard0000", "Apple")
+        sh.addShardToZone("shard0002", "Apple")
+
+
+        // 56.*.*.*为USPS美国邮政局ip段
+        sh.updateZoneKeyRange("test.ips", {"ip": "056.000.000.000"}, {"ip": "057.000.000.000", "USPS"})
+
+        // 17.*.*.*为苹果公司ip段
+        sh.updateZoneKeyRange("test.ips", {"ip": "017.000.000.000"}, {"ip": "018.000.000.000", "Apple"})
+        ```
+
+    - 消防水管策略：一些服务器的性能比其他服务器更强大
+
+        ```mongodb
+        // shard0000性能10倍于其他机器。创建分区
+        sh.addShardToZone("shard0000", "10x")
+
+        // 升序键的当前值到无穷大的块，始终固定到"10x"的分片上
+        sh.updateZoneKeyRange("test.users", {"_id": ObjectId()}, {"_id": MaxKey}, "10x")
+        ```
+
+        - 当前值到无穷大会固定到指定分片上。解决方法：可以设置一个定时任务，每天更新一次键值范围
+
+            ```mongodb
+            use config
+            var zone = db.tags.findOne({"ns": "<dbName.collName>", "max": {"<shardKey>", MaxKey}})
+            zone.min.<shardKey> = ObjectId()
+            db.tags.save(zone)
+            ```
+
+        - 该策略的缺点是：需要一些变更，才能进行扩展。如果最强大的服务器无法再处理写入，则没有简单的方法可以在这台服务器和另一台服务器之间分配负载
+
+    - 希望是数据价值高（实时集合），而不是数据价值低（日志集合）用于高性能服务器上
+
+        - 例子1：划分高性能和低性能分区
+
+            ```mongodb
+            sh.addShardToZone("shard0000", "high")
+            // shard0001 - no zone
+            // shard0002 - no zone
+            // shard0003 - no zone
+            sh.addShardToZone("shard0004", "low")
+            sh.addShardToZone("shard0005", "low")
+
+            // 将不同数据库集合分配个不同的分片
+            sh.updateZoneKeyRange("super.import", {"<shardKey>": MinKey}, {"<shardKey>": MaxKey}, "high")
+            sh.updateZoneKeyRange("some.logs", {"<shardKey>": MinKey}, {"<shardKey>": MaxKey}, "low")
+            ```
+
+        - 例子2：对非高性能分片分区
+
+            ```mongodb
+            // 只希望不放在高性能分区上，而不在乎放在哪个分区上
+            sh.addShardToZone("shard0001", "whatever")
+            sh.addShardToZone("shard0002", "whatever")
+            sh.addShardToZone("shard0003", "whatever")
+            sh.addShardToZone("shard0004", "whatever")
+            sh.addShardToZone("shard0005", "whatever")
+
+            // 随机分发到非高性能的5个分片上
+            sh.updateZoneKeyRange("normal.coll", {"<shardKey>": Minkey}, {"<shardKey": MaxKey}, "whatever")
+
+            // 移除shard0005的标签
+            sh.removeShardFromZone("shard0005", "whatever")
+
+            // 参数必须与sh.updateZoneKeyRange()一样
+            sh.removeRangeFromZone("normal.coll", {"<shardKey>": Minkey}, {"<shardKey": MaxKey}, "whatever")
+            ```
+
+- 热点块和复合片键
+
+    - 最好每个分片都有几个热点，写操作可以在分片集群中均匀分发，并且同一个分片的写操作是递增。实现这一点需要：复合片键
+
+    - 复合片键：
+
+        - 第一个值：随机值，基数较少。可以将每个值想象为1个块
+        - 第二个值：升序键。在块的内部，值总是在增加
+
+        - 可以想象为每个块都是1个升序文档的栈，每个栈都是递增的，直到块被拆分。一旦某个块被拆分，就只有一个新的块是热点块，其他块实际上已经死亡，不在增长。
+            - 如果栈均匀的分发到各个分片上，写操作也将均匀分发
+
+        - 我们希望每个分片有几个热点块，但不要太多。如果有1个分片有1000个热点块的话，就等同于随机写了
+
+        - 添加新的块不会有任何写操作，因为没有热点块在这个分片上面
+
+### 管理
+
+#### 查看基本分片信息
+
+- 查看分片信息
+
+    ```mongodb
+    // sh.status()从config数据库收集。如果块的数量比较多，会统计块总数的信息，而不是打印每个块。
+    sh.status()
+
+    // 打印所有块
+    sh.status(true)
+    ```
+
+- 查看配置信息
+
+    - 不要直接连接config配置服务器，避免以外更改或删除数据
+
+    - 应该通过mongos连接到config数据库。就算config数据库被意外删除，也可以与config配置服务保持同步
+
+    - 通常来说不应该更改config数据库的任何数据；如果修改了，则需要重启所有mongos才能看到效果
+
+    - 默认情况下，数据库的新集合都会在数据库对应的主分片上创建
+
+    ```mongodb
+    // 先进入config数据库
+    use config
+
+    // 查看所有分片（config.shards）
+    db.shards.find()
+
+    // 查看所有数据库（config.databases）。包括分片数据库和非分片数据库
+    db.databases.find()
+    ```
+
+- 集合中每个块的记录
+
+    - `sh.status()`会通过`config.chunks`收集它大部分信息
+
+    ```mongodb
+    db.chunks.find()
+
+    // 只输出1行
+    db.chunks.find().skip(1).limit(1).pretty()
+    ```
+
+    | db.chunks.find()中有用的字段 | 说明                                                 |
+    |------------------------------|------------------------------------------------------|
+    | lastmod                      | 数据库的版本                                         |
+    | Timestamp                    | 第一部分：块迁移到新分片的次数；第二部分：拆分的次数 |
+    | lastmodEpoch                 | 集合创建的时间                                       |
+
+- 查看已经发生的拆分和迁移
+
+    - 拆分：
+
+        ```mongodb
+        // 查看拆分的记录
+        db.changelog.find({what: "split"})
+        ```
+
+        - `details`字段：提供了原始文档和拆分后的内容信息
+
+    - 迁移：
+
+        - from分片：
+
+            ```mongodb
+            // from
+            db.changelog.find({what: "moveChunk.from"})
+              {
+                _id: 'tz-pc:27021-2023-12-08T16:50:00.186+08:00-6572d8b8e2e37f6f638e9361',
+                server: 'tz-pc:27021',
+                shard: 'rs1',
+                clientAddr: '',
+                time: ISODate("2023-12-08T08:50:00.186Z"),
+                what: 'moveChunk.from',
+                ns: 'crm.users',
+                details: {
+                  'step 1 of 6': 0,
+                  'step 2 of 6': 2,
+                  'step 3 of 6': 61,
+                  'step 4 of 6': 139,
+                  'step 5 of 6': 35,
+                  'step 6 of 6': 36,
+                  min: { name: MinKey() },
+                  max: { name: MaxKey() },
+                  to: 'rs0',
+                  from: 'rs1',
+                  note: 'success'
+                }
+              },
+            ```
+
+            - 当"from"分片收到mongos的`moveChunk`命令时的步骤
+                - 1.检查命令参数
+                - 2.向config配置服务器申请一把分布式锁，以进入迁移过程
+                - 3.尝试连接到"to"分片
+                - 4.复制数据
+                - 5.与"to"分片和config配置服务器协调，确认迁移是否成功
+
+            - `details`字段的每一步都是计时：`stepN of N`表示每一步所花的时间（单位：毫秒）
+
+                - "to"分片和from分片必须从`step4 of 6`开始通信：每个分片会直接连接到另一个分片以及config配置服务器通信，执行迁移
+
+                - 如果"from"分片在最后几步网络连接不稳定，那么会处于一种无法撤销迁移、也无法完成迁移的状态。在这种状态下，mongod会关闭
+
+        - to分片：
+
+            ```mongodb
+            // to。
+            db.changelog.find({what: "moveChunk.to"})
+              {
+                _id: 'tz-pc:27019-2023-12-08T16:50:00.176+08:00-6572d8b88b9cdd671843e061',
+                server: 'tz-pc:27019',
+                shard: 'rs0',
+                clientAddr: '',
+                time: ISODate("2023-12-08T08:50:00.176Z"),
+                what: 'moveChunk.to',
+                ns: 'crm.users',
+                details: {
+                  'step 1 of 8': 2,
+                  'step 2 of 8': 15,
+                  'step 3 of 8': 14,
+                  'step 4 of 8': 105,
+                  'step 5 of 8': 0,
+                  'step 6 of 8': 10,
+                  'step 7 of 8': 0,
+                  'step 8 of 8': 51,
+                  min: { name: MinKey() },
+                  max: { name: MaxKey() },
+                  to: 'rs0',
+                  from: 'rs1',
+                  note: 'success'
+                }
+
+            // 比from之多了这2行
+                  to: 'rs0',
+                  from: 'rs1',
+            ```
+
+            - `details`字段的每一步都是计时：`stepN of N`表示每一步所花的时间（单位：毫秒）
+                - 与from一样
+
+            - 当"to"分片收到"from"分片发来的命令时的步骤
+
+                - 1.迁移索引
+                    - 如果这个分片以前从未保存过迁移集合的块：需要知道都索引了那些字段
+                    - 如果这个分片以前保存过迁移集合的块：忽略此步骤
+
+                - 2.删除块范围内的任何现有数据。
+                    - 可能会有从失败的迁移或恢复过程遗留下来的数据，不希望这些数据干扰当前数据
+
+                - 3.复制过程：将数据块中的所有文档复制到"to"分片
+
+                - 4.执行在复制过程，出现的对这些文档的操作
+
+                - 5.等待"to"分片将新迁移的数据复制到大多数服务器上
+                - 6.更新元数据，表明位于"to"分片上
+
+- 查看均衡器设置
+    ```mongodb
+    db.settings.find()
+    [
+      { _id: 'balancer', mode: 'off', stopped: true },
+      { _id: 'automerge', enabled: false }
+    ]
+    ```
+
+#### 网络信息
+
+```mongodb
+// 获取连接统计
+// connPoolStats没有使用锁，计数不是实时的
+db.adminCommand({"connPoolStats": 1})
+```
+
+|字段|说明|
+|----------------------|---------------------------------------------------------------------------------------------------------------|
+| totalAvailable       | mongos和monod实例向分片集群或副本集其他成员的**可用传出连接总数**                                             |
+| totalCreated         | mongos和monod实例向分片集群或副本集其他成员的**创建的传出连接总数**                                           |
+| totalInUse           | mongos和monod实例向**正在使用的**分片集群或副本集其他成员的**传出连接总数**                                   |
+| totalRefreshing      | mongos和monod实例向**正在刷新的**分片集群或副本集其他成员的**传出连接总数**                                   |
+| numClientConnections | mongos和monod实例向分片集群或副本集其他成员的**活动并保存的传出同步连接数量**                                 |
+| numAScopedConnection | mongos和monod实例向分片集群或副本集其他成员的**活动并保存的传出作用域同步数量**                               |
+| polls                | 按连接池分组的连接统计信息（正在使用/可用/已创建/刷新）。基于DBClient的连接池和基于NetworkInterfaceTL的连接池 |
+| hosts                | 按主机分株的连接统计信息（正在使用/可用/已创建/刷新）mongod和monos实例与分片或副本集每个成员的之间的连接      |
+
+
+- 限制连接数量
+
+    - 默认情况下mongos和mongod一样接受65536个连接
+    - 因此如果有5个mongos进程，每个与10000个客户端连接，那么mongos会试图创建50000个连接到分片
+
+    - 设置连接最大数的命令行：`mongos --maxConns`
+        - maxConns只会阻止mongos创建超过这个数量的连接。达到数量后会阻塞请求，等待连接被释放
+
+    - 一个分片可用处理的单个mongos最大连接数公式：`maxConns = maxConnsPrimary - (numMembersPerReplicaSet * 3) - (other * 3) / numMongosProcesses`
+        - `maxConnsPrimary`：主节点最大连接数。通常设置20000
+        - `(numMembersPerReplicaSet * 3)`：主节点与每个从节点创建的一个连接，而每个从节点会主节点创建2个连接，总共3个连接
+        - `(other * 3)`：连接mongods各种进程数量，比如监视或备份的代理、shell的直接连接（用于管理），或者为了迁移而连接到其他分片的连接
+        - `numMongosProcesses`：分片集群中的mongos总数
+
+        - 读者著：只有一个mongos和一个mongosh的计算：20000 - (3 * 3) - (1 * 3) / 1 = 19988
+
+    - 当一个mongodb实例完全退出时，会关闭所有连接。
+    - 如果实例非正常下线（断电、崩溃、网络等）它可能不会关闭所有套接字。
+        - 分片集群中其他服务器，可能会认为连接是正常的，会得到一个错误并刷新连接。
+            - 连接数少时，刷新过程会很快。如果有数千个连接必须1个接着1个刷新时，可能会出现大量错误
+            - 解决方法：重新启动陷入重连风暴的进程
+
+#### 服务器管理
+
+- 添加服务器
+    ```mongodb
+    // 将副本集加入到分片
+    sh.addShard("rs0/localhost:27017")
+    ```
+
+- 修改分片上的成员，需要连接给分片的主节点（而不是通过mongos），并重新配置副本集。
+    - 集群配置会监测到变更并自动更新config.shards。不要手动修改config.shards
+
+- 删除服务器
+
+    - 不应该从集群中删除分片。如果添加了过多的分片，最好让系统增长到这些分片的体量，而不是先删除分片，然后等需要时再添加
+
+    - 不过，必要情况下，可以对分片进行删除
+        - 确保均衡器是打开的：均衡器的任务是把要删除分片上的所有数据移动到其他分片上（排空drainning）
+
+    ```mongodb
+    // removeShard命令会将该分片上的所有块，移动到其他分片上
+    // 如果有很多块或较大的块，排空需要很长时间
+    db.adminCommand({"removeShard": "rs0"})
+
+    // 再一次运行可以查看移动进度
+    db.adminCommand({"removeShard": "rs0"})
+    {
+      msg: 'draining ongoing',
+      state: 'ongoing', // 正在进行移动
+      remaining: { chunks: Long("3"), dbs: Long("3"), jumboChunks: Long("0") },
+      note: 'you need to drop or movePrimary these databases',
+      dbsToMove: [ 'test', 'apple', 'app' ],
+      ok: 1,
+      '$clusterTime': {
+        clusterTime: Timestamp({ t: 1702038842, i: 1 }),
+        signature: {
+          hash: Binary.createFromBase64("AAAAAAAAAAAAAAAAAAAAAAAAAAA=", 0),
+          keyId: Long("0")
+        }
+      },
+      operationTime: Timestamp({ t: 1702038842, i: 1 })
+    }
+    ```
+
+    - 如果所有块移动后，removeShard有dbsToMove字段列出的数据库。完成分片删除，就需要删除这些数据库或者将数据库移动到新的分片
+
+        ```mongodb
+        // movePrimary命令移动dbsToMove字段的数据库到rs1
+        db.adminCommand({"movePrimary": "crm", "to": "rs1"})
+        db.adminCommand({"movePrimary": "apple", "to": "rs1"})
+        db.adminCommand({"movePrimary": "app", "to": "rs1"})
+
+        // 再一次运行removeShard。记得开启均衡器，不然无法完成
+        db.adminCommand({"removeShard": "rs0"})
+        {
+          msg: 'removeshard completed successfully',
+          state: 'completed', // 已经完成。
+          shard: 'rs0',
+          ok: 1,
+          '$clusterTime': {
+            clusterTime: Timestamp({ t: 1702039713, i: 4 }),
+            signature: {
+              hash: Binary.createFromBase64("AAAAAAAAAAAAAAAAAAAAAAAAAAA=", 0),
+              keyId: Long("0")
+            }
+          },
+          operationTime: Timestamp({ t: 1702039713, i: 4 })
+        }
+        ```
+
+- 刷新配置：有时候mongos过旧，或找不到应有数据
+    ```mongodb
+    // 刷新配置。然后需要重启mongos或mongod进程才能清除所有缓存数据
+    db.adminCommand({"flushRouterConfig": 1})
+    ```
+
+#### 数据块管理
+
+- 手动分片：自己控制分发到哪里。需要关闭均衡器
+
+    - 除非遇到特殊情况，否则应该使用自动分片而不是手动分片。
+
+    - 不要在均衡器开启的情况下，进行手动分片
+
+        - 如果同时使用存在的问题：
+            - 有shardA和shardB两个分片，每个分片都有500个块。
+            - shardA接受了大量的写操作，你决定关掉均衡器，并将30个最活跃的块移动到shardB。
+            - 重新开启均衡器，它可能会将30个块（可能不是刚刚的30个）从shardB移动到shardA来平衡块
+        - 两种解决方法：
+            - 1.在开启均衡器之前，将30个不活跃的块，从shardB移动到shardA，这样分片之间就不会出现不均衡
+            - 2.对shardA的块执行30次拆分
+
+    ```mongodb
+    // 关闭均衡器。如果均衡器正在迁移，则完成之前不会生效
+    sh.stopBalancer()
+    // 或者
+    sh.setBalancerState(false)
+
+    // 在输入上一条命令后，确认均衡器是否正在迁移。
+    use config
+    while(sh.isBalancerRunning()) {
+        print("waiting...");
+        sleep(1000);
+    }
+    ```
+
+    ```mongodb
+    // 关闭均衡器后，就可以手动迁移了。先查看数据块与分片的映射
+    use crm
+    db.chunks.find()
+
+    // 迁移crm数据库的users集合的name: MaxKey()数据块到rs0
+    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+    // 如果这个块超过块的最大值，mongos会拒绝移动。需要使用splitAt命令手动拆分
+    sh.splitAt("crm.users", {"name": NumberLong("7000000000000000000")})
+    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+    ```
+
+- 修改块大小
+
+    - 默认为128MB。允许的范围大小1到1024MB之间
+
+    - 修改后，不会立即改变
+        - 如果增加了块的大小：已经存在的块，通过插入或更新来增长，直到达到新大小
+        - 如果减少了块的大小：则需要花费一些时间才能将所有块拆分为新的大小
+            - 拆分操作是无法恢复的。
+
+    - 如果迁移过于频繁或者使用的文档太大，则可能需要增加块的大小
+
+    ```mongodb
+    // 设置为64MB
+    use config
+    db.settings.updateOne(
+       { _id: "chunksize" },
+       { $set: { _id: "chunksize", value: 64 } },
+       { upsert: true }
+    )
+    ```
+
+- 超大块（jumbo chunk）：无法拆分和无法移动的块
+
+    - 如果选择了`date`作为片键。则mongos每天最多只能创建1个块。
+        - 无法拆分：假设有一天的数据量比其他任何一天都要多，但这个块不能拆分，因为片键值是相同的
+        - 无法移动：而且如果这个块大于`config.settings`中最大块的大小时，均衡器将无法移动
+
+        ```mongodb
+        // 超大块会被标记为jumbo标志
+        sh.status()
+        ```
+
+    - 假设有3个分片shard1、shard2、shard3。写操作都分发到shard1（热点分片），均衡器只能移动非超大块，所以它只会将较小的块从热点分片移走
+
+        - shard1上会有越来越多的超大块，即使3个分片之间的块数量完全均衡，但shard1的填充速度会比其他2个分片要快
+
+    - 使用`dataSize`命令查看块大小。`dataSize`必须扫描整个块的数据确定它的大小
+
+        ```mongodb
+        // 查找块的范围
+        use config
+        var chunks = db.chunks.find({"ns": "crm.users",}).toArray()
+
+        use crm
+        db.runCommand({"dataSize", "users",
+            "keyPattern": {"data": 1}, // 片键
+            "min": chunks[0].min,
+            "max": chunks[0].max}
+            })
+        ```
+
+    - 手动移动超大块
+        ```mongodb
+        // 关闭均衡器
+        sh.setBalancerState(false)
+
+        // mongodb不允许移动超过最大块大小的块。调大块的大小，这里为10000MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 10000 } },
+           { upsert: true }
+        )
+
+        // 假设crm.users的NumberLong("8345072417171006784")为超大块，移动到rs0
+        sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+        // 在crm数据库的分片rs1上执行splitChunk，直到块数量与rs0大致相同
+
+        // 设置为原来的大小。mongodb7.0默认为128MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 128 } },
+           { upsert: true }
+        )
+
+        // 开启均衡器
+        sh.setBalancerState(true)
+        ```
+
 ## GridFS
 
 - [官方文档](https://www.mongodb.com/docs/manual/core/gridfs/)
@@ -3548,6 +4566,21 @@ db.users.dropIndex({"name": 1})
 
     // 这样就可以使用索引查询
     db.fs.files.find( { filename: myFileName } ).sort( { uploadDate: 1 } )
+    ```
+
+### GridFS分片
+
+- GridFS将文件拆分成块（GridFS块）；分片将集合拆分成块（分片块）
+
+- `fs.files`集合比`fs.chunks`集合小的多，可能不需要分片
+
+- `fs.chunks`集合的字段`{"_id": 1}`和`{"files_id": 1, "n": 1}`都是升序键，不适合作为片键
+
+- 在对`fs.chunks`集合的`files_id`创建哈希索引：那么每个文件都会在分片集群中随机分发，并且同一个文件始终被包含在单个分片块中。
+    - 两全其美：写操作会均匀分发到所有分片；读操作只需要访问1个分片
+    ```mongodb
+    db.fs.chunks.ensureIndex({"files_id": "hashed"})
+    sh.shardCollection("test.fs.chunks", {"files_id": "hashed"})
     ```
 
 ## 安全事项
@@ -3793,6 +4826,12 @@ insert query update delete getmore command dirty used flushes vsize  res qrw arw
     # 打开mongosh，切换数据库
     use newtest
     ```
+### mtool
+
+```sh
+# 安装mtools
+pip3 install mtools pymongo
+```
 
 # reference
 

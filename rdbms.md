@@ -1169,6 +1169,8 @@ Nested-Loop Join(嵌套循环连接)
 
 - [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
 
+- [sql-formatter：sql语句格式化的js库](https://github.com/sql-formatter-org/sql-formatter)
+
 - [Migrate：数据库迁移/变更工具](https://github.com/golang-migrate/migrate)
 
     - 支持 MySQL、MariaDB、PostgreSQL、SQLite、Neo4j、ClickHouse 等不同类型的数据库。

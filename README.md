@@ -343,6 +343,8 @@ Port:3306
 
 ## NOSQL(非关系数据库)
 
+![image](./Pictures/database_concept/databases-type.avif)
+
 ### 基本理论
 
 - [Michael Stonebraker: SQL Databases v. NoSQL Databases](https://cacm.acm.org/magazines/2010/4/81482-sql-databases-v-nosql-databases/fulltext)
