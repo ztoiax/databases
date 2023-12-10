@@ -42,6 +42,120 @@
         - 不能是空字符串`""`
         - 不能含有`/` `\` `.` `"` `*` `<` `>` `:` `|` `?` `$` `\0（空字符）`
 
+## 如何部署mongodb
+
+- 使用RAID10
+    - 不要使用RAID5，它非常非常慢
+
+- `WiredTiger`存储引擎支持多线程。
+    - 如果在速度和核心数选择：选择速度。——mongodb更擅长在单个处理器上利用更多周期，而不是增加并行度
+
+- mongodb通常不使用交换空间。极端情况下`WiredTiger`存储引擎会使用一些交换空间
+
+- 内存如果过度分配，mongodb获取的内存实际并不存在，则无法很好的工作
+    ```sh
+    # 禁止内存过度分配
+    echo 2 > /proc/sys/vm/overcommit_memory
+    ```
+
+- 虚拟机的神秘内存：虚拟层有时无法正确处理内存分配
+    - 100GB RAM的虚拟机，但允许访问的只有60GB
+    - 相反的情况：20GB RAM的虚拟机，但100GB数据都能放入其中
+
+- 虚拟机IO问题：可能与其他租户共享一个产品，每个人都有可能竞争磁盘IO
+
+- 关闭NUMA
+
+    - 如果mongodb以NUMA运行，性能降低时，会打印警告信息
+
+    - 问题例子：cpu1内存满了，cpu1需要淘汰本地的内存数据，但此时cpu2的内存还没有满。这会导致mongodb运行速度变慢
+
+    - 关闭numa启动mongodb，需要执行以下2个步骤
+
+    - 1.关闭`/proc/sys/vm/zone_reclaim_mode` ：当某个 Node 内存不足时，系统可以从其他 Node 寻找空闲内存，也可以从本地内存中回收内存。
+        ```sh
+        # 关闭
+        echo 0 > /proc/sys/vm/zone_reclaim_mode
+        ```
+
+    - 2.以numactl启动mongodb实例
+        ```sh
+        # --interleave=all内存分配是应该尽量均匀地分布在各个节点上，启动mongodb
+        numactl --interleave=all mongod --config ~/mongodb/mongodb.conf
+        ```
+
+- 关闭大内存页（THP）（默认开启）：THP会导致更多的磁盘IO。如果数据不能放在内存，磁盘刷新时需要写入几MB而不是几KB
+
+    - 虽说THP是为了数据库而开发的功能。但mongodb的顺序访问比关系数据库要少的多
+
+    ```sh
+    # 关闭THP
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    echo never > /sys/kernel/mm/transparent_hugepage/defrag
+    ```
+
+- 选择磁盘调度算法：
+
+    - 没有调度算法（NOOP）：不对文件系统和应用程序的 I/O 做任何处理
+
+        - 应用场景：
+            - 1.虚拟机 I/O 中，此时磁盘 I/O 调度算法交由物理机系统负责。
+            - 2.SSD。SSD不存在机械磁盘中的局部问题
+
+    - 优先级调度算法（DEADLINE）：在CFS的基础上分为读、写两个FIFO队列
+        - 最适合磁盘密集型的数据库
+        - 应用场景：非虚拟机的物理机
+
+- 关闭文件系统的访问时间追踪
+    - mongodb使用的数据文件流量非常大，关闭时间追踪可以提升性能
+    ```
+    # 默认为relatime，修改为noatime。需要重新启动才能生效
+    /dev/sda1 /data xfs rw,noatime 1 2
+    ```
+
+- 修改限制
+
+    - 1.进程运行创建线程数的限制
+
+        - mongodb每接受一个连接，就会创建一个线程。
+
+            - 如果有3000个连接，就会有3000个线程
+
+        - 客户端随着流量的增加动态的创建子进程
+            - 假设有20个应用程序服务器，每个应用程序服务器可以创建100个子进程，而每个子进程又可以创建10个连接到mongodb的线程。20 * 100 * 10 = 20000个连接
+
+        ```sh
+        # 查看最大线程数
+        cat /proc/sys/kernel/threads-max
+        # 设置最大线程数
+        ulimit -u 1024
+        ```
+
+    - 2.进程允许打开文件描述符数的限制
+
+        - 每个传入和传出的连接都需要文件描述符
+
+        ```sh
+        # 修改打开的文件描述符数量（默认为1024）
+        ulimit -n 20000
+        ```
+
+- 时间同步：1秒之内最安全
+    - 使用ntp保持时间同步
+
+
+### 安全事项
+```sh
+# 应该严格限制外部对mongodb的访问。指定监听端口
+mongod --bing_ip
+
+# 禁止执行javascript代码
+mongod --noscripting
+
+# 默认数据传输不加密。启用加密。需要创建密钥
+mongod --tlsMode
+```
+
 ## mongosh
 
 - mongosh是一个功能齐全的javascript解释器，并且包含了一些扩展语法（语法糖）
@@ -94,6 +208,9 @@ db.help()
 // 查看集合级别的帮助
 db.foo.help()
 
+// 查看函数的说明
+db.currentOp().help()
+
 // 函数如果不加()，可以输出javascript的代码
 db.movies.updateOne
 ```
@@ -113,6 +230,23 @@ db.movies
 use test
 db.dropDatabase()
 ```
+
+- 关闭mongod
+
+    ```mongodb
+    // 关闭mongod
+    db.shutdownServer()
+    // 强制关闭mongod
+    db.adminCommand({"shutdown": 1, "force": true})
+    ```
+    - `db.adminCommand({"shutdown": 1, "force": true})`和`SIGINT`或`SIGTERM`信号。都是可以实现安全关闭。但如果是副本集可能会有未复制的同步数据
+    ```sh
+    # 在终端前台运行，按Ctrl-C相当于发送SIGINT信号
+
+    # 假设mongod的pid为10014
+    kill -2 10024 # SIGINT
+    kill 10024 # SIGTERM
+    ```
 
 ### 执行javascript脚本
 
@@ -2576,6 +2710,343 @@ db.users.dropIndex({"name": 1})
 
     - `oplog`条目大小限制：每条`oplog`条目必须小于16MB的BSON
 
+## 应用程序的设计模式
+
+### 不适合使用mongodb的场景
+
+- 关系数据库擅长在许多不同的维度，连接不同类型的数据。mongodb不会在这么做
+- 选择关系数据库，往往是工具还不支持mongodb：如SQLAlchemy、WordPress
+### 设计模式
+
+- 设计模式时需要考虑的：
+
+    - 与关系数据库不同的是，在为模式建模之前，需要了解查询和数据访问的方式
+
+    - 查询和写入的访问模式
+        - 需要量化应用程序和最大系统的工作负载（读写操作）
+        - 一旦知道了查询的运行时间和频率，就可以识别最常见的识别。
+            - 这些查询需要在模式设计时支持。
+            - 一旦确定了这些查询，就应该减少查询的数量，并在设计中确保一起查询的数据存储在同一个文档
+            - 这些查询未使用的数据，应该存放在不同的集合中。不经常使用的数据，也应该移动到不同的集合中
+            - 需要考虑动态（读/写）数据和静态（主要是读）数据分离开
+            - 提高最常见的查询优先级会获得最佳的性能
+
+    - 关系类型
+
+        - 要考虑文档之间的关系，哪些数据是相关的。从而确定是嵌入，还是引入
+        - 最好是引用文档，而不是执行其他查询
+        - 要考虑关系发生变化时，需要更新多少文档
+        - 要考虑数据结构是否易于查询。如使用内嵌数组（数组中的数组）对某些关系进行建模
+
+    - 基数
+
+        - 确定文档与数据的关联方式后，要考虑这些关系的基数。比如一对一、一对多、多对多、一对百万、多对几十亿
+
+        - 考虑相关字段的更新与读取比例
+
+        - 考虑这些问题有助于确定采用内嵌文档还是引用文档，是否应该跨文档对数据进行反范式化处理
+
+- 设计模式：
+
+    - [m320 Data Modeling in MongoDB（mongodb大学提供一个设计模式的4分钟视频）](https://www.youtube.com/embed/hNdMXM5XbQw?rel=0&autoplay=1)
+
+    - 多态模式：
+        - 数据结构类似，但不相同
+        - 涉及跨文档的公共字段
+
+    - 属性模式：
+        - 部分字段会进行排序；或需要排序的字段近存在部分文档中；或者这2个条件都满足
+        - 它包含将数据重塑为键-值对数组，并在该数组中的元素上创建索引
+        - 此模式有助于查询那些存在许多相似字段的文档，因此需要索引更少，查询也更容易编写。
+
+    - 分桶模式：
+        - 时间序列数据
+        - mongodb将这些数据分桶存储到一组文档中，例如使用1小时存储桶，将该时间内所有数据都放到文档的一个数组中。文档有开始和结束时间，表示这个桶涵盖的时间段
+
+    - 异常值模式
+        - 解决少数文档的查询超出应用程序正常模式的情况。
+        - 用一个标志表示文档的异常值，将额外的溢出存储到一个或多个文档中，这些文档通过`_id`引用第一个文档
+        - 应用场景：社交网络、图书销售、电影评论
+
+    - 计算模式
+        - 频繁计算数据时使用；读取密集型数据访问模式下使用
+        - 此模式建议在后台执行计算，并定期更新主文档
+
+    - 子集模式
+        - 适用于：
+            - 经常使用的数据和不经常使用的数据分割为2个单独的集合
+                - 例子：电子商务评论将一个产品10条最近的评论，保存在主（经常访问的）；其他旧的评论，移动到第二个的集合，应用程序只有在需要多于10条评论时才查询
+            - 超过机器ram时可以使用这模式
+
+                - 这种情况可能是大文档造成的
+
+    - 扩展引用模式：
+        - 每个系统都有自己的集合，并且你希望将这些系统组织在一起实现特定功能
+        - 这种模式以数据冗余为代价，减少将信息整合在一起所需要的查询数量
+        - 例子：电子商务有订单、客户、库存可能会有单独集合。当将这些单独的集合，收集到单个订单的所有信息时，可能会对性能产生负面影响
+
+    - 近似值模式：
+        - 需要昂贵资源（时间、内存、cpu周期）计算，却不需要绝对精确的情况下非常有用
+        - 例子：一张图片或一条帖子的点赞计数器、一个页面浏览的计数器，其中知道确切的计数是不必要的（如999535还是100000）
+        - 此模式可以极大减少写入次数。
+            - 例子每浏览100次或更多次时更新计数器，而不是每次浏览后都进行更新
+
+    - 树形模式：
+        - 有很多查询，并且数据主要是层级结构时
+        - 结构存储在同一个文档的数组中
+        - 例子：电子商务的产品目录中，通常有多个类别的产品，或者这个产品的类别从属于其他某个类别。如硬盘，本身是个类别又属于存储类别，存储又属于计算机部件类别。需要一个字段跟踪整个层次结构，另一个字段保存直接类别（硬盘）。
+            - 保存层级结构的字段：提供对这些值使用多键索引的能力。这可以确保很容易地层次结构相关的所有项目。
+            - 直接类别字段：允许找到此类别直接相关的所有项目
+
+    - 预分配模式：
+        - 创建一个初始的空结构，稍后对进行填充。
+            - 主要用于MMAP存储引擎，但仍然有一些可以使用此模式的场景
+            - 例子：一个按天管理资源的预定系统，可以跟踪该资源是空闲/预定。资源（x）和天数（y）二维结构可以使得检查可用，以及执行计算变得简单
+
+    - 文档版本控制模式：
+        - 添加一个额外的字段（例如`v`或`version`）跟踪文档版本；还需另一个集合保存文档的所有修订版本
+        - 例子：某个版本需要`mobile`字段；另一个版本则不需要；还有一个版本的`mobile`字段只是可选字段。
+
+        - 问题：随着数据库的增长，文档结构也会变化。
+            - 解决方法1：如果可以应该考虑文档版本控制模式
+            - 解方方法2：通过事务确保每一个文档都修改成功
+
+### 范式化和反范式化
+
+- 范式化（normalization）：指将数据分散到多个集合中，在集合之间进行引用
+    - 优点：更新数据，只需更新一份文档。写入速度快
+
+- 反范式化（denormalization）：将所有数据嵌入单个文档中。多个文档可能拥有数据副本，而不是所有文档都引用同一份数据
+    - 优点：读取速度快
+    - 缺点：更新数据，需更新多份文档。但可以通过单词查询获取所有相关数据
+
+- 基数：一个集合对另一个集合的引用数。有一对一、一对多、多对多的关系
+    - 例子：博客应用程序。
+        - 每篇文章都有一个标题：因此是一对一关系。
+        - 每个作者有很多文章：因此是一对多关系。
+        - 每篇文章有很多评论：因此是一对多关系。
+        - 每篇文章有很多标签，每个标签又可以在多篇文章中使用：因此是多对多关系。
+
+    - “多”可以划分2个子类别：很多和很少
+        - “少”：使用内嵌比较好
+        - “多”：使用引用比较好
+        - 例子：
+            - 作者与文章之间的一对少：每个作者只写了几篇文章。
+            - 文章与标签之间可能存在多对少：文章数量比标签多
+
+- 选择哪一个非常困难。要根据实际需要权衡：
+
+    - 如果写操作比读操作更重要，但每执行一次写，就要进行1000次读，那还是应该先优化读取速度
+
+    - 选择范式化：
+        - 如果定期更新
+        - 如果生成的信息越多，就越不应该将这些信息内嵌到其他文档；而应该使用引用。又或者使用子集模式
+            - 例子：评论树、活动列表
+
+    - 选择反范式化：
+        - 如果数据变化不频繁
+            - 例子：可以将用户和用户的地址保存到不同集合。因为地址很少变化，应该嵌入进用户文档
+
+    | 适合引用（范式化）     | 适合内嵌（反范式化）     |
+    |------------------------|--------------------------|
+    | 较大子文档             | 较小子文档               |
+    | 数据经常变更           | 数据不经常变更           |
+    | 数据必须强一致性       | 数据最终一致性即可       |
+    | 文档数据大幅增加       | 文档数据小幅增加         |
+    | 数据通常不包含在结果中 | 数据需要二次查询才能获得 |
+    | 快速写入               | 快速读取                 |
+
+    - 判断以下users集合的字段，是否内嵌到用户文档中？
+        - 用户首选项：内嵌。用户首选项只与用户文档相关，而且可能与文档中的其他字段被一起查询
+        - 最近活动：取决于活动的增长和变化的频繁程度。——如果是固定长度的字段（如最近10次活动）应该使用内嵌或使用子集模式。
+        - 好友：不应该内嵌或者不应该完全内嵌
+        - 用户生成的内容：引用
+
+- 如果使用内嵌文档并且需要更新时，应该设置一个定时（cron）任务，以确保所做的更新都能成功更新到所有文档。
+    - 问题：进行多次更新时，如果服务器崩溃了，就需要一种方法检测，并能继续执行未完成的更新
+    - 解决方法：
+        - 更新运算符中：`$set`是幂等，`$inc`则不是。
+        - 网络故障下
+            - 幂等的操作可以重复执行
+            - 非幂等操作应该分解为2个幂等操作后，再重复执行。因为每个单独的`updateOne`操作都是幂等
+                - 操作1：添加一个待处理令牌
+                - 操作2：同时唯一键和一个待处理令牌来实现
+
+
+- 例子：保存学生和他们上课程的信息
+
+    - 解决方法：范式化
+        - 一个students集合（每个学生一个文档）
+        - 一个classes集合（每门课程是一个文档）
+        - 第三个集合studentClasses存储学生及其所学课程的引用
+        ```mongodb
+        use school
+        db.students.insert({"_id": ObjectId(1), "name": "joe", "age": "26"})
+        db.classes.insert([
+            {"_id": ObjectId(100), "class": "english", "room": 100},
+            {"_id": ObjectId(101), "class": "computer", "room": 101},
+        ])
+
+        // 通过_id引用
+        db.studentClasses.insert({
+            "studnetId": ObjectId(1),
+            "classes": [
+                ObjectId(100),
+                ObjectId(101),
+            ]
+        })
+        ```
+
+        - 问题：假设要找到一个学生上的课：需要查询students集合的学生信息，studentClasses的课程_id，再查找classes集合的课程信息。总共3次查询，这不是理想的mongodb数据设计，除非课程和学生信息会经常变化，并且不需要对数据进行快速读取。
+
+    - 解决方法：可以把studentClasses集合的两次嵌入，减少为1次
+
+        ```mongodb
+        // 只嵌入classes的文档，减少1次查询，最后总共需要2次查询
+        db.studentClasses.insert({
+            "name": "joe",
+            "classes": [
+                ObjectId(100),
+                ObjectId(101),
+            ]
+        })
+        ```
+
+    - 解决方法：完全反范式化，只需1次查询
+        - 优点：只需1次查询
+        - 缺点：需要占用更多空间，多次更新
+
+        ```mongodb
+        // 完全反范式化。
+        db.studentClasses.insert({
+            "name": "joe",
+            "classes": [
+                {"class": "english", "room": 100},
+                {"class": "computer", "room": 101},
+            ]
+        })
+        ```
+
+    - 解决方法：混合使用内嵌和引用
+        ```mongodb
+        db.studentClasses.insert({
+            "name": "joe",
+            "classes": [
+                {"_id":ObjectId(100), "class": "english"},
+                {"_id":ObjectId(101), "class": "computer"},
+            ]
+        })
+        ```
+
+- 例子：社交应用程序。有好友、粉丝等
+    - 关注、好友、收藏可以简化为一个发布-订阅系统
+    - 订阅实现的3种方法：
+        - 1.生产者内嵌到订阅者文档
+            ```mongodb
+            {
+                "_id": ObjectId(1),
+                "name": "joe",
+                "following": [
+                    ObjectId(100),
+                    ObjectId(101),
+                ]
+            })
+
+            // 对于一个给定的用户文档，查询他们可能感兴趣的所有已发布活动??代码不全面没有看到
+            db.activities.find({"user": {"$in": user["following"]}})
+            // 如果需要查找对新发布获得感兴趣所有用户，则必须查询所有用户的following
+            ```
+
+        - 2.将订阅者内嵌到生产者文档
+            - 优点：每当生产者发信息，立即可以给订阅者发通知
+            - 缺点：如果要查找一个用户的所有粉丝，需要查询整个users集合（与上一个方法的限制相反）
+                - 查询的所有粉丝的操作可能并不频繁
+            ```mongodb
+            {
+                "_id": ObjectId(100),
+                "name": "joe",
+                "follower": [
+                    ObjectId(1),
+                    ObjectId(2),
+                ]
+            })
+            ```
+
+        - 以上2种解决方法都有一个缺点：用户文档会变得很大。following和follower字段甚至可以不用返回。
+        - 3.对follower进行范式化。将订阅信息保存到单独的集合避免以上缺点
+            ```mongodb
+            {
+                "_id": ObjectId(100), // 生产者（被关注者）的_id
+                "follower": [
+                    ObjectId(1),
+                    ObjectId(2),
+                ]
+            })
+            ```
+
+            - 问题：内嵌的字段文档只适合有限数量的引用。
+                - 例子：如果某个用户很有名，导致粉丝列表的文档溢出
+
+            - 解决方法：使用异常值模式。必要时创建一个延续文档，然后从添加tbc（to be continued）数组字段，执行相应的逻辑
+
+                ```mongodb
+                {
+                    "_id": ObjectId(100), // 生产者（被关注者）的_id
+                    "name": "joe",
+                    "tbc": [
+                        ObjectId(1000),
+                        ObjectId(1001),
+                    ],
+                    "follower": [
+                        ObjectId(1),
+                        ObjectId(2),
+                    ]
+                })
+
+                ```
+
+### 如何删除旧数据
+
+- 有些数据短时间内比较重要：几周或几个月后。3种解决方法：
+
+    - 1.固定集合：最简单的方式。
+        - 缺点：容易受到流量峰值，从而暂时降低它们所能容纳的时间长度
+
+    - 2.TTL集合：可以精确的控制删除文档的时间
+        - 缺点：写入量过大的集合中操作速度不够快，需要遍历TTL索引来删除文档。
+            - 如果TTL集合可以承受足够的写入，那这就是最容易实现的方法
+
+    - 3.多个集合：
+        - 每个月的文档单独使用一个集合。
+        - 月份变更时，就创建本月的空集合
+        - 查询时，搜索本月和以前的月份。一旦集合超过特定时间，比如6个月，才删除
+
+        - 优点：可以满足任何流量
+        - 缺点：实现复杂。必须使用动态集合或数据库名称，需要查询多个数据库
+
+### 数据库和集合的设计
+
+- 类似模式的文档应该保存在同一个集合
+
+    - 如果文档位于不同集合或数据库中，可以是聚合查询的`$merge`阶段
+
+- 重要性划分：价值最高的集合，可能数据量最小（用户集合没有日志集合数据量多）
+    - 用户集合使用在ssd或者RAID10，对日志和活动集合使用RAID0
+
+### 连接问题
+
+- 服务器会为每个连接维护一个队列：客户端的请求会添加到队列的末端，并且始终可以读取到自己的写操作
+
+- 如果打开2个mongosh，连接相同的数据库，就会有2个队列。
+    - 问题：一个mongosh执行插入操作，另一个mongosh查询可能不会返回插入的文档
+    - 这个问题难以手动复现。但在繁忙的服务器上，可能会出现交错插入和查询的操作。
+
+- ruby、python、java这些驱动程序使用了连接池。
+
+    - 连接池会建立多个与服务端的连接
+
+    - 问题：一个线程插入，另一个线程检查数据是否插入成功时，可能出现好像没有插入成功，然后又突然出现了
+
 ## 副本集（replica set）
 
 - 副本集：只能有一个主节点（primary），多个保存主节点数据副本的从节点（secondary）
@@ -2587,7 +3058,7 @@ db.users.dropIndex({"name": 1})
 
 - 所有mongodb驱动程序都遵守服务器发现和监控（SDAM）规范。驱动程序会持续监视副本集的拓扑结构，以检测应用程序对成员的访问是否有变化。并且维护哪个成员是主节点的信息
 
-- 读偏好：
+- 读偏好（read preference)：
 
     - `primary`（默认值）：始终发送给主节点，没有主节点就报错
     - `primaryPreferred`：当主节点停止运行时，副本集会进入一个临时的只读模式
@@ -2686,6 +3157,7 @@ db.users.dropIndex({"name": 1})
 
         - 除非使用`writeConcern`将写操作复制多个从节点才算成功
             ```mongodb
+            // 副本集写操作需要写入majority（大多数成员），如果在100毫秒内没有复制到大多数成员，则返回错误
             db.users.insertOne(
                 {"_id": 10, "name": "joe"},
                 { writeConcern: {"w": "majority", "wtimeout": 100}}
@@ -3434,7 +3906,7 @@ db.users.dropIndex({"name": 1})
 
 ## 分片（shard)
 
-- 分片类似于集群
+- 分片类似于集群和RAID10
     - 可以使用性能较弱的机器实现负载
     - 可以基于地理位置拆分文档，让靠近它们的客户端更快的访问
 
@@ -4326,128 +4798,6 @@ db.adminCommand({"connPoolStats": 1})
     db.adminCommand({"flushRouterConfig": 1})
     ```
 
-#### 数据块管理
-
-- 手动分片：自己控制分发到哪里。需要关闭均衡器
-
-    - 除非遇到特殊情况，否则应该使用自动分片而不是手动分片。
-
-    - 不要在均衡器开启的情况下，进行手动分片
-
-        - 如果同时使用存在的问题：
-            - 有shardA和shardB两个分片，每个分片都有500个块。
-            - shardA接受了大量的写操作，你决定关掉均衡器，并将30个最活跃的块移动到shardB。
-            - 重新开启均衡器，它可能会将30个块（可能不是刚刚的30个）从shardB移动到shardA来平衡块
-        - 两种解决方法：
-            - 1.在开启均衡器之前，将30个不活跃的块，从shardB移动到shardA，这样分片之间就不会出现不均衡
-            - 2.对shardA的块执行30次拆分
-
-    ```mongodb
-    // 关闭均衡器。如果均衡器正在迁移，则完成之前不会生效
-    sh.stopBalancer()
-    // 或者
-    sh.setBalancerState(false)
-
-    // 在输入上一条命令后，确认均衡器是否正在迁移。
-    use config
-    while(sh.isBalancerRunning()) {
-        print("waiting...");
-        sleep(1000);
-    }
-    ```
-
-    ```mongodb
-    // 关闭均衡器后，就可以手动迁移了。先查看数据块与分片的映射
-    use crm
-    db.chunks.find()
-
-    // 迁移crm数据库的users集合的name: MaxKey()数据块到rs0
-    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-
-    // 如果这个块超过块的最大值，mongos会拒绝移动。需要使用splitAt命令手动拆分
-    sh.splitAt("crm.users", {"name": NumberLong("7000000000000000000")})
-    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-    ```
-
-- 修改块大小
-
-    - 默认为128MB。允许的范围大小1到1024MB之间
-
-    - 修改后，不会立即改变
-        - 如果增加了块的大小：已经存在的块，通过插入或更新来增长，直到达到新大小
-        - 如果减少了块的大小：则需要花费一些时间才能将所有块拆分为新的大小
-            - 拆分操作是无法恢复的。
-
-    - 如果迁移过于频繁或者使用的文档太大，则可能需要增加块的大小
-
-    ```mongodb
-    // 设置为64MB
-    use config
-    db.settings.updateOne(
-       { _id: "chunksize" },
-       { $set: { _id: "chunksize", value: 64 } },
-       { upsert: true }
-    )
-    ```
-
-- 超大块（jumbo chunk）：无法拆分和无法移动的块
-
-    - 如果选择了`date`作为片键。则mongos每天最多只能创建1个块。
-        - 无法拆分：假设有一天的数据量比其他任何一天都要多，但这个块不能拆分，因为片键值是相同的
-        - 无法移动：而且如果这个块大于`config.settings`中最大块的大小时，均衡器将无法移动
-
-        ```mongodb
-        // 超大块会被标记为jumbo标志
-        sh.status()
-        ```
-
-    - 假设有3个分片shard1、shard2、shard3。写操作都分发到shard1（热点分片），均衡器只能移动非超大块，所以它只会将较小的块从热点分片移走
-
-        - shard1上会有越来越多的超大块，即使3个分片之间的块数量完全均衡，但shard1的填充速度会比其他2个分片要快
-
-    - 使用`dataSize`命令查看块大小。`dataSize`必须扫描整个块的数据确定它的大小
-
-        ```mongodb
-        // 查找块的范围
-        use config
-        var chunks = db.chunks.find({"ns": "crm.users",}).toArray()
-
-        use crm
-        db.runCommand({"dataSize", "users",
-            "keyPattern": {"data": 1}, // 片键
-            "min": chunks[0].min,
-            "max": chunks[0].max}
-            })
-        ```
-
-    - 手动移动超大块
-        ```mongodb
-        // 关闭均衡器
-        sh.setBalancerState(false)
-
-        // mongodb不允许移动超过最大块大小的块。调大块的大小，这里为10000MB
-        db.settings.updateOne(
-           { _id: "chunksize" },
-           { $set: { _id: "chunksize", value: 10000 } },
-           { upsert: true }
-        )
-
-        // 假设crm.users的NumberLong("8345072417171006784")为超大块，移动到rs0
-        sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-
-        // 在crm数据库的分片rs1上执行splitChunk，直到块数量与rs0大致相同
-
-        // 设置为原来的大小。mongodb7.0默认为128MB
-        db.settings.updateOne(
-           { _id: "chunksize" },
-           { $set: { _id: "chunksize", value: 128 } },
-           { upsert: true }
-        )
-
-        // 开启均衡器
-        sh.setBalancerState(true)
-        ```
-
 ## GridFS
 
 - [官方文档](https://www.mongodb.com/docs/manual/core/gridfs/)
@@ -4583,12 +4933,390 @@ db.adminCommand({"connPoolStats": 1})
     sh.shardCollection("test.fs.chunks", {"files_id": "hashed"})
     ```
 
+## 管理
+### 数据块管理
+
+- 手动分片：自己控制分发到哪里。需要关闭均衡器
+
+    - 除非遇到特殊情况，否则应该使用自动分片而不是手动分片。
+
+    - 不要在均衡器开启的情况下，进行手动分片
+
+        - 如果同时使用存在的问题：
+            - 有shardA和shardB两个分片，每个分片都有500个块。
+            - shardA接受了大量的写操作，你决定关掉均衡器，并将30个最活跃的块移动到shardB。
+            - 重新开启均衡器，它可能会将30个块（可能不是刚刚的30个）从shardB移动到shardA来平衡块
+        - 两种解决方法：
+            - 1.在开启均衡器之前，将30个不活跃的块，从shardB移动到shardA，这样分片之间就不会出现不均衡
+            - 2.对shardA的块执行30次拆分
+
+    ```mongodb
+    // 关闭均衡器。如果均衡器正在迁移，则完成之前不会生效
+    sh.stopBalancer()
+    // 或者
+    sh.setBalancerState(false)
+
+    // 在输入上一条命令后，确认均衡器是否正在迁移。
+    use config
+    while(sh.isBalancerRunning()) {
+        print("waiting...");
+        sleep(1000);
+    }
+    ```
+
+    ```mongodb
+    // 关闭均衡器后，就可以手动迁移了。先查看数据块与分片的映射
+    use crm
+    db.chunks.find()
+
+    // 迁移crm数据库的users集合的name: MaxKey()数据块到rs0
+    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+    // 如果这个块超过块的最大值，mongos会拒绝移动。需要使用splitAt命令手动拆分
+    sh.splitAt("crm.users", {"name": NumberLong("7000000000000000000")})
+    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+    ```
+
+- 修改块大小
+
+    - 默认为128MB。允许的范围大小1到1024MB之间
+
+    - 修改后，不会立即改变
+        - 如果增加了块的大小：已经存在的块，通过插入或更新来增长，直到达到新大小
+        - 如果减少了块的大小：则需要花费一些时间才能将所有块拆分为新的大小
+            - 拆分操作是无法恢复的。
+
+    - 如果迁移过于频繁或者使用的文档太大，则可能需要增加块的大小
+
+    ```mongodb
+    // 设置为64MB
+    use config
+    db.settings.updateOne(
+       { _id: "chunksize" },
+       { $set: { _id: "chunksize", value: 64 } },
+       { upsert: true }
+    )
+    ```
+
+- 超大块（jumbo chunk）：无法拆分和无法移动的块
+
+    - 如果选择了`date`作为片键。则mongos每天最多只能创建1个块。
+        - 无法拆分：假设有一天的数据量比其他任何一天都要多，但这个块不能拆分，因为片键值是相同的
+        - 无法移动：而且如果这个块大于`config.settings`中最大块的大小时，均衡器将无法移动
+
+        ```mongodb
+        // 超大块会被标记为jumbo标志
+        sh.status()
+        ```
+
+    - 假设有3个分片shard1、shard2、shard3。写操作都分发到shard1（热点分片），均衡器只能移动非超大块，所以它只会将较小的块从热点分片移走
+
+        - shard1上会有越来越多的超大块，即使3个分片之间的块数量完全均衡，但shard1的填充速度会比其他2个分片要快
+
+    - 使用`dataSize`命令查看块大小。`dataSize`必须扫描整个块的数据确定它的大小
+
+        ```mongodb
+        // 查找块的范围
+        use config
+        var chunks = db.chunks.find({"ns": "crm.users",}).toArray()
+
+        use crm
+        db.runCommand({"dataSize", "users",
+            "keyPattern": {"data": 1}, // 片键
+            "min": chunks[0].min,
+            "max": chunks[0].max}
+            })
+        ```
+
+    - 手动移动超大块
+        ```mongodb
+        // 关闭均衡器
+        sh.setBalancerState(false)
+
+        // mongodb不允许移动超过最大块大小的块。调大块的大小，这里为10000MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 10000 } },
+           { upsert: true }
+        )
+
+        // 假设crm.users的NumberLong("8345072417171006784")为超大块，移动到rs0
+        sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+        // 在crm数据库的分片rs1上执行splitChunk，直到块数量与rs0大致相同
+
+        // 设置为原来的大小。mongodb7.0默认为128MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 128 } },
+           { upsert: true }
+        )
+
+        // 开启均衡器
+        sh.setBalancerState(true)
+        ```
+### 文档、集合、数据库
+
+- 查看文档的存储在mongodb的大小
+
+    ```mongodb
+    bsonsize({_id:ObjectId()})
+    bsonsize({_id:""+ObjectId()})
+
+    // 查看文档大小
+    bsonsize(db.users.findOne())
+    ```
+
+- 查看集合信息
+    ```mongodb
+    db.users.stats()
+    ```
+
+- 查看数据库信息
+
+    - `fsUsedSize`：mongodb实例存储数据，所占用文件系统的磁盘总量
+    - `dataSize`：数据库未压缩数据的大小。因为WiredTiger通常会被压缩。这个值不等于`storageSize`
+    - `indexSize`：索引所占的空间
+
+    ```mongodb
+    db.stats()
+    ```
+
+### 操作查询
+
+- 查看数据库正在执行的操作列表
+
+    | db.currentOp()重要的字段      | 说明                                                                                                                                                                         |
+    |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | opid                          | 该操作的唯一标识                                                                                                                                                             |
+    | active                        | 操作是否正在运行。false表示操作等待其他操作的让出锁                                                                                                                          |
+    | op                            | 操作类型通常为query、insert、update、remove                                                                                                                                  |
+    | desc                          | 客户端的标识符。与日志的消息相连。与连接相关的每个日志消息都已`conn3`作为前缀，可以用它来筛选日志                                                                            |
+    | locks                         | 锁的类型                                                                                                                                                                     |
+    | waitingForLock                | 当前是否处于阻塞，等待获取锁                                                                                                                                                 |
+    | numYields                     | 释放锁允许其他操作进行的次数。搜索文档（查询、更新和删除）可能会让出锁。一个操作在有其他操作进入队列并等待锁时，才会让出。如果没有处于waitingForLock状态，当前操作不会让出锁 |
+    | lockStats.timeAcquiringMicros | 获取锁花费的时间                                                                                                                                                             |
+
+    ```mongodb
+    // 查看数据库正在执行的操作列表
+    db.currentOp()
+
+    // 慢操作。返回在db1数据库执行，并且超过3秒的操作
+    db.currentOp(
+       {
+         "active" : true,
+         "secs_running" : { "$gt" : 3 },
+         "ns" : /^db1\./
+       }
+    )
+
+    // 返回在等待锁的写入操作
+    db.currentOp(
+       {
+         "waitingForLock" : true,
+         $or: [
+            { "op" : { "$in" : [ "insert", "update", "remove" ] } },
+            { "command.findandmodify": { $exists: true } }
+        ]
+       }
+    )
+
+    // 返回active为true，并且没有让出锁的操作
+    db.currentOp(
+       {
+         "active" : true,
+         "numYields" : 0,
+         "waitingForLock" : false
+       }
+    )
+
+    // 正在创建索引的操作
+    db.adminCommand(
+        {
+          currentOp: true,
+          $or: [
+            { op: "command", "command.createIndexes": { $exists: true }  },
+            { op: "none", "msg" : /^Index Build/ }
+          ]
+        }
+    )
+    ```
+
+
+    - 停止指定操作
+        - 并不是所有操作都能停止：
+            - 1.只有操作让出时，才能停止（更新、查找、删除）
+            - 2.等待锁的操作不能被停止
+
+        - 在查询耗时过长的操作时，可能会看到一些长时间运行的内部操作。
+            - 这其中最常见的是复制线程（同步源获取更多操作）和分片的回写监听器。这些操作被停止了，mongodb会重新启动它们。
+                - 停止复制线程：复制操作会短暂的停止
+                - 停止回写监听器：可能会导致mongos遗漏正常的写入错误
+
+        - 防止幻象写入操作：如果写操作比mongodb的处理速度要快，写操作就会堆积在操作系统的套接字缓冲区。
+            - 问题：用户停止mongodb正在进行的写操作时，还会处理剩下的缓冲区的写操作。即使客户端已经没有发送写操作。
+            - 解决方法：执行写入确认机制：让每次写入操作都等待，直到前一个写操作完成；而不是仅仅等到前一个写操作处于缓冲区就开始写一次写入。
+
+
+        ```mongodb
+        // 停止指定操作。db.currentOp()的查询操作字段opid作为参数
+        db.killOp(18708)
+        ```
+
+- 系统分析器（默认关闭）：分析慢操作，代价是影响性能
+
+    - 开启分析器后：每一条读写操作都会记录system数据库的profile集合
+        - 每次写入都要花费额外的写入时间
+        - 每次读都要等待写锁（因为必须在system.profile写入一条记录）
+
+    ```mongodb
+    // 查看当前分析器的设置
+    db.getProfilingStatus()
+
+    // 关闭分析器
+    db.setProfilingLevel(0)
+
+    // 开启分析器。指定级别为1，默认记录耗时超过100毫秒的信息
+    db.setProfilingLevel(1)
+    // 只记录超过500毫秒的所有操作
+    db.setProfilingLevel(1, 500)
+    // 只记录超过2000毫秒的查询操作
+    db.setProfilingLevel( 1, { filter: { op: "query", millis: { $gt: 2000 } } } )
+    // 清除filter字段的设置
+    db.setProfilingLevel( 1, { filter: "unset" } )
+
+    // 开启分析器。指定级别为2，也就是记录所有信息。
+    db.setProfilingLevel(2)
+
+    // 执行一些操作
+    db.foo.insert({x:1})
+    db.foo.update({}, {$set: {x:2}})
+    db.foo.remove({})
+
+    // 查看分析器
+    db.system.profile.find()
+    ```
+
+### 日志和持久性
+
+- 日志级别
+    ```sh
+    # --logpath将日志发送到文件，而不是输出到前台
+    mongod --logpath
+    // 或者
+    db.adminCommand({"logRotate": 1})
+    ```
+
+    ```mongodb
+    // 设置日志的值，默认为0。范围0-5
+    db.adminCommand({"setParameter": 1 "logLevel": 3})
+    // 查看日志的值
+    db.adminCommand({getParameter: 1, logLevel: 1})
+
+    // 这里设置默认日志设置为1，查询组件的日志级别为2
+    db.adminCommand({"setParameter": 1, logComponentVerbosity: { verboseity:1, query: { verbosity: 2 }}})
+    ```
+
+- mongodb同时维护日志和数据库数据文件的内存视图。默认情况下
+
+    - 日志条目：每50毫秒刷新到磁盘
+
+        ```mongodb
+        // --journalCommitInterval设置日志刷新间隔。范围1-500毫秒
+        mongod --journalCommitInterval 25 --config ~/mongodb/mongodb.conf &
+        ```
+    - 数据库文件：每60毫秒刷新到磁盘。这个60秒间隔叫检查点（checkpoint）
+    - 如果服务器突然停止，重新启动后，可以使用日志重放在关闭前没有刷新到磁盘的所有写操作
+
+- 日志文件：mongodb在`dbPath`目录创建名为journal的子目录。WiredTiger的日志文件的名称格式为`WiredTigerLog.0000000020`大小为100MB。超过后会创建新的日志文件。
+
+    - 由于日志文件只需在上次检查点之后恢复数据，因此在新的检查点写入完成时，mongodb会自动删除“旧的”日志文件
+        - 如果服务器崩溃（或kill -9）。mongod重启时会重放日志文件。可能会丢失的写操作的最大范围是：最近100毫秒+日志刷新到磁盘的时间内发生的写操作
+
+    ```sh
+    # mongodb7.0。初始启动mongodb时便会创建3个100MB的日志文件
+    ll journal
+    .rw------- 1 100Mi tz tz  9 Dec 13:29 -I WiredTigerLog.0000000020
+    .rw------- 1 100Mi tz tz  9 Dec 13:21 -I WiredTigerPreplog.0000000001
+    .rw------- 1 100Mi tz tz  9 Dec 13:21 -I WiredTigerPreplog.0000000002
+    ```
+
+
+- 问题：从节点数据可能会落后主节点，导致读取到的数据是几秒、几分钟、几小时之前的
+
+    - `writeConcern`写关注：
+
+        ```mongodb
+        // 副本集写操作需要写入majority（大多数成员），如果在100毫秒内没有复制到大多数成员，则返回错误
+        try {
+            db.users.insertOne(
+                {"_id": 10, "name": "joe"},
+                { writeConcern: {"w": "majority", "wtimeout": 100}}
+            );
+        } catch (e) {
+            print(e)
+        }
+
+        // j 表示日志也要写入
+        try {
+            db.users.insertOne(
+                {"_id": 10, "name": "joe"},
+                { writeConcern: {"w": "majority", "wtimeout": 100, "j": true}}
+            );
+        } catch (e) {
+            print(e)
+        }
+        ```
+
+    - `readConcern`读关注：可以设置在写操作被持久化之前就看到写入的结果。
+
+        - 不要将`readConcern`读关注和读偏好（read preference)混淆，后者处理从何处读取数据的问题。
+        - 和写`writeConcern`写关注一样，需要权衡性能的影响
+
+        | 值            | 说明                             |
+        |---------------|----------------------------------|
+        | local（默认） | 返回的数据，不确保写入大多数成员 |
+        | linearizable  | 返回的数据，确保写入大多数成员   |
+        | majority      | 可以避免读取过时数据             |
+        | available     |                                  |
+        | snapshot      |                                  |
+
+- mongodb不能保证什么？
+    - 硬盘和文件系统错误
+    - 一些较便宜和旧的硬盘，在写操作排队等待时（而不是在实际写入后）就会报告写入成功。mongodb无法防止这个级别的数据丢失
+
+- 检查数据损坏
+    ```mongodb
+    // 检查users集合是否有损坏。valid如果true，则没有数据损坏
+    db.users.validate({full: true})
+    ```
+
+## WiredTiger存储引擎
+
+- 默认会对集合和索引启用压缩。算法是google的snappy。还可以选择facebook的zstd和zlib。或者选择不压缩
+
+- 文档级别：允许并发多个客户端的更新操作，对集合中的不同文档同时进行更新
+    - WiredTiger使用多版本并发控制（MVCC）来隔离读写操作
+
+```mongodb
+// 查看集合详细信息
+db.users.stats()
+//省略
+uri: 'statistics:table:collection-2--5575423204468368826',
+//省略
+
+# 集合对应的文件
+ll | grep '5575423204468368826'
+.rw-------  1  36Ki tz tz 10 Dec 11:07 -I collection-2--5575423204468368826.wt
+.rw-------  1  36Ki tz tz 10 Dec 11:07 -I index-3--5575423204468368826.wt
+```
+
 ## 安全事项
 
 - `$where`：可以在查询中执行javascript代码
     - 为了安全起见，应该严格限制，禁止终端用户随意使用`$where`
 
-## 监控
+## 监控的指标
 
 ### 副本集
 
@@ -4644,7 +5372,7 @@ db.serverStatus().globalLock
 db.serverStatus().locks
 ```
 
-### mongodb-compass（官方的gui工具）
+#### mongodb-compass（官方的gui工具）
 
 - 和`mongostat`、`mongotop`工具返回的指标信息是一致的
 ![avatar](./Pictures/mongodb/mongodb-compass_Databases.avif)
@@ -4666,15 +5394,46 @@ config.system.sessions      0ms     0ms      0ms
         test.analytics      0ms     0ms      0ms
        test.blog.posts      0ms     0ms      0ms
                 test.c      0ms     0ms      0ms
+
+# 获取每个数据库锁的信息
+mongotop --locks
 ```
 
-#### mongostat
+#### mongostat：每秒打印统计信息
+
+| 重要的字段     | 说明                                                                             |
+|----------------|----------------------------------------------------------------------------------|
+| flushes        | mongod将数据刷新到磁盘的次数                                                     |
+| vsize          | mongod虚拟内存数量。大约是数据目录大小的两倍（1倍用于映射文件，1被用于记录日志） |
+| res            | mongod正在使用的内存数量。                                                       |
+| used           | WiredTiger cache 的占比                                                          |
+| qr和qw         | 读操作和写操作的队列大小（有多少个读和写操作正处于阻塞中，等待被处理             |
+| ar和qw         | 有多少个正在执行读操作和写操作的客户端                                           |
+| netIn和 netOut | 传入和传出的网络字节数                                                           |
+| conn           | 连接数（包括传入和传出）                                                         |
+| time           | 进行这些统计所花费的时间                                                         |
 
 ```sh
 mongostat
 insert query update delete getmore command dirty used flushes vsize  res qrw arw net_in net_out conn                time
     *0    *0     *0     *0       0     0|0  0.0% 0.4%       0 2.64G 243M 0|0 0|0   111b   69.5k   11 Nov 22 00:26:35.626
     *0    *0     *0     *0       0     1|0  0.0% 0.4%       0 2.64G 243M 0|0 0|0   112b   69.5k   11 Nov 22 00:26:36.626
+
+# 把副本集和分片中的每个mongod进行输出
+# 连接单个副本集
+mongostat --discover --port 27017
+# 连接mongos，对所有副本集分片
+mongostat --discover --port 47017
+
+# -O 添加更多的字段host,version，并把network.numRequests自定义名字为network requests
+mongostat -O='host,version,network.numRequests=network requests'
+
+# -o 自定义所有字段
+mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
+    opcounters.query.rate()=Query Rate,\
+    opcounters.command.rate()=Command Rate,\
+    wiredTiger.cache.pages requested from the cache=Pages Req,\
+    metrics.document.inserted=inserted rate'
 ```
 
 ### mongoimport和mongoexport导入和导出
@@ -4835,6 +5594,7 @@ pip3 install mtools pymongo
 
 # reference
 
+- [官方文档的gptai](https://www.mongodb.com/docs/)
 - [官方文档](https://www.mongodb.com/docs/manual/)
 
 # 第三方 mongodb 软件
