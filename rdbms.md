@@ -262,6 +262,21 @@ WHERE Ai < c2 and Ai > c1
 
 ![image](./Pictures/rdbms/lsm.avif)
 
+### b树对比lsm树
+
+![image](./Pictures/rdbms/btree_vs_lsm.avif)
+
+- 在不限制写入的情况下；
+    - LSM 树的写入性能是 B 树的 1.5 ~ 2 倍；
+    - LSM 树的读取性能是 B 树的 1/6 ~ 1/3；
+
+- 在限制写入的情况下；
+    - LSM 树的写入性能与 B 树的性能基本持平；
+    - LSM 树的读取性能是 B 树的 1/4 ~ 1/2；
+    - 每秒会写入 30,000 条数据，无论那种情况下 B 树的读取性能是远好于 LSM 树的。
+
+- 对于大多数的 OLTP 系统来说，系统的查询会是写的很多倍
+
 ### Buffer Tree
 
 ![image](./Pictures/rdbms/buffer-tree.avif)
@@ -1177,3 +1192,15 @@ Nested-Loop Join(嵌套循环连接)
 
 - [sqlmap: 自动检测和利用 SQL 注入漏洞，获得数据库服务器的权限。](https://github.com/sqlmapproject/sqlmap)
 
+- [SQLGlot：sql转换器，支持20多种如DuckDB, Presto / Trino, Spark / Databricks, Snowflake, and BigQuery.](https://github.com/tobymao/sqlglot)
+    ```py
+    import sqlglot
+
+    # SQL 转 Spark
+    sql = """WITH baz AS (SELECT a, c FROM foo WHERE a = 1) SELECT f.a, b.b, baz.c, CAST("b"."a" AS REAL) d FROM foo f JOIN bar b ON f.a = b.a LEFT JOIN baz ON f.a = baz.a"""
+    print(transpile(sql, write="spark", identify=True, pretty=True)[0])
+    ```
+
+- 客户端
+
+    - [dbgate：MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others的gui](https://github.com/dbgate/dbgate)

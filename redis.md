@@ -7289,13 +7289,13 @@ slowlog reset
 
             ![avatar](./Pictures/redis/惰性删除流程图.avif)
 
-        - 2.定时任务删除：定时任务（默认每100ms执行1次）`hz`参数控制。
+        - 2.定时任务删除（Redis 6.0之前）：定时任务（默认每100ms执行1次）`hz`参数控制。
 
             - 根据过期的可以的比例，使用快慢两种速率回收key
             ![avatar](./Pictures/redis/memory-recovery.avif)
-                - 每个数据库空间随机检查20个key，发现过期时删除
+                - 每个数据库空间（如db0）随机检查20个key，发现过期时删除
                     - 配置文件参数`ACTIVE_EXPIRE_CYCLE_LOOKUPS_PER_LOOP`，默认为 20
-                - 如果超过检查数量的25%的key，循环执行到不足25%或运行到超时为止
+                - 如果超过检查数量的25%的key（20个键值的25%，也就是5个），循环执行到不足25%或运行到超时为止
                 - 如果之前回收key逻辑超时，则会以快模式运行回收
 
                 - 快慢模式逻辑一样，只是超时时间不同
@@ -7319,6 +7319,34 @@ slowlog reset
                         127.0.0.1:6379> config get lazyfree-lazy-expire
                         lazyfree-lazy-expire: no
                         ```
+
+            - Redis 6.0之前：每次执行定期删除都是随机抽取20个键值，如果当前Redis有过期时间的键值数量较多(例如几百万、几千万)，那么这个随机会导致很多key不会被扫描到
+
+                - Redis 6.0：
+
+                    - 每次随机-->记录遍历游标：在redisDb加了一个游标(expires_cursor)，记录上一次扫描的位置，可以保证最终全部的键值会被扫描到，有效的提升效率。
+
+                    - 从超过检查数量的key25%到10%
+
+                    - 新增active_expire_effort配置，可以适当增强定期删除粒度，它的值范围在1-10。
+                        ```c
+                        unsigned long effort = server.active_expire_effort-1, /* Rescale from 0 to 9. */
+                        //增加每次扫描key的个数
+                        config_keys_per_loop = ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP +  ACTIVE_EXPIRE_CYCLE_KEYS_PER_LOOP/4*effort,
+                        //增加快模式的超时时间
+                        config_cycle_fast_duration = ACTIVE_EXPIRE_CYCLE_FAST_DURATION +  ACTIVE_EXPIRE_CYCLE_FAST_DURATION/4*effort,
+                        //增加慢模式的超时时间
+                        config_cycle_slow_time_perc = ACTIVE_EXPIRE_CYCLE_SLOW_TIME_PERC + 2*effort,
+                        //上述while中的比率
+                        config_cycle_acceptable_stale = ACTIVE_EXPIRE_CYCLE_ACCEPTABLE_STALE- effort;
+                        ```
+
+                    - 实验：写入500万条string（没有过期时间，加之长期不访问），key和value都是16字节，过期时间在1-18秒
+
+                        | 版本         | 全部数据过期耗时 |
+                        |--------------|------------------|
+                        | Redis 4.0.14 | 38262ms          |
+                        | Redis 6.0.15 | 19267ms          |
 
     - 2.超过`maxmemory`触发策略：
 
@@ -7496,6 +7524,60 @@ slowlog reset
 
     - hash-ziplist比string更节省内存。节省内存随着value的减少递增
     - hash-ziplist比string写入更耗时。但随着value的减少，耗时逐渐降低
+
+### 死键
+
+- [Redis开发运维实战：Redis成本优化-键值管理-1.Redis“垃圾”过期死键管理与优化]()
+
+- Redis死键的定义不尽相同，通常有两种：
+    - 1.写到Redis里后，由于过期时间过长或者压根没有过期时间，加之长期不访问，这类key可以被称为死键。
+    - 2.明明已经过了过期时间，但还占用Redis内存（没有真的删除），这类key也可以被称为死键。
+
+- 为什么会有死键？
+    - 惰性删除：如果很多key不会被二次访问，就会产生死键
+    - 定期删除：如果过期键值生产速度大于定期删除速度。有2种情况：
+        - 1.当前Redis有大量写入同时键值过期时间都很短。
+        - 2.当前Redis包含大量键值(例如百万级别)，但已经过期的数据只占很小的比率，这种相对诡异。
+
+- 危害：集群100GB, 键值如果没有死键只有50G，如果有死键可能就是90GB
+    - 增加运维次数：业务侧可能会频繁提交扩容。
+    - 浪费成本
+    - 可能产生逐出：不可预期的使用容量，可能会造成数据逐出(大部分逐出算法都是近似算法，例如lru)
+
+- 如何识别
+
+    - 1.expires表要“大”
+
+        - 需要有一定规模(不然死键问题不存在)，一般认为超过100万（但这个不绝对，比如第2中情况）
+
+    - 2.批量生成大量短过期时间的键值
+
+    - 3.avg_ttl不可靠
+        - avg_ttl是一个近似值，同时它会受到非常长过期时间的干扰（俗称“被平均”）。avg_ttl是15day，但是确实包含了大量死键
+
+    - 4.利用stat_expired_time_cap_reached_count定位
+        - stat_expired_time_cap_reached_count比较频繁说明过期键值很多，因为已经超时了，可以把全部实例绘图监控或者告警
+
+    - 5.键值分析结合stat_expired_stale_perc指标
+        - stat_expired_stale_perc是total_expired/total_sampled的近似比率，如果偏高说明过期键值很多，如果偏低，需要结合键值分析看是否受到了整体的干扰。
+
+    - 6.终极绝招：scan后给集群打标签
+        - 低峰期对每个可疑集群进行清理scan，记录前后键值容量变化，对集群进行标签后，开启定期scan
+
+- 如何解决
+
+    - 官方给出的一个方法是重启。这个对线上环境不太现实(即使有failover)
+
+    - 1.适度调整`active_expire_effort`参数(针对Redis 6.0+)
+
+        - Redis是要对外提供服务的，所以我们必须保证有足够多的CPU时间给正常的命令访问，Redis 4.0之后有个核心指标stat_expired_time_cap_reached_count可以作为参考，其实它就是记录了超时次数，代表在过期删除上投入过多CPU时间.可以对其进行监控。
+
+    - 2.定期scan
+
+        - 当识别到某些集群有如下特点，可以借助外力scan（其实就是惰性删除）帮助过期键值数据删除，但是也要力度适度，例如要结合当前Redis的CPU繁忙程度进行sleep时间设定。    
+        ![avatar](./Pictures/redis/死键.avif)
+
+    - 3.hz：这个建议不要乱调整。
 
 ### 处理大key（bigkey）
 
@@ -8340,6 +8422,67 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
         ![avatar](./Pictures/redis/grafana-redis.avif)
 
 ### 生产环境排查案例
+
+#### 版本升级实践
+
+- [Redis开发运维实战：Redis版本升级实践]()
+
+- 数据库产品求稳不求新。有2点原因：
+    - 可能费力不讨好：新版本不稳定、没拿到什么收益。
+    - 升级困难：不丢数据、平滑迁移、迁移效率高。
+
+- Redis版本调查问卷(6.0 release是在2020年4月)
+    ![avatar](./Pictures/redis/Redis版本调查问卷.avif)
+
+- 优点：
+    - 新功能
+    - 性能
+    - 稳定性
+
+- 缺点：兼容性问题
+
+    - 如果不配置save配置，在Redis 6.2之前是等同于空、但是Redis 6.2后会使用默认配置实现auto save，那就是灾难性的。
+
+    - Redis 5.0中Redis 4.0关于最大客户端缓冲区的名字是不同的。
+        ```
+        # 4.0
+        client_longest_output_list
+        client_biggest_input_buf
+
+        # 5.0
+        client_recent_max_input_buffer
+        client_recent_max_output_buffer
+        ```
+
+- 开始升级工作，一般我会分为四个阶段。
+
+    - 1.线上引流测试：观察1-2周
+        - 使用类似tcpcopy的工具将一部分线上流量引入到新版本，观察收益、稳定性、性能、兼容性等。
+
+    - 2.内存系统测试：观察1-2周
+        - 组内会有一些平台组件用到CacheCloud
+
+    - 3.业务开发测试集群：观察2-3周
+        - 业务测试或者开发用的集群：此时主要关注业务侧耗时变化、性能变化是否符合预期。
+
+    - 4.线上典型场景：观察3-4周
+        - 成本收益类：例如Redis 7.0在小hash、set、zset上是有成本优化的。
+        - 稳定性收益类：例如Redis 6.2解决了rehash、大批量evict带来的稳定性问题
+        - 功能性：例如业务用新的命令、新的数据结构，新的module（例如json）
+
+    - 5.持续升级：时间和规模有关
+        - 譬如业务主动要求。
+        - 譬如业务扩容。
+        - 譬如机房整体搬迁
+
+- Redis稳定性：Redis整体还是非常稳定的，也不用过于担忧(遵循7-8个小版本以后)。
+
+- Redis版本升级不难也难：升级准备是否充足、升级计划是否合理，只要安排合理可以慢慢那结果。
+
+- 我经历过3次Redis升级：
+    - Redis 3->4：2019年开始，耗时2年升级完100万实例
+    - Redis 4->6：2021年开始，耗时2年升级完160万实例
+    - Redis 6->7：预期也需要两年
 
 #### [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](https://cloud.tencent.com/developer/article/2334339)
 
@@ -10703,6 +10846,10 @@ RedKV部分兼容Redis协议，string/hash/zset等主要数据类型
 ## 得物的redis
 
 - [得物技术：得物 Redis 设计与实践](https://zhuanlan.zhihu.com/p/662888646)
+
+## 滴滴的redis
+
+- [滴滴技术：滴滴 Redis 异地多活的演进历程](https://blog.itpub.net/28285180/viewspace-2996267/)
 
 # 第三方 redis 软件
 

@@ -2,9 +2,23 @@
 
 ## 基本概念
 
+![avatar](./Pictures/mongodb/mongodb基本概念.avif)
+
+| SQL                     | MongoDB                        |
+|-------------------------|--------------------------------|
+| 列（Col）               | 字段（Field）                  |
+| 行（Row）               | 文档（Document）               |
+| 表（Table）             | 集合（Collection）             |
+| 主键（Primary Key）     | 对象 ID（Objectid）            |
+| 索引（Index）           | 索引（Index）                  |
+| 嵌套表（Embeded Table） | 嵌入式文档（Embeded Document） |
+| 数组（Array）           | 数组（Array）                  |
+
 - 文档（document）：是mongodb的基本单元，类似于关系数据库的行。
 
-    - 概念上与javascript中的对象非常相近，可以被认为是json格式在基础上加上一些拓展类型
+    - BSON 文档：key-value对组成的数据结构。速度优于JSON
+
+        - 概念上与javascript中的对象非常相近，可以被认为是json格式在基础上加上一些拓展类型
 
     - `{ greeting : "Hello, world!" }`：这个文档包含一个键为`greeting`，对应的值为`Hello, world!`
 
@@ -32,15 +46,28 @@
         - 不能含有`$`。因为某些系统生成的集合会包含`$`，除非你是要访问这些集合
         - `.`表示子集合。例子`blog.posts`
 
-- 一个mongodb实例有多个独立的数据库（database），一个数据库有0个或多个集合。
+- 数据库（database）：名不能包含空字符，名不能为空并且必须小于 64 个字符。
 
-    - 一个推荐的做法是：将单个应用程序的所有数据存储在同一个数据库
+    - 一个mongodb实例有多个独立的数据库（database），一个数据库有0个或多个集合。
 
-    - 命名：
-        - 严格区分大小写
-        - 长度限制为64字节
-        - 不能是空字符串`""`
-        - 不能含有`/` `\` `.` `"` `*` `<` `>` `:` `|` `?` `$` `\0（空字符）`
+        - 一个推荐的做法是：将单个应用程序的所有数据存储在同一个数据库
+
+        - 命名：
+            - 严格区分大小写
+            - 长度限制为64字节
+            - 不能是空字符串`""`
+            - 不能含有`/` `\` `.` `"` `*` `<` `>` `:` `|` `?` `$` `\0（空字符）`
+
+    - 特殊数据库
+
+        - `admin`：保存 root 用户和角色。
+            - 一些特定的服务器端命令也只能从这个数据库运行。比如：关闭服务器
+            - 一般不建议用户直接操作这个数据库。
+
+        - `local` ：不会被复制到其他分片的，因此可以用来存储本地单台服务器的任意 collection。
+            - 一般不建议用户直接操作这个数据库。也不建议进行 CRUD 操作，因为数据无法被正常备份与恢复。
+
+        - `config`： 当 MongoDB 使用分片设置时，config 数据库可用来保存分片的相关信息。
 
 ## 如何部署mongodb
 
@@ -217,14 +244,23 @@ db.movies.updateOne
 
 - 基本使用
 ```mongodb
+// 查看所有数据库
+show dbs
+
 // 查看当前数据库
 db
 
 // 选择要使用的数据库
 use dbname
 
+// 查看所有集合
+show collections
+
 // 查看当前数据库集合
 db.movies
+
+//查看集合的文档总数
+db.users.countDocuments()
 
 // 删除当前整个数据库
 use test
@@ -382,13 +418,30 @@ typeof connectTo
 
 - ObjectID：一个12字节的ID，提供秒粒度的的唯一标识
 
+    | 总共12字节 | 说明                       |
+    |------------|----------------------------|
+    | 4 字节     | 的时间戳，表示 unix 时间戳 |
+    | 5 字节     | 随机值                     |
+    | 3 字节     | 递增计数器，初始化为随机值 |
+
     - mongodb分布式使用ObjectID而不是自动递增主键。——跨多个服务器同步自动递增主键，既困难又耗时
+
 
     ```mongodb
     { "key": ObjectId() }
     ```
 
 ### CRUD（创建、读取、更新、删除）
+
+#### 创建
+
+- 可以通过直接插入数据，自动创建集合
+
+- mongodb5.0支持时间序列数据集合
+
+    ```mongodb
+    db.createCollection("collection_name",{ timeseries: { timeField: "timestamp" } } )
+    ```
 
 #### 插入
 
@@ -2185,7 +2238,7 @@ db.users.dropIndex({"name": 1})
     db.users.insert({"name": "swedishChef", language: "french"})
     ```
 
-### 固定集合
+### 固定集合（capped collection）
 
 - 固定集合（类似于环形队列）：按插入顺序存储。空间不足时，最旧的文档会被删除，新文档取而代之
 
@@ -2246,11 +2299,17 @@ db.users.dropIndex({"name": 1})
 
 - 一个集合可以有多个`TTL`索引。
 
-- `TTL`索引不能是复合索引。但可以像普通索引那样优化排序和查询
+- TTL 索引限制 ：
+    - `TTL`索引不能是复合索引。但可以像普通索引那样优化排序和查询
+    - `_id`字段不支持 TTL 索引。
+    - 无法在固定集合(Capped Collection)上创建 TTL 索引。因为 MongoDB 无法从固定集合中删除文档。
+    - 如果某个字段已经存在非 TTL 索引，那么在该字段上无法再创建 TTL 索引。
+
+- 对于副本集而言，TTL 索引的后台进程只会在 Primary 节点开启，在从节点会始终处于空闲状态，从节点的数据删除是由主库删除后产生的 oplog 来做同步。
 
 - 创建`TTL`索引
 
-    - `expireAfterSeconds`选项：创建TTL索引
+    - `expireAfterSeconds`过期时间选项：创建TTL索引
     - mongodb每分钟扫描TTL索引，因此不能依赖秒级粒度。可以使用`collMod`命令：修改`expireAfterSeconds`的值
 
     ```mongodb
@@ -2271,7 +2330,9 @@ db.users.dropIndex({"name": 1})
 
 - 聚合框架能够使用索引
 
-- 一共5个阶段：
+- 阶段：
+
+    ![avatar](./Pictures/mongodb/聚合框架.avif)
 
     - `$match`：匹配阶段
 
@@ -2665,6 +2726,16 @@ db.users.dropIndex({"name": 1})
     ])
     ```
 
+## map-reduce
+
+- 从 MongoDB 5.0 开始，map-reduce 已经不被官方推荐使用了，替代方案是 聚合框架。聚合框架提供比 map-reduce 更好的性能和可用性。
+
+- mapreduce 操作包括两个阶段：
+    - map 阶段处理每个文档并将 key 与 value 传递给 reduce 函数进行处理
+    - reduce 阶段将 map 操作的输出组合在一起。
+
+- mapreduce 可使用自定义 JavaScript 函数来执行 map 和 reduce 操作，以及可选的 finalize 操作。
+
 ## 事务
 
 - 一篇2019年的SIGMOD会议论文[《Implementation of Cluster-wide Logical Clock and Causal Consistency in MongoDB》](https://dl.acm.org/doi/10.1145/3299869.3314049)。讲述逻辑会话和因果一致性背后的机制提供了深层次的技术解释
@@ -2691,8 +2762,17 @@ db.users.dropIndex({"name": 1})
     | 不包含错误处理逻辑             | 自动为TransientTransactionError和UnknownTransactionCommitResult提供错误处理逻辑 |
 
 - 事务的限制：
-    - 时间限制：
-        - 默认最大运行时间1分钟。
+    - 仅 WiredTiger 引擎支持事务。
+    - 对集合的创建和删除操作，不能出现在事务中。
+    - 对索引的创建和删除操作，不能出现在事务中。
+    - 不能对系统级别的数据库和集合进行操作。
+    - 不能使用 explain 操作做查询分析。
+    - 不能对 固定集合 进行操作。
+    - 事务不能在 session 外运行。
+    - 一个 session 只能运行一个事务，多个 session 可以并行运行事务。
+    - `oplog`条目大小限制：每条`oplog`条目必须小于16MB的BSON
+
+    - 时间限制：默认最大运行时间1分钟。
         - 显示设置`maxTimeMS`参数。如果没有设置则使用`transaction-LifetimeLimitSeconds`；如果设置了，但大于`transaction-LifetimeLimitSeconds`，则以后者为准
         - 修改mongod实例级别的`transaction-LifetimeLimitSeconds`
         - 分片集群：必须在所有分片副本集上设置`transaction-LifetimeLimitSeconds`。
@@ -2708,7 +2788,15 @@ db.users.dropIndex({"name": 1})
                 | -1          | 将`maxTimeMS`参数作为超时时间  |
                 | 大于0的数字 | 指定超时时间（单位：秒）       |
 
-    - `oplog`条目大小限制：每条`oplog`条目必须小于16MB的BSON
+## 视图
+
+- 视图基于已有的集合进行创建，是只读的，不实际存储硬盘，通过视图进行写操作会报错。
+
+- 视图使用其上游集合的索引。由于索引是基于集合的，所以你不能基于视图创建、删除或重建索引，也不能获取视图的索引列表。
+
+- 如果视图依赖的集合是分片的, 那么视图也视为分片的。
+
+- 视图是实时计算并读取的。
 
 ## 应用程序的设计模式
 
@@ -3058,17 +3146,6 @@ db.users.dropIndex({"name": 1})
 
 - 所有mongodb驱动程序都遵守服务器发现和监控（SDAM）规范。驱动程序会持续监视副本集的拓扑结构，以检测应用程序对成员的访问是否有变化。并且维护哪个成员是主节点的信息
 
-- 读偏好（read preference)：
-
-    - `primary`（默认值）：始终发送给主节点，没有主节点就报错
-    - `primaryPreferred`：当主节点停止运行时，副本集会进入一个临时的只读模式
-    - `nearest`：在延迟最低的从节点上读取。适合低延迟需求大于一致性需求的场景
-        - 基于驱动程序对副本集成员的平均ping，将路由请求到延迟最低的成员
-        - 如果应用程序需要低延迟读和低延迟写，由于副本集只允许主节点写，因此需要分片
-
-    - `secondary`：如果可以接受旧数据。总是发送给从节点；如果没有从节点就报错，不会发送给主节点
-    - `secondaryPreferred`：如果可以接受旧数据。总是发送给从节点；没有从节点，就发送给主节点
-
 ### 启动副本集
 
 - 实验：在单机服务器上，建立一个3节点的副本集
@@ -3367,6 +3444,17 @@ db.users.dropIndex({"name": 1})
             ```
 
 ### 管理
+
+- 读偏好（read preference)：
+
+    - `primary`（默认值）：始终发送给主节点，没有主节点就报错
+    - `primaryPreferred`：当主节点停止运行时，副本集会进入一个临时的只读模式
+    - `nearest`：在延迟最低的从节点上读取。适合低延迟需求大于一致性需求的场景
+        - 基于驱动程序对副本集成员的平均ping，将路由请求到延迟最低的成员
+        - 如果应用程序需要低延迟读和低延迟写，由于副本集只允许主节点写，因此需要分片
+
+    - `secondary`：如果可以接受旧数据。总是发送给从节点；如果没有从节点就报错，不会发送给主节点
+    - `secondaryPreferred`：如果可以接受旧数据。总是发送给从节点；没有从节点，就发送给主节点
 
 - 副本集最多只能有50个成员，其中只有7个成员拥有投票权
     - 这是为了减少每个成员的心跳产生的网络流量
@@ -3906,6 +3994,8 @@ db.users.dropIndex({"name": 1})
 
 ## 分片（shard)
 
+![avatar](./Pictures/mongodb/shard.avif)
+
 - 分片类似于集群和RAID10
     - 可以使用性能较弱的机器实现负载
     - 可以基于地理位置拆分文档，让靠近它们的客户端更快的访问
@@ -3944,12 +4034,12 @@ db.users.dropIndex({"name": 1})
 
 - 块与分片
 
-    - 会将集合才分成多个块块，对于大型集合来说可能需要几个小时
+    - 会将集合才分成多个块（默认 64M，可选范围 1 ～ 1024M），对于大型集合来说可能需要几个小时
         ```mongodb
         sh.shardCollection("crm.users", {"name": 1})
         ```
 
-    - 一个文档总是仅属于一个块。因此不能使用数组字段作为片键——因为数组会创建多个索引项
+    - 一个文档总是仅属于一个块。因此不能使用数组字段作为分片键（shard key）——因为数组会创建多个索引项
 
     - mongodb会用一个较小的表来维护块与分片的映射，保存在`config`数据库的`chunks`集合中
 
@@ -3961,7 +4051,7 @@ db.users.dropIndex({"name": 1})
         - 删除会使块包含更少的文档
         - 插入会使块包含更多的文档
         - 拆分：
-            - 块增长到一定大小，会拆分成2个更小的块
+            - 块增长到一定大小（默认64MB），会拆分成2个更小的块
 
                 - 例子：有一个`3 <= "age" < 17`的块被拆分时，会分成`3 <= "age" < 12`和`12 <= "age" < 17`。12被成为拆分点（split point）
 
@@ -3989,7 +4079,7 @@ db.users.dropIndex({"name": 1})
         - 如果说age，就需要检查大部分甚至所有的块。因此应使用`{"age": 1, "name": 1}`作为复合片键
 
 
-- 均衡器：负责数据迁移
+- 均衡器：负责数据迁移（rebalance）
 
     - 是config配置服务器的主节点的后台进程：监视每个分片的块数量，只要块达到阈值大小，才会被激活
 
@@ -3998,6 +4088,9 @@ db.users.dropIndex({"name": 1})
         - mongodb3.4之后，可以并发执行迁移，并发的最大数量是分片总数的一半
 
     - 达到阈值时，会开始对块进行迁移：从负载较大的分片中选一个块，并询问分片是否在迁移之前进行拆分，拆分完成后，就会将块迁移到较少块的机器上
+
+        ![avatar](./Pictures/mongodb/shard-rebalance.avif)
+
         - 这对客户端不可见
             - 1.mongos会将所有读写请求路由到旧的块上
             - 2.mongos会收到一个错误（日志中可能会有unable to setShardVersion），然后从config配置服务器查找数据的新位置，并更新块分布表
@@ -4018,14 +4111,6 @@ db.users.dropIndex({"name": 1})
             {upsert: true}
         )
         ```
-
-- 变更流（change stream）：允许应用追踪数据库中数据的实时变更
-    - mongodb3.6之后：只能通过追踪`oplog`实现，是一个复杂且容易出错的操作
-    - 变更流可以为一个集合、一组集合、一个数据库、整个集群的所有数据的变更提供订阅机制
-        - 使用了聚合框架：允许用户自定义过滤
-    - 所有变更流操作，都必须针对mongos发出
-    - 如果开启变更流的分片，并运行带有`mulit:true`的集合的更新操作，会出现向孤儿文档发送通知
-    - 如果一个分片被删除，那么打开的变更流游标被关闭，并且无法恢复
 
 ### 启动分片
 
@@ -4361,7 +4446,11 @@ sh.status()
 
 ### 选择片键
 
-- 片键：对集合进行分片时，需要对一两个字段进行数据拆分，这个键（这些键）就是片键
+- 数据库可以混合使用分片和未分片集合
+    - 分片集合被分区并分布在集群中的各个分片中
+    - 未分片集合仅存储在主分片中
+
+- 片键（shard key）：对集合进行分片时，需要对一两个字段进行数据拆分，这个键（这些键）就是片键
 
 - 对于分片的每个集合，首先要回答以下问题
 
@@ -4380,6 +4469,9 @@ sh.status()
     - 不能是数组。如果是`sh.shardCollection()`会失败。
     - 特殊类型不能作为片键：地理空间索引
     - 插入文档后，片键的值可能会被修改，除非是不可变的如`_id`字段。在mongodb4.2之前不能修改文档的片键值
+
+    - 如果该集合具有其他唯一索引，则无法分片该集合。
+        - 对于已分片的集合，不能在其他字段上创建唯一索引。
 
 - 片键的基数：和索引一样，基数越高，分片性能越好。
     - 如果logLevel只有DEBUG、WARN、ERROR三个值，则mongodb无法分出超过三个以上的块
@@ -4513,6 +4605,87 @@ sh.status()
         - 添加新的块不会有任何写操作，因为没有热点块在这个分片上面
 
 ### 管理
+
+#### 手动分片。mongodb5.0支持在线数据重新分片
+
+- 手动分片：自己控制分发到哪里。需要关闭均衡器
+
+- 除非遇到特殊情况，否则应该使用自动分片而不是手动分片。
+
+- 不要在均衡器开启的情况下，进行手动分片
+
+    - 如果同时使用存在的问题：
+        - 有shardA和shardB两个分片，每个分片都有500个块。
+        - shardA接受了大量的写操作，你决定关掉均衡器，并将30个最活跃的块移动到shardB。
+        - 重新开启均衡器，它可能会将30个块（可能不是刚刚的30个）从shardB移动到shardA来平衡块
+    - 两种解决方法：
+        - 1.在开启均衡器之前，将30个不活跃的块，从shardB移动到shardA，这样分片之间就不会出现不均衡
+        - 2.对shardA的块执行30次拆分
+
+```mongodb
+// 关闭均衡器。如果均衡器正在迁移，则完成之前不会生效
+sh.stopBalancer()
+// 或者
+sh.setBalancerState(false)
+
+// 在输入上一条命令后，确认均衡器是否正在迁移。
+use config
+while(sh.isBalancerRunning()) {
+    print("waiting...");
+    sleep(1000);
+}
+```
+
+```mongodb
+// 关闭均衡器后，就可以手动迁移了。先查看数据块与分片的映射
+use crm
+db.chunks.find()
+
+// 迁移crm数据库的users集合的name: MaxKey()数据块到rs0
+sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+// 如果这个块超过块的最大值，mongos会拒绝移动。需要使用splitAt命令手动拆分
+sh.splitAt("crm.users", {"name": NumberLong("7000000000000000000")})
+sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+```
+
+#### 在线数据重新分片
+
+- MongoDB5.0以前：重新分片过程复杂且需要手动分片
+
+    - 方法1：先dump整个集合，然后用新的分片键把数据库重新加载到一个新的集合中。
+
+        - 缺点：由于这是一个需要离线处理的过程，因此您的应用程序在重新加载完成之前需要中断停服较长时间。例如：在一个三分片的集群上dump和重新加载一个10 TB以上的集合可能需要几天时间。
+
+    - 方法2：新建一个分片集群并重新设定集合的分片键，然后通过定制迁移方式，将旧分片集群中需要重新分片的集合，按新的分片键写入到新的分片集群中。
+
+        - 缺点：该过程中需要您自行处理查询路由和迁移逻辑、不断检查迁移进度，以确保所有数据迁移成功。
+            - 定制迁移是高度复杂的、劳动密集型的、有风险的任务，而且耗时很长。例如：某个MongoDB用户花了三个月才完成100亿个document的迁移。
+
+- MongoDB5.0以后：`reshardCollection`命令即可启动重新分片
+    - 优点：
+        - 1.并不是简单地重新平衡数据，而是在后台将所有当前集合的数据复制并重新写入新集合，同时与应用程序新的写入保持同步。
+        - 2.完全自动化。将重新分片花费的时间从几周或几个月压缩到几分钟或几小时，避免了冗长繁杂的手动数据迁移。
+        - 3.通过使用在线重新分片，可以方便地在开发或测试环境中评估不同分片键的效果
+
+    ```mongodb
+    // MongoDB会克隆现有集合，然后将现有集合中所有oplog应用到新集合中，当所有oplog被使用后，MongoDB会自动切换到新集合，并在后台删除旧集合。
+    reshardCollection: "<database>.<collection>", key: <shardkey>
+    ```
+
+#### mongosync将数据从分片集群迁移到另一个分片集群
+
+- 这是mongodb官方的工具，不是360那个mongosync
+
+- [官网下载](https://www.mongodb.com/try/download/mongosync)
+
+- [官方文档](https://www.mongodb.com/docs/cluster-to-cluster-sync/current/reference/mongosync/)
+
+```sh
+mongosync \
+     --cluster0 "mongodb://192.0.2.10:27017,192.0.2.11:27017,192.0.2.12:27017" \
+     --cluster1 "mongodb://192.0.2.20:27017,192.0.2.21:27017,192.0.2.22:27017"
+```
 
 #### 查看基本分片信息
 
@@ -4798,6 +4971,16 @@ db.adminCommand({"connPoolStats": 1})
     db.adminCommand({"flushRouterConfig": 1})
     ```
 
+### 分片选择
+
+- 在了解了 MongoDB 的基本性能数据之后，就可以根据自己的业务需求选取合适的配置了。如果是分片集群，其中最重要的就是分片选取，包括：
+
+    - 需要多少个 Mongos
+    - 需要分为多少个分片
+    - 分片键和分片算法用什么
+
+    ![avatar](./Pictures/mongodb/分片选择公式.avif)
+
 ## GridFS
 
 - [官方文档](https://www.mongodb.com/docs/manual/core/gridfs/)
@@ -4933,49 +5116,32 @@ db.adminCommand({"connPoolStats": 1})
     sh.shardCollection("test.fs.chunks", {"files_id": "hashed"})
     ```
 
+## 变更流（change stream）
+
+- 变更流（change stream）：允许应用追踪数据库中数据的实时变更
+    - 监听到的变更事件包括：insert、update、replace、delete、drop、rename、dropDatabase 和 invalidate。
+
+- mongodb3.6之后：只能通过追踪`oplog`实现，是一个复杂且容易出错的操作
+
+- 可应用于复制集和分片集：
+    - 应用于复制集时，可以在复制集中任意一个节点上开启监听
+    - 应用于分片集时，则只能在 mongos 上开启监听。
+        - 在 mongos 上发起监听，是利用全局逻辑时钟提供了整个分片上变更的总体排序，确保监听事件可以按接收到的顺序安全地解释。
+        - mongos 会一直检查每个分片，查看每个分片是否存在最新的变更。
+
+        - 如果开启变更流的分片，并运行带有`mulit:true`的集合的更新操作，会出现向孤儿文档发送通知
+        - 如果一个分片被删除，那么打开的变更流游标被关闭，并且无法恢复
+
+- 应用场景：
+    - 数据同步：多个 MongoDB 集群之间的增量数据同步。
+    - 审计：对 MongoDB 操作进行审计、监控。
+    - 数据订阅：外部程序订阅 MongoDB 的数据变更，可离线数据同步、计算或分析等。
+        - 可以为一个集合、一组集合、一个数据库、整个集群的所有数据的变更提供订阅机制
+            - 使用了聚合框架：允许用户自定义过滤
+
 ## 管理
+
 ### 数据块管理
-
-- 手动分片：自己控制分发到哪里。需要关闭均衡器
-
-    - 除非遇到特殊情况，否则应该使用自动分片而不是手动分片。
-
-    - 不要在均衡器开启的情况下，进行手动分片
-
-        - 如果同时使用存在的问题：
-            - 有shardA和shardB两个分片，每个分片都有500个块。
-            - shardA接受了大量的写操作，你决定关掉均衡器，并将30个最活跃的块移动到shardB。
-            - 重新开启均衡器，它可能会将30个块（可能不是刚刚的30个）从shardB移动到shardA来平衡块
-        - 两种解决方法：
-            - 1.在开启均衡器之前，将30个不活跃的块，从shardB移动到shardA，这样分片之间就不会出现不均衡
-            - 2.对shardA的块执行30次拆分
-
-    ```mongodb
-    // 关闭均衡器。如果均衡器正在迁移，则完成之前不会生效
-    sh.stopBalancer()
-    // 或者
-    sh.setBalancerState(false)
-
-    // 在输入上一条命令后，确认均衡器是否正在迁移。
-    use config
-    while(sh.isBalancerRunning()) {
-        print("waiting...");
-        sleep(1000);
-    }
-    ```
-
-    ```mongodb
-    // 关闭均衡器后，就可以手动迁移了。先查看数据块与分片的映射
-    use crm
-    db.chunks.find()
-
-    // 迁移crm数据库的users集合的name: MaxKey()数据块到rs0
-    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-
-    // 如果这个块超过块的最大值，mongos会拒绝移动。需要使用splitAt命令手动拆分
-    sh.splitAt("crm.users", {"name": NumberLong("7000000000000000000")})
-    sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-    ```
 
 - 修改块大小
 
@@ -5241,10 +5407,58 @@ db.adminCommand({"connPoolStats": 1})
     .rw------- 1 100Mi tz tz  9 Dec 13:21 -I WiredTigerPreplog.0000000002
     ```
 
+- mongodb不能保证什么？
+    - 硬盘和文件系统错误
+    - 一些较便宜和旧的硬盘，在写操作排队等待时（而不是在实际写入后）就会报告写入成功。mongodb无法防止这个级别的数据丢失
+
+- 检查数据损坏
+    ```mongodb
+    // 检查users集合是否有损坏。valid如果true，则没有数据损坏
+    db.users.validate({full: true})
+    ```
+
+### 一致性和writeConcern和readConcern
 
 - 问题：从节点数据可能会落后主节点，导致读取到的数据是几秒、几分钟、几小时之前的
 
-    - `writeConcern`写关注：
+- 因果一致性：
+    - 单节点的数据库由于为读写操作提供了顺序保证，因此实现了因果一致性。
+        - 分布式系统同样可以提供这些保证，但必须对所有节点上的相关事件进行协调和排序。
+
+    - 不符合因果一致性的流程
+    ![avatar](./Pictures/mongodb/不符合因果一致性的流程.avif)
+    - 符合因果一致性的流程
+    ![avatar](./Pictures/mongodb/符合因果一致性的流程.avif)
+
+    - 为了建立副本集和分片集事件的全局偏序关系，MongoDB 实现了一个逻辑时钟，称为 lamport logical clock。每个写操作在应用于主节点时都会被分配一个时间值。这个值可以在副本和分片之间进行比较。
+
+    - 在客户端会话中开启因果一致性
+        - 要保证 `readconcern` 和 `writeconcern` 的值都是 `majority`
+        - 应用程序必须确保一次只有一个线程在客户端会话中执行这些操作。
+
+- 线性一致性：任何读操作都能读到某个数据的最近一次写的数据。系统中的所有进程看到的操作顺序，都遵循全局时钟的顺序。
+
+    ![avatar](./Pictures/mongodb/线性一致性.avif)
+
+- `writeConcern`写策略：
+
+    - w字段：
+
+        | w字段的值                          | 说明                                                                             |
+        |------------------------------------|----------------------------------------------------------------------------------|
+        | 0                                  | 客户端不需要收到任何有关写操作是否执行成功的确认，就直接返回成功，具有最高性能。 |
+        | 1                                  | 表示写主成功则返回                                                               |
+        | majority（mongodb5.0开始为默认值） | 需要收到多数节点（含主节点）关于操作执行成功的确认                               |
+        | all                                | 表示全部节点确认才返回成功                                                       |
+
+
+    - wtimeout字段：主节点在等待足够数量的确认时的超时时间，单位为毫秒。超时返回错误，但并不代表写操作已经执行失败。
+
+        | wtimeout字段的值 | 说明                       |
+        |------------------|----------------------------|
+        | w 为 0           | 永不返回错误               |
+        | w 是 1           | 主节点确认的超时时间       |
+        | w 为 majority    | 表示多数节点确认的超时时间 |
 
         ```mongodb
         // 副本集写操作需要写入majority（大多数成员），如果在100毫秒内没有复制到大多数成员，则返回错误
@@ -5256,47 +5470,203 @@ db.adminCommand({"connPoolStats": 1})
         } catch (e) {
             print(e)
         }
+        ```
 
+    - j：表示日志也要写入
+
+        | j字段的值 | 说明                                                                                                                                                                |
+        |-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+        | false | 表示写操作到达内存即算作成功                                                                                                                                        |
+        | true  | 写操作落到 journal 文件中才算成功。w:0 如果指定 j:true，则优先使用 j:true 来请求独立或复制集主副本的确认。j:true 本身并不能保证不会因复制集主故障转移而回滚写操作。 |
+
+        ```mongodb
         // j 表示日志也要写入
         try {
             db.users.insertOne(
                 {"_id": 10, "name": "joe"},
-                { writeConcern: {"w": "majority", "wtimeout": 100, "j": true}}
+                { writeConcern: {"w": "majority",  "j": true}}
             );
         } catch (e) {
             print(e)
         }
         ```
 
-    - `readConcern`读关注：可以设置在写操作被持久化之前就看到写入的结果。
+- `readConcern`读策略：可以设置在写操作被持久化之前就看到写入的结果。
 
-        - 不要将`readConcern`读关注和读偏好（read preference)混淆，后者处理从何处读取数据的问题。
-        - 和写`writeConcern`写关注一样，需要权衡性能的影响
+    - 不要将`readConcern`读策略和读偏好（read preference)混淆，后者处理从何处读取数据的问题。
+    - 和写`writeConcern`写策略一样，需要权衡性能的影响
 
-        | 值            | 说明                             |
-        |---------------|----------------------------------|
-        | local（默认） | 返回的数据，不确保写入大多数成员 |
-        | linearizable  | 返回的数据，确保写入大多数成员   |
-        | majority      | 可以避免读取过时数据             |
-        | available     |                                  |
-        | snapshot      |                                  |
+    | 值（一致性依次由弱到强） |
+    |--------------------------|
+    | local（默认）            |
+    | available                |
+    | majority                 |
+    | linearizable             |
 
-- mongodb不能保证什么？
-    - 硬盘和文件系统错误
-    - 一些较便宜和旧的硬盘，在写操作排队等待时（而不是在实际写入后）就会报告写入成功。mongodb无法防止这个级别的数据丢失
+    - `local`（默认）：
+        - 读操作直接读取本地最新的数据，但不保证该数据已被写入大多数复制集成员。
+        - 数据可能会被回滚。
+        - 默认是针对主节点读。如果读取操作与因果一致的会话相关联，则针对副节点读。
 
-- 检查数据损坏
-    ```mongodb
-    // 检查users集合是否有损坏。valid如果true，则没有数据损坏
-    db.users.validate({full: true})
-    ```
+    - `available`：在`local`值的基础上，在分片集群场景下，为了保证性能，可能返回孤儿文档。
+    - `majority`：
+        - 保证读取的数据不会被回滚
+        - 不能保证读到本地最新的数据。受限于不同节点的复制进度，可能会读取到更旧的值。
+        - 当写操作对应的writeconcern 配置中 w 的值越大；readconcern 被配置为 majority 的读操作，就有更大的概率读取到最新的数据。
+
+    - `linearizable`：
+        - 会等待在读之前所有的 majority committed 确认。
+        - 承诺线性一致性，要求读写顺序和操作真实发生的时间完全一致，既保证能读取到最新的数据，也保证读到数据不会被回滚。
+        - 只对读取单个文档时有效，且可能导致非常慢的读，因此总是建议配合使用 `maxTimeMS` 使用。
+        - 只能用在主节点的读操作上，考虑到写操作也只能发生在主节点上
+
+        - 问题：如果writeconcern 为 majority 的写操作。数据写入到多数节点后，没有在日志中持久化，当这些节点发生重启恢复，那么之前通过配置 readconcern 为 linearizable 的读操作读取到的数据就可能丢失。
+            - 解决方法：通过 `writeConcernMajorityJournalDefault` 选项保证指定 writeconcern 为 majority 的写操作在日志中是否持久化。
+            - 依然存在的问题：如果写操作持久化到了日志中，但是没有复制到多数节点，在重新选主后，同样可能会发生数据丢失，违背一致性承诺。
+
+        - majority和linearizable的区别
+
+            ![avatar](./Pictures/mongodb/majority和linearizable的区别.avif)
+
+    - `snapshot`：
+        - MongoDB 4.0 版本中新出现的多文档事务而设计的，只能用在显式开启的多文档事务中。
+        - 与关系型数据库中的快照隔离级别语义一致。最高隔离级别，接近于 serializable。
+        - 保证在事务中的读不出现脏读、不可重复读和幻读。因为所有的读都将使用同一个快照，直到事务提交为止该快照才被释放。
+        -  writeconcern 为 majority，则在事务提交后，读操作可以保证已从多数提交数据的快照中读取
+            - 该快照提供与该事务开始之前的操作的因果一致性。
+            - 它读取 majority committed 的数据，但可能读不到最新的已提交数据
+
+#### 事务与read concern和write concern
+
+| read concern值 | 说明                                                                                   |
+|----------------|----------------------------------------------------------------------------------------|
+| local          | 数据可能回滚。对于分片群集上的事务，local 不能保证数据是从整个分片的同一快照视图获取。 |
+| majority       | 无法回滚数据。对于分片群集上的事务，不能保证数据是从整个分片的同一快照视图中获取。     |
+
+| write concern值 | 说明                                                                              |
+|-----------------|-----------------------------------------------------------------------------------|
+| w:0             | 事务写入不关注是否成功，默认为成功。                                              |
+| w:1             | 事务写入到主节点就开始往客户端发送确认写入成功。                                  |
+| w:majority      | 大多数节点成功原则，例如一个复制集 3 个节点，2 个节点成功就认为本次事务写入成功。 |
+| w:all           | 所有节点都写入成功，才认为事务提交成功。                                          |
+| j:false         | 写操作到达内存就算事务成功。                                                      |
+| j:true          | 写操作只有记录到日志文件才算事务成功。                                            |
+| wtimeout:       | 写入超时时间，过期表示事务失败。                                                  |
 
 ## WiredTiger存储引擎
 
+- 使用 WiredTiger，如果没有 journal 记录，MongoDB 能且仅能从最后一个检查点恢复。
+    - 如果需要恢复最后一次 checkpoint 之后所做的更改，那么开启日志是必要的。
+
 - 默认会对集合和索引启用压缩。算法是google的snappy。还可以选择facebook的zstd和zlib。或者选择不压缩
 
-- 文档级别：允许并发多个客户端的更新操作，对集合中的不同文档同时进行更新
-    - WiredTiger使用多版本并发控制（MVCC）来隔离读写操作
+- 支持使用 B+ 树和 LSM 两种数据结构
+
+    ```mongodb
+    // 创建使用LSM数据结构的集合
+    db.createCollection(
+        "posts",
+        { storageEngine: { wiredTiger: {configString: "type=lsm"}}}
+    )
+    ```
+
+- B+ 树（默认使用）
+
+    ![avatar](./Pictures/mongodb/B+Tree.avif)
+
+    - 以 page 为单位往磁盘读写数据，B+ 树的每个节点为一个 page
+
+        | 三种类型的 page | 说明                                                                                              |
+        |-----------------|---------------------------------------------------------------------------------------------------|
+        | root page       | B+ 树的根节点                                                                                     |
+        | internal page   | 存储数据的中间索引节点                                                                            |
+        | leaf page       | 真正存储数据的叶子节点：包含页头（page header）、块头（block header）和真正的数据（key-value 对） |
+
+        | leaf page的字段  | 说明                                                    |
+        |------------------|---------------------------------------------------------|
+        | page header      | 定义了页的类型、页存储的记录条数等信息                  |
+        | block header块头 | 定义了页的校验和 checksum、块在磁盘上的寻址位置等信息。 |
+        | page             |                                                         |
+
+        | page字段  | 说明                                                                                       |
+        |-----------|--------------------------------------------------------------------------------------------|
+        | WT_ROW    | 从磁盘加载的key-value数组，每一条记录还有一个cell_offset变量，表示这条记录在page上的偏移量 |
+        | WT_UPDATE | 下个 checkpoint 之前被修改的数据。实现 MVCC                                                |
+        | WT_INSERT | 下个 checkpoint 之前新增的数据                                                             |
+
+    - Page 的生命周期状态机：
+
+        ![avatar](./Pictures/mongodb/B+Tree-Page的生命周期.avif)
+
+        - `reconcile`过程：发生在 checkpoint 的时候，将内存中 Page 的修改转换成磁盘需要的 B+ Tree 结构。
+            - 新建一个 Page 来将修改了的数据做整合，然后原 Page 就会被 discarded，新 page 会被刷新到磁盘，同时加入 LRU 队列。
+
+        - `evict`过程：是内存不够用了或者脏数据过多的时候触发的
+            - 由 eviction_target（内存使用量）和 eviction_dirty_target（内存脏数据量）来控制
+            - 根据 LRU 规则淘汰内存 Page 到磁盘。
+            - 默认是有后台的 evict 线程控制的。但是如果超过一定阈值就会把用户线程也用来淘汰，会严重影响性能，应该避免这种情况。用户线程参与 evict 的原因，一般是大量的写入导致磁盘 IO 抗不住了，需要控制写入或者更换磁盘。
+
+        | Page状态  | 说明                                                                                                                                                                                               |
+        |-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+        | DIST      | Page 在磁盘中                                                                                                                                                                                      |
+        | DELETE    | Page 已经在磁盘中从树中删除                                                                                                                                                                        |
+        | READING   | Page 正在被从磁盘加载到内存中                                                                                                                                                                      |
+        | MEM       | Page 在内存中，且能正常读写。                                                                                                                                                                      |
+        | LOCKED    | 内存淘汰过程（evict）正在锁住 Page                                                                                                                                                                 |
+        | LOOKASIDE | 在执行 reconcile 的时候，如果 page 正在被其他线程读取被修改的部分，这个时候会把数据存储在 lookasidetable 里面。当页面再次被读时可以通过 lookasidetable 重构出内存 Page。                           |
+        | LIMBO     | 在执行完 reconcile 之后，Page 会被刷到磁盘。这个时候如果 page 有 lookasidetable 数据，并且还没合并过来之前就又被加载到内存了，就会是这个状态，需要先从 lookasidetable 重构内存 Page 才能正常访问。 |
+
+    - 块设备管理模块：为 page 分配 block
+        - 定位文档位置时，先计算 block 的位置，通过 block 的位置找到它对应的 page，再通过 page 找到文档行数据的相对位置。
+
+- checkpoint 实现将内存中修改的数据持久化到磁盘，保证系统在因意外重启之后能快速恢复数据。
+
+    ![avatar](./Pictures/mongodb/checkpoint.avif)
+
+    - 一个 checkpoint 就是一个内存 B+ Tree，其结构就是前面提到的 Page 组成的树
+
+    | checkpoint字段       | 说明                                                               |
+    |----------------------|--------------------------------------------------------------------|
+    | root page            | 就是指向 B+ Tree 的根节点                                          |
+    | allocated list pages | 上个 checkpoint 结束之后到本 checkpoint 结束前：新分配的 page 列表 |
+    | discarded list pages | 上个 checkpoint 结束之后到本 checkpoint 结束前：被删掉的 page 列表 |
+    | available list pages | 分配了但是没有使用的 page，新建 page 时直接从这里取。              |
+
+    - 流程：
+
+        ![avatar](./Pictures/mongodb/checkpoint流程.avif)
+
+        - 1.在系统启动或者集合文件打开时，从磁盘加载最新的 checkpoint。
+        - 2.根据 checkpoint 的 file size truncate 文件。
+            - 因为只有 checkpoint 确认的数据才是真正持久化的数据，它后面的数据可能是最新 checkpoint 之后到宕机之间的数据，不能直接用，需要通过 Journal 日志来回放。
+        - 3.根据 checkpoint 构建内存的 B+ Tree。
+        - 5.数据库 run 起来之后，各种修改操作都是操作 checkpoint 的 B+ Tree，并且会 checkpoint 会有专门的 list 来记录这些修改和新增的 page
+        - 6.在 60s 一次的 checkpoint 执行时，会创建新的 checkpoint，并且将旧的 checkpoint 数据合并过来。然后执行 reconcile 将修改的数据刷新到磁盘，并删除旧的 checkpoint。这时候会清空 allocated，discarded 里面的 page，并且将空闲的 page 加到 available 里面。
+
+- WiredTiger使用多版本并发控制（MVCC）来隔离读写操作
+    - 文档级别：允许并发多个客户端的更新操作，对集合中的不同文档同时进行更新
+    - MVCC 通过非锁机制进行读写操作，是一种乐观并发控制模式。
+    - WiredTiger 仅在全局、数据库和集合级别使用意向锁。
+    - 当存储引擎检测到两个操作之间存在冲突时，将引发写冲突，从而导致 MongoDB 自动重试该操作。
+
+- 内存 cache：
+
+    - 数据量小的时候是纯内存读写，性能肯定非常好，当数据量过大时就会触发内存和磁盘间数据的来回交换，导致性能降低。
+
+    - 内存分配大小一般是不建议改的，除非你确实想把自己全部数据放到内存
+
+    - Wired Tiger 会将整个内存划分为 3 块：
+
+        - 1.WiredTiger cache：缓存前面提到的内存数据，默认大小 Max((RAM - 1G)/2,256M )，服务器 16G 的话，就是(16-1)/2 = 7.5G 。
+            - B+ 树缓存未压缩的数据，可以直接使用的数据。并通过淘汰算法确保内存占用在合理范围内。
+            - 这个内存配置一定要注意，因为 Wired Tiger 如果内存不够可能会导致数据库宕掉的。
+
+        - 2.索引 cache：换成索引信息，默认 500M
+
+        - 3.File System Cache：是经过压缩的数据，可以占用更少的内存空间，相对的就是数据不能直接用，需要解压
+            - 这个实际上不是存储引擎管理，是利用的操作系统的文件系统缓存，目的是减少内存和磁盘交互。剩下的内存都会用来做这个。
+
+- Database File：存储压缩后的数据。每个 WiredTiger 表对应一个独立的磁盘文件。磁盘文件划分成多个按 4 KB 对齐的 extent，并通过 3 个链表来管理：available list（可分配的 extent 列表) ，discard list（废弃的 extent 列表）和 allocate list（当前已分配的 extent 列表）
 
 ```mongodb
 // 查看集合详细信息
@@ -5310,6 +5680,32 @@ ll | grep '5575423204468368826'
 .rw-------  1  36Ki tz tz 10 Dec 11:07 -I collection-2--5575423204468368826.wt
 .rw-------  1  36Ki tz tz 10 Dec 11:07 -I index-3--5575423204468368826.wt
 ```
+
+## 性能测试
+
+- 分片是 4 核 8G 的配置
+
+- 写性能
+    - 写性能的瓶颈在单个分片上
+    - 当数据量小时是存内存读写，写性能很好，之后随着数量增加急剧下降，并最终趋于平稳，在 3000QPS。
+    - 少量简单的索引对写性能影响不大
+    - 分片集群批量写和逐条写性能无差异，而如果是复制集群批量写性能是逐条写性能的数倍。
+
+    ![avatar](./Pictures/mongodb/分片写性能.avif)
+
+- 读性能
+
+    - 下面这些测试数据都是在单分片 2 亿以上的数据，这个时候 cache 已经不能完全换成业务数据了，如果数据量很小，数据全在 cache 这个性能应该会很好。
+
+    - 1.按 shardkey 查询：在 Mongos 处能算出具体的分片和 chunk，所以查询速度非常稳定，不会随着数据量变化。
+        - 平均耗时 2ms 以内，4 核 8G 单分片 3 万 QPS。这种查询方式的瓶颈一般在 分片 Mongod 上，但也要注意 Mongos 配置不能太低。
+
+    - 2.按索引查询：由于 Mongos 需要将数据全部转发到所有的分片，然后聚合全部结果返回客户端，因此性能瓶颈在 Mongos 上。
+        - 测试 Mongos 8 核 16G + 10 分片情况下，单个 Mongos 的性能在 1400QPS，平均时延 10ms。
+
+        - 业务场景索引是唯一的，因此如果索引数据不唯一，后端分片数更多，这个性能还会更低。
+
+    - 3.全表扫描的查询：在数据量上千万之后基本不可用
 
 ## 安全事项
 
@@ -5346,14 +5742,17 @@ rs.printSecondaryReplicationInfo()
 
 ### 监控
 
+- [官方文档](https://www.mongodb.com/docs/manual/administration/monitoring/)
+
 #### mongodb自带的
 
 ```mongodb
-// 显示具体数据库的统计信息
+// 显示具体数据库的存储使用和数据量的文档，对象集合和索引计数器
 use test
 db.stats()
 
-// 显示实例的统计信息。可以是mongod和mongos
+// 显示一个实例的统计信息（包含磁盘使用，内存使用，连接，日志和索引访问）。可以是mongod和mongos
+// 缺点：只能输出一个实例
 db.serverStatus()
 
 // 实例的连接数
@@ -5370,6 +5769,15 @@ db.serverStatus().globalLock
 
 // 实例的锁详细信息
 db.serverStatus().locks
+```
+
+- 耗时长的锁
+```mongodb
+use config
+db.locks.find()
+
+// 查看有没有均衡器的锁
+db.locks.find( { _id : "balancer" } )
 ```
 
 #### mongodb-compass（官方的gui工具）
@@ -5435,6 +5843,10 @@ mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
     wiredTiger.cache.pages requested from the cache=Pages Req,\
     metrics.document.inserted=inserted rate'
 ```
+
+#### datadog-agent
+
+- [datadog-agent](https://docs.datadoghq.com/integrations/mongo/?tab=standalone)
 
 ### mongoimport和mongoexport导入和导出
 
@@ -5585,17 +5997,120 @@ mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
     # 打开mongosh，切换数据库
     use newtest
     ```
+
 ### mtool
+
+- [官方文档](https://rueckstiess.github.io/mtools/install.html)
 
 ```sh
 # 安装mtools
 pip3 install mtools pymongo
 ```
 
-# reference
+#### mlaunch：快速启动实例，支持副本集和分片
 
-- [官方文档的gptai](https://www.mongodb.com/docs/)
-- [官方文档](https://www.mongodb.com/docs/manual/)
+- mlaunch启动实例时：会自动生成`data`目录。启动实例的配置文件为`.mlaunch_startup`是一个json文件
+- `mlaunch stop`等同于`mlaunch kill`
+
+- 基本命令
+```sh
+# 快速启动端口为27017的实例。
+mlaunch --single
+
+# 查看启动实例的命令
+mlaunch list --startup
+
+# 查看启动的所有实例
+mlaunch list
+
+# json格式输出
+mlaunch list --json
+
+# 查看启动的所有实例，通过tags字段显示详细信息
+mlaunch list --tags
+
+# 关闭所有启动的实例
+mlaunch stop
+# 或者
+mlaunch kill
+
+# 启动关闭的实例
+mlaunch start
+
+# 重新启动所有实例
+mlaunch restart
+
+# mlaunch启动实例，会自动新建一个data目录。
+rm -rf data
+```
+
+```sh
+# 设置用户名和密码
+mlaunch --sharded 2 --single --auth --username thomas --password my_s3cr3t_p4ssw0rd
+# 启动自己编译的mongod二进制文件
+mlaunch --single --binarypath ./build/bin
+```
+
+- 副本集
+```sh
+# 快速启动端口为27017、27018、27019的副本集
+mlaunch --replicaset
+# 指定端口37017、37018、37019
+mlaunch --replicaset --nodes 3 --port 30000
+# 指定名字
+mlaunch --replicaset --name "my_rs_1"
+# 5个节点
+mlaunch --replicaset --nodes 5
+# 2个节点，1个仲裁者
+mlaunch --replicaset --nodes 2 --arbiter
+
+# 查看启动实例的命令
+mlaunch list --startup
+
+# 查看启动的所有实例，通过tags字段显示详细信息
+mlaunch list --tags
+
+# 关闭所有副本集
+mlaunch stop
+# 或者
+mlaunch kill
+
+# 删除data目录
+rm -rf data
+```
+
+- 分片
+```sh
+# 启动3个分片，每个分片是启动3个节点的副本集，config配置服务器只会启动1个，mongos路由进程启动1个
+mlaunch --replicaset --sharded shard0001 shard0002 shard0003
+
+# 设置config配置服务器为3个。MongoDB 3.4版本以上会默认使用--csrs
+mlaunch --replicaset --sharded shard0001 shard0002 shard0003 --config 3
+# 或者
+mlaunch --replicaset --sharded shard0001 shard0002 shard0003 --config 3 --csrs
+# 设置启动mongos路由进程的个数
+mlaunch --replicaset --sharded shard0001 shard0002 shard0003 --config 3 --mongos 2
+
+# 查看启动实例的命令
+mlaunch list --startup
+
+# 查看启动的所有实例，通过tags字段显示详细信息
+mlaunch list --tags
+
+# 只关闭mongos
+mlaunch stop mongos
+# 或者
+mlaunch kill mongos
+
+# 只关闭shard0002分片中的1个secondary
+mlaunch stop shard0002 secondary
+
+# 只关闭shard0002分片中的primary
+mlaunch stop shard0002 primary
+
+# 关闭整个shard0002分片
+mlaunch stop shard0002
+```
 
 # 第三方 mongodb 软件
 
@@ -5615,3 +6130,39 @@ pip3 install mtools pymongo
 
     - [mongoku: web client](https://github.com/huggingface/Mongoku)
 
+    - snippet：可以增加mongosh，类似于插件
+
+        ```mongosh
+        // 搜索snippet
+        snippet search
+
+        // 查看帮助文档
+        snippet help analyze-schema
+
+        // 安装snippet
+        snippet install analyze-schema
+
+        // 查看安装的snippet
+        snippet ls
+
+        // 卸载snippet
+        snippet uninstall analyze-schema
+        ```
+
+        ```mongodb
+        // analyze-schema表格形式显示字段和数据类型
+        schema(db.users)
+        ┌─────────┬───────────────┬───────────┬─────────────┐
+        │ (index) │       0       │     1     │      2      │
+        ├─────────┼───────────────┼───────────┼─────────────┤
+        │    0    │ '_id        ' │ '50.0 %'  │ 'ObjectId'  │
+        │    1    │ '_id        ' │ '50.0 %'  │  'Number'   │
+        │    2    │ 'age        ' │ '50.0 %'  │  'Number'   │
+        │    3    │ 'age        ' │ '50.0 %'  │ 'Undefined' │
+        ```
+
+# reference
+
+- [官方文档的gptai](https://www.mongodb.com/docs/)
+- [官方文档](https://www.mongodb.com/docs/manual/)
+- [mongodb中文社区](https://mongoing.com/)
