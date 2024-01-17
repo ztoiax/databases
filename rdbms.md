@@ -346,13 +346,13 @@ WHERE A2 = c2 and A1 = c1
 
 #### 并发控制(隔离性等级的实现)
 
-| 隔离性等级                | 内容                                                                                                                                                                 |
-|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 可串行化(serializable)    | 保证事务调度的结果与没有并发的调度结果一致                                                                                                                           |
-| 可重复读(repeatable read) | 只允许读取已提交的的数据, 而且一个事务两次读却一个数据期间, 其他事务不得更新该数据.但该事务不要求与其他事务可串行化.例如:一个事务可能查找到一个已提交事务插入的数据 |
-| 已提交读(read committed) , phantom read (幻读) | 只允许读取已提交的的数据, 但不要求可重复读. |
-| 未提交读(read uncommmitted)                    | 允许读却未提交的数据.隔离性最低             |
-| 以上隔离性等级都不允许**脏读(dirty write)**    | 数据不能被未提交或中止的事务写入            |
+| 隔离性等级                                     | 内容                                                                                                                                                                 |
+|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 可串行化(serializable)                         | 保证事务调度的结果与没有并发的调度结果一致                                                                                                                           |
+| 可重复读(repeatable read)                      | 只允许读取已提交的的数据, 而且一个事务两次读却一个数据期间, 其他事务不得更新该数据.但该事务不要求与其他事务可串行化.例如:一个事务可能查找到一个已提交事务插入的数据 |
+| 未提交读(read uncommmitted)                    | 隔离性最低。会出现脏读、不可重复读、幻读                                                                                                                             |
+| 已提交读(read committed) , phantom read (幻读) | 只允许读取已提交的的数据。会出现不可重复读、幻读                                                                                                                     |
+| 快照（snapshot）                               | 会出现幻读                                                                                                                                                           |
 
 - 大部分数据库默认等级为**已提交读**
 
@@ -1204,3 +1204,16 @@ Nested-Loop Join(嵌套循环连接)
 - 客户端
 
     - [dbgate：MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others的gui](https://github.com/dbgate/dbgate)
+
+    - [harlequin：sql tui](https://github.com/tconbeer/harlequin)
+        ```sh
+        // sqlite
+        harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
+
+        // DuckDB
+        harlequin "path/to/duck.db" "another_duck.db"
+
+        // mysql
+        pip install harlequin-mysql
+        harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
+        ```

@@ -1,5 +1,96 @@
 # mongodb
 
+## 适合业务
+
+- 高并发web应用
+    - 读/写请求都比较多。
+    - 早期数据量很少，到一定程度后数据量暴增
+    - 适合业务拓展：传统型关系型数据库结构是固定的，增加一个字段或横向拓展数据库会带来巨大的工作量；mongodb支持无固定结构表模型
+
+- 实时计算类应用
+    - 如实时营销、实时推荐等。
+    - 可以在前端部署mongodb缓存集群，从消息队列（如kafaka）获取实时数据。利用mongodb插件是存储引擎的特定，缓存集群使用memory存储引擎，然后直接利用mongodb的计算框架（如aggregate、mr等）进行数据运算，也可以利用mongo-spark连接器将缓存集群与spark计算集群连接后的进行计算。
+
+- 数据中台
+    - 企业积累了丰富的数据，但数据散落在各个异构系统中，数据的价值没有被挖掘出来，更不要说数据之间蕴含的丰富知识
+    - 数据中台包含数据采集、开发、开放、治理、运营等功能模块，相较于传统关系型数据库，mongodb比较适合在数据中台使用
+        - 数据采集：从异构的oracle、mysql、sql server等数据库采集原数据后，需要一个统一的存储中心，mongodb分片集群就能满足这种需求，不需要安装额外插件
+        - 数据开发：对于前端REST风格api请求调用，可以直接访问json格式文档数据，免除序列化和反序列化过程
+        - 数据治理：mongodb每一个集合（表）都对应有一个元数据表管理，可以基于此开发数据的全生命周期管理功能。复制集部署，可以保障数据的安全和高可用
+        - 数据运营：mongodb chart工具，提供可视化数据提取、分析
+
+    - tapdata 可以说是在mongodb生态量身定做的一个工具集。
+
+        - 传统的etl工具、建模工具及api工具等还是基于关系型数据库的。但在大数据时代，需要处理大量的非结构化数据
+
+        - tapdata的功能：
+
+            - 数据同步功能：tapdata支持sql server、oracle、sybase、mongodb、db2等数据库，作为一个企业级数据中台，并不是所有数据都存储在数据库中，还可以存储在文件中xlsx、csv等格式文件的数据同步
+
+            - 数据建模功能：可以把多个表多对一合并，mongodb基于这种内嵌的模型，可以把一对一，一对多的关系，甚至多对一的关系直接合并到一起。
+                - tapdata提供了一个可视化的数据建模界面
+
+            - 数据管理功能：来至不同数据库的几百个表必须有一个非常好的数据管理能力。tapdata可以对数据进行分类并存储，贴好标签
+
+            - 数据api发布功能：就是指数据放进来后，可以通过restful api快速地将数据交付出去。
+                - 用户想获取一些数据，数据管理员可以根据用户的需求，直接在一分钟之内将数据中台已经有的数据封装成api并发布。
+
+        - tapdata负责前端的数据采集和数据管理等功能
+        - mongodb负责后端的数据存储和计算等功能
+
+        - 根据mongodb最小集群要求：需要3个mongod节点 + 1个tapdata同步节点 + 1个tapdata api server节点 = 5个节点。就可以组成一个小型企业数据中台
+
+    - mongodb htap全渠道业务支持
+
+        - mongodb既可以做分析型业务，也可以做交易型业务
+
+        ![avatar](./Pictures/mongodb/mongodb-htap.avif)
+
+        - 集群中有5个节点，4个secondray + 1个primary。
+            - 左侧的primary节点可以用来直接与移动端或网页端的应用进行交互收集、采集数据，mongodb自动把数据从primary节点同步到secondary节点
+            - 右侧2个secondary节点专门用来做分析型业务。标签`use=analytics`
+
+- 游戏类应用
+
+    - 玩家所拥有的装备、经验值等数据都在时刻变化着，这就是需要表结构有较强的适应性，mongodb表结构自由模式就能满足这个要求。
+
+    - 玩家按地理划分进行组队形成一些新玩法，mongodb自带地理位置索引就能满足这个要求。为了避免游戏掉线影响玩家的体验，mongodb的复制集部署模式解决此类问题。
+
+    - 运营人员对游戏数据进行统计分析，及时开展促销等推广活动。
+
+- 日志分析类系统
+
+    - 日志分析特点是数据量大，允许部分数据丢失，不会影响整个系统可靠性。
+    - mongodb可以利用分片集群，使日志系统拥有较大的存储容量；另一方面利用mongodb特有查询语句快速找到某条日志记录。
+
+- ai应用场景
+
+    - 深度学习输入的数据集可能包含点击数据流、日志文件、社交媒体、物联网传感器数据流、csv、文本、图像、视频等快速变化的结构化和非结构化数据。
+
+    - 深度学习的训练过程通常涉及新的隐藏层、特征标签、超参数和新的输入数据，因此需要频繁地修改底层的数据模型。
+
+    - mongodb已经成为许多ai和深度学习平台的数据库
+
+        - 1.IBM分析与可视化
+            - 沃森分析是ibm云托管服务，提供智能数据发现以指导数据挖掘、自动执行预测分析和可视化输出。沃森分析应用于银行、保险、零售、电信、石油等行业。
+            - mongodb与db2一起管理数据存储。
+
+        - 2.预测价值
+            - 英国最大的数字汽车市场广泛使用针对存储在mongodb中的数据运行的机器学习
+            - mongodb存储了汽车的规格和详细信息，如汽车的数量、状况、颜色、里程、保险历史等
+            - 该数据由auto trader的数据科学团队编写的机器学习算法提取，以生成准备的预测价值，然后写回数据库。
+
+        - 3.自然语言处理
+            - 北美ai开发者将nlp软件构建到智能家庭的移动设备中，设备和用户之间的所有交互都存储在mongodb中，然后反馈到学习算法中。
+
+        - 4.零售业的地理位置分析
+
+            - 美国的移动应用程序开发者在mongodb构建智能引擎，可实时处理和存储数千万个客户及其位置上丰富的地理空间数据点。
+
+            - 智能引擎使用可扩展的机器学习和多维分析技术表现行为模式，允许零售商通过移动设备使用基于位置的优惠预测和定位客户。
+            - mongodb对具有复杂索引和查询的地理空间数据结构的支持为机器学习算法提供了基础。
+            - mongodb利用分片横向扩展设计允许公司从数十万个客户数据点扩展到数百万个客户数据点。
+
 ## 基本概念
 
 ![avatar](./Pictures/mongodb/mongodb基本概念.avif)
@@ -550,7 +641,27 @@ typeof connectTo
 
 - `updateOne()`、`updateMany()`、`replaceOne()`都是接受至少2个参数：第一个为查询要更新文档的限定条件，第二个为描述更新的文档
 
-- `replaceOne()`：新文档完全替换匹配的文档。
+    ```mongodb
+    // 插入测试文档
+    db.test.insertMany([
+        {"gid": 1, "name": "joe"},
+        {"gid": 2, "name": "john"}
+    ])
+
+    // 将gid值为1和2的文档，修改为3
+    db.test.updateMany(
+        {"gid": {$in:[1, 2]}},
+        {$set: {"gid": "3"}}
+    )
+    ```
+
+- `replaceOne()`：替换为新的文档
+    ```mongodb
+    // 插入测试文档
+    db.test.insertOne({"_id":1, "name": "joe", "address": "beijing"})
+    // 替换为新文档
+    db.test.replaceOne({"_id":1},{"name": "john", "age": 27, "address": "beijing"})
+    ```
 
     - 对于大规模迁移场景非常有用
 
@@ -567,7 +678,7 @@ typeof connectTo
     delete joe.name
     delete joe.friends
     delete joe.enemies
-    db.users.replaceOne({"name": "joe",}, joe)
+    db.users.replaceOne({"name": "joe"}, joe)
 
     // 更新后的结果
     db.users.findOne()
@@ -611,6 +722,14 @@ typeof connectTo
         {"brithday": "11/17/2023"},
         {"$set": {"gift": "Happy Birthday!"}}
     )
+    // 以上命令输出：matchedCount匹配的文档数量，modifiedCount修改文档的数量
+    {
+      acknowledged: true,
+      insertedId: null,
+      matchedCount: 3,
+      modifiedCount: 3,
+      upsertedCount: 0
+    }
     ```
 
 - `findOneAndUpdate()`：返回匹配结果并进行更新
@@ -668,7 +787,8 @@ typeof connectTo
     ```
 
 - `$set`：设置一个字段值，如果不存在，则创建该字段。可以修改键的类型
-- `$unset`：删除键
+- `$unset`：删除集合字段
+- `$rename`：重命名集合字段
 
     ```mongodb
     // 插入测试文档
@@ -680,7 +800,7 @@ typeof connectTo
     // $set修饰符，修改为数组类型
     db.people.updateOne({ "name": "Trump" }, { $set : { "skill": [ "mongodb", "redis" ]}})
 
-    // $unset，删除skill键
+    // $unset，删除skill字段
     db.people.updateOne({ "name": "Trump" }, { $unset : { "skill": 1}})
     ```
 
@@ -697,6 +817,53 @@ typeof connectTo
 
     // joe改为joe schmoe
     db.blog.posts.updateOne({"author.name": "joe"}, {"$set": {"author.name": "joe schmoe"}})
+    ```
+
+    ```mongodb
+    // 将所有集合的name字段改名为username
+    db.people.updateMany({}, {$rename: {"name": "username"}})
+    ```
+
+- `$currentDate`将字段的值修改为当前时间
+    ```mongodb
+    // 插入测试文档
+    db.test.insertOne({
+        "name": "joe"
+    })
+
+    // 修改为timestamp格式
+    db.people.updateOne(
+        {"name": "joe"},
+        {$currentDate: {"cust_id": {$type: "timestamp"}}}
+    )
+    // 修改为data格式
+    db.people.updateOne(
+        {"name": "joe"},
+        {$currentDate: {"cust_id": {$type: "date"}}}
+    )
+    ```
+
+
+- `$min`：比较字段值，原值大于指定值则修改，小于则不修改
+- `$max`：比较字段值，原值小于指定值则修改，大于则不修改
+    ```mongodb
+    // 插入测试文档
+    db.customers.insertOne({
+        "_id": 1,
+        "paid": 1000,
+    })
+
+    //$min。1000大于900，所以修改为900
+    db.customers.updateMany(
+        {"_id": 1},
+        {$min:{"paid": 900}}
+    )
+
+    // 900小于950，所以不修改
+    db.customers.updateMany(
+        {"_id": 1},
+        {$min:{"paid": 950}}
+    )
     ```
 
 ##### 数组运算符
@@ -830,7 +997,7 @@ typeof connectTo
     ```
 
 - `$`定位运算符
-- `arrayFilters`
+- `arrayFilters`：修改数组中的1个或多个元素
     ```mongodb
     // 插入测试文档
     db.blog.posts.insertOne({
@@ -850,15 +1017,16 @@ typeof connectTo
     db.blog.posts.updateOne({"comments.author": "lynn"}, {"$set": {"comments.$.auther": "jim"}})
 
     // arrayFilters将评论votes值小于或等于-5的文档，添加一个名为"hidden"的字段，并设置true
-    // 命令代码没看懂??
     db.blog.posts.updateOne(
-        {_id: ObjectId("65571920178fe558a4489cd3")},
-        {"$set": {"comments.$.[elem].hidden": true}},
-        {"arrayFilters":[{"elem.votes": { $lte: -5 }}]}
+        {"connect": 'hello'},
+        {"$set": {"comments.$[element].hidden": true}},
+        {arrayFilters:[{"element.votes": { $lte: -5 }}]}
     )
     ```
 
 ##### upsert
+
+- `upsert`：匹配不到文档时，插入新文档
 
 - 记录网页的访问次数
 
@@ -901,6 +1069,27 @@ typeof connectTo
     db.users.findOne()
     ```
 
+#### bulkWrite批量写操作，包含插入、修改、删除
+```mongodb
+db.c.insertMany([
+    {"y": 0},
+    {"y": 1},
+    {"y": 2},
+])
+
+// 默认按顺序执行
+db.c.bulkWrite([
+    {insertOne: {"y": 3}},
+    {updateOne: {"filter": {"y": 0}, "update": {$set:{"y": 100}}}},
+])
+
+// 不按顺序执行，假设有3条语句，第2条出现错误，不会影响第3条执行
+db.c.bulkWrite([
+    {insertOne: {"y": 3}},
+    {updateOne: {"filter": {"y": 0}, "update": {$set:{"y": 100}}}},
+    {"ordered": false}
+])
+```
 #### 查询
 
 ##### 基本查询
@@ -954,7 +1143,8 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
 - or查询：
     - `$in`：匹配一个键的多个值
     - `$nin`：反向匹配一个键的多个值
-    - `$or`：匹配多个键
+    - `$or`：匹配多个键。或运算
+    - `$and`：匹配多个键。与运算
 
     ```mongodb
     // $in。抽奖活动的中奖号码是725、542、390
@@ -975,6 +1165,11 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
     db.raffle.find({"$or": {"$in": "ticket": [725, 542, 390]}, {"winner": true}})
     ```
 
+    ```mongodb
+    // $and匹配多个键
+    db.raffle.find({"$and": {"ticket": 725}, {"winner": true}})
+    ```
+
 - `$not`：匹配条件以外
 - `$mod`：将查询的值，除以第一个值，如果余数等于第二个值，则匹配成功
     ```mongodb
@@ -987,6 +1182,7 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
 
 - `null`：除了匹配null值外，还会匹配不存在
 - `$exists`：确认键已存在
+    - 与关系型数据库的`exists`不一样，关系型数据库中的`exists`相当于mongodb中的`$in`
 
     ```mongodb
     // 插入测试文档
@@ -1011,45 +1207,6 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
     // 仅匹配值为null的文档，$eq检测值是否为null，$exists确认键是否存在
     db.c.find({"z": {"$eq": null, "$exists": true}})
     ```
-
-- `$regex`：正则表达式
-    - 兼容perl的正则表达式（PCRE）
-    - 查询之前，最后先在javascript上检查语法
-    - 索引不能用于不区分大小写`/joe/i`
-    - 索引能用于前缀表达式`/^joe/`
-
-    ```mongodb
-    // 插入测试文档
-    db.users.insertMany([
-        {"name": "joe"},
-        {"name": "Joe"},
-        {"name": "JOe"},
-        {"name": "JOE"},
-        {"name": "joey"},
-    ])
-
-    // i不区分大小写。匹配joe, Joe, JOe, JOE, joey
-    db.users.find({"name": {"$regex": /joe/i}})
-    // 等同于上
-    db.users.find({"name": /joe/i})
-
-    // ?匹配joe和joey
-    db.users.find({"name": /joey?/})
-
-    // ^匹配开头为joe
-    db.users.find({"name": /^joe/})
-
-    // 正则表达式可以插入文档
-    db.regex.insertOne({"joe": /^joe/})
-
-    db.regex.findOne()
-    { _id: ObjectId("65582b70a9bfee369da33408"), joe: /^joe/ }
-
-    // 将存储的正则表达式，作为变量进行查询
-    regex_joe=db.regex.findOne()
-    db.users.find({"name": regex_joe.joe})
-    ```
-
 
 - `$where`：可以在查询中执行javascript代码
     - 为了安全起见，应该严格限制，禁止终端用户随意使用`$where`
@@ -1164,7 +1321,7 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
         db.people.ensureIndex({"profession": 1, "state": 1, "random": 1})
         ```
 
-##### 查询数组
+##### 数组查询
 
 - `$all`：匹配多个值。顺序无关紧要
 
@@ -1180,7 +1337,7 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
         {"_id": 3, "fruit": ["cherry", "banana", "apple"]},
     ])
 
-    // 匹配包含banana的数组
+    // 匹配数组中的任意值。banana
     db.food.find({"fruit": "banana"})
     [
       { _id: 1, fruit: [ 'apple', 'banana', 'peach' ] },
@@ -1273,7 +1430,83 @@ db.users.find({}, { "name": 1, "age": 1, "_id": 0})
     db.test.find({"x": {"$gt": 10, "$lt": 20}}).min({"x": 10}).max({"x": 20})
     ```
 
-##### 查询内嵌文档
+- 数组元素是文档
+
+    ```mongodb
+    // 插入测试文档
+    db.GoodsValue.insertMany([
+        {"_id": 1, "prices": [{"low": 1, "middle": 11, "high": 13}, {"low":1, "middle":8, "high": 15}]},
+        {"_id": 2, "prices": [{"low": 3, "middle": 11, "high": 15}, {"low":5, "middle":8, "high": 16}]},
+        {"_id": 3, "prices": [{"low": 3, "middle": 11, "high": 15}, {"low":6, "middle":9, "high": 16}]},
+    ])
+
+    // prices.low为3
+    db.GoodsValue.find({"prices.low": 3})
+    [
+      {
+        _id: 2,
+        prices: [
+          { low: 3, middle: 11, high: 15 },
+          { low: 5, middle: 8, high: 16 }
+        ]
+      },
+      {
+        _id: 3,
+        prices: [
+          { low: 3, middle: 11, high: 15 },
+          { low: 6, middle: 9, high: 16 }
+        ]
+      }
+    ]
+
+    // 上面的命令返回所有字段，通过投射返回指定字段。low
+    db.GoodsValue.find({"prices.low": 3}, {"_id": 0, "prices.low": 1})
+    [
+      { prices: [ { low: 3 }, { low: 5 } ] },
+      { prices: [ { low: 3 }, { low: 6 } ] }
+    ]
+    ```
+
+##### 正则表达式查询
+- `$regex`：正则表达式
+    - 兼容perl的正则表达式（PCRE）
+    - 查询之前，最好先在javascript上检查语法
+    - 索引不能用于不区分大小写`/joe/i`
+    - 索引能用于前缀表达式`/^joe/`
+
+```mongodb
+// 插入测试文档
+db.users.insertMany([
+    {"name": "joe"},
+    {"name": "Joe"},
+    {"name": "JOe"},
+    {"name": "JOE"},
+    {"name": "joey"},
+])
+
+// i不区分大小写。匹配joe, Joe, JOe, JOE, joey
+db.users.find({"name": {"$regex": /joe/i}})
+// 等同于上
+db.users.find({"name": /joe/i})
+
+// ?匹配joe和joey
+db.users.find({"name": /joey?/})
+
+// ^匹配开头为joe
+db.users.find({"name": /^joe/})
+
+// 正则表达式可以插入文档
+db.regex.insertOne({"joe": /^joe/})
+
+db.regex.findOne()
+{ _id: ObjectId("65582b70a9bfee369da33408"), joe: /^joe/ }
+
+// 将存储的正则表达式，作为变量进行查询
+regex_joe=db.regex.findOne()
+db.users.find({"name": regex_joe.joe})
+```
+
+##### 内嵌文档查询
 
 ```mongodb
 // 插入测试文档
@@ -1307,6 +1540,50 @@ db.blog.posts.insertOne({
 // 查询内嵌文档author字段为claire，并且votes大于0的文档
 db.blog.posts.find({"comments": {"$elemMatch" : {"author": "claire", "votes": {"$gte": 0}}}})
 ```
+
+##### 文本查询
+
+- `$text`查询运算符
+
+```mongodb
+// 插入测试文档
+db.profiles.insertMany([
+    {"_id": 1, "comments": "high value and address in china, beijing"},
+    {"_id": 2, "comments": "middle value and address in china, beijing"},
+    {"_id": 3, "comments": "low value and address in china, beijing"},
+    {"_id": 4, "comments": "high value and address in china, shanghai"},
+    {"_id": 5, "comments": "middle value and address in china, shanghai"},
+    {"_id": 6, "comments": "low value and address in china, shanghai"},
+])
+
+// 需要创建索引，才能使用文本查询
+db.profiles.createIndex({"comments": "text"})
+
+// 查询包含high的comments
+db.profiles.find({$text: {$search: "high"}})
+
+// 空格为分隔符，执行OR逻辑的查询。high or low
+db.profiles.find({$text: {$search: "high low"}})
+
+// \"连接短语
+db.profiles.find({$text: {$search: "\"high value\"" }})
+```
+
+- `$meta`运算符：将单词或词组进行匹配文档记录时，有些文档匹配度高，有些则比较低。`$meta`可以进行打分
+
+    ```mongodb
+    // $meta将分数存储到textScore的字段
+    db.profiles.find(
+        {$text: {$search: "high value"}},
+        {score: {$meta:"textScore"}}
+    )
+
+    // 在上一条命令上，进行排序
+    db.profiles.find(
+        {$text: {$search: "high value"}},
+        {score: {$meta:"textScore"}}
+    ).sort({score: {$meta: "textScore"}}).limit(10)
+    ```
 
 ##### 游标
 
@@ -1361,7 +1638,59 @@ db.blog.posts.find({"comments": {"$elemMatch" : {"author": "claire", "votes": {"
     });
     ```
 
+### 聚集操作
+
+- `count()`返回文档记录数量
+    ```mongodb
+    db.people.count()
+    db.people.count({"name": "joe"})
+    ```
+
+- `estimatedDocumentCount()`：默认等同于`count()`，差别是使用集合元数据进行统计。mongodb非正常关闭使用
+    ```mongodb
+    db.people.estimatedDocumentCount()
+    ```
+
+
+- `countDocuments()`：默认等同于`count()`，差别是不使用集合元数据进行统计，而是扫描集合本身的数据。mongodb意外故障使用
+    ```mongodb
+    db.people.countDocuments()
+    ```
+
+- `distinct()`：非重复值
+```mongodb
+db.people.insertMany([
+    {"_id":1 , "name": "joe"},
+    {"_id":2 , "name": "joe"}
+])
+
+db.people.distinct("name")
+```
+
+## 数据库加锁
+
+- mongodb支持以下几种锁：
+
+    - 共享锁（R）：读锁，读取操作创建的锁，上锁后任何事务无法进行修改，其他事务可以并发读取，也可以对此数据再加共享锁。
+    - 排他锁（W）：写锁，上锁后，则其他事务不可以并发读取，也不能对数据添加任何锁。获取排他锁的事务既能读取数据，又能修改数据
+    - 意向共享锁（r）：当事务对集合中的一条文档记录添加共享锁后，mongodb会自动在该条文档记录的上级，级在集合和数据库上添加一个意向共享锁
+    - 意向共享锁（w）：当事务对集合中的一条文档记录添加排他锁后，mongodb会自动在该条文档记录的上级，级在集合和数据库上添加一个意向排他锁
+
+| 操作                 | 数据库层面               | 集合层面                         |
+|----------------------|--------------------------|----------------------------------|
+| 查询                 | 意向共享锁（r）          | 意向共享锁（r）                  |
+| 插入                 | 意向排他锁（w）          | 意向排他锁（w）                  |
+| 删除                 | 意向排他锁（w）          | 意向排他锁（w）                  |
+| 修改                 | 意向排他锁（w）          | 意向排他锁（w）                  |
+| 聚集aggregation      | 意向共享锁（r）          | 意向共享锁（r）                  |
+| 创建索引（从前端）   | 排他锁（W）              |                                  |
+| 创建索引（从后端）   | 意向排他锁（w）          | 意向排他锁（w）                  |
+| 查询数据库的集合列表 | 意向共享锁（r）          |                                  |
+| mapreduce操作        | 排他锁（w）和共享锁（R） | 意向排他锁（w）和意向共享锁（r） |
+
 ## 索引（index）
+
+- 索引是B-tree数据结构
 
 - 集合扫描：不使用索引的查询。
 
@@ -1435,6 +1764,7 @@ db.users.dropIndex({"name": 1})
 
 - `stage: 'COLLSCAN'`：没有使用索引的集合扫描
 - `stage: 'IXSCAN'`：使用索引
+- `indexName`：表示使用了哪个索引
 
 - `needYield: 0`：暂停的次数。如果有写操作，查询会定期释放锁让步给写操作
 - `indexBound: {}`：索引如何被使用，并给出索引的遍历范围
@@ -1608,6 +1938,7 @@ db.users.dropIndex({"name": 1})
         - 查询
 
             ```mongodb
+            // executionStats参数，返回详细计划信息
             db.students.find({"student_id": {"$gt": 50000}, "class_id": 54}).sort({"student_id: 1"}).explain("executionStats")
             ```
 
@@ -1864,7 +2195,7 @@ db.users.dropIndex({"name": 1})
             }
           }
         ]
-        ```
+    ```
 
 
 - `_id`：也是唯一索引，只是不能被删除。
@@ -1937,7 +2268,7 @@ db.users.dropIndex({"name": 1})
     ]
     ```
 
-### 地理空间索引
+### 地理空间索引和查询
 
 - 有2种地理空间索引：
 
@@ -2175,44 +2506,6 @@ db.users.dropIndex({"name": 1})
     db.articles.createIndex({"$**": "text"})
     ```
 
-- 文本查询
-
-    - `$text`查询运算符
-
-    - `$meta`运算符：将数据投射出来，否则元数据不会显示到查询结果
-
-    ```mongodb
-    // 空格为分隔符，执行OR逻辑的查询。以下查询包含"impact" "crater" "lunar"的所有文章
-    db.articles.find({"$text": {"$search": "impact crater lunar"}},
-        {title: 1}
-    ).limit(10)
-
-    // \"连接短语。impact crater AND lunar
-    db.articles.find({"$text": {"$search": "\"impact crater\" lunar"}},
-        {title: 1}
-    ).limit(10)
-
-    // impact crater AND lunar OR meteor
-    db.articles.find({"$text": {"$search": "\"impact crater\" lunar meteor"}},
-        {title: 1}
-    ).limit(10)
-
-    // 全部使用AND。impact crater AND lunar AND meteor
-    db.articles.find({"$text": {"$search": "\"impact crater\" \"lunar\" \"meteor\""}},
-        {title: 1}
-    ).limit(10)
-
-    // $meta将分数存储到textScore的字段
-    db.articles.find({"$text": {"$search": "\"impact crater\" \"lunar\" \"meteor\""}},
-        {title: 1, score: {$meta: "textScore"}}
-    ).limit(10)
-
-    // 在上一条命令上，进行排序
-    db.articles.find({"$text": {"$search": "\"impact crater\" \"lunar\" \"meteor\""}},
-        {title: 1, score: {$meta: "textScore"}}
-    ).sort({score: {meta: "textScore"}}).limit(10)
-    ```
-
 - 优化全文本搜索：分区全文本索引
     - 使某些查询条件将搜索结果的范围变窄。
         ```mongodb
@@ -2322,6 +2615,14 @@ db.users.dropIndex({"name": 1})
     db.sessions.createIndex({"collMod": "someapp.cache", "index": {"keyPattern": {"lastUpdated": 1}, "expireAfterSeconds": 3600})
     ```
 
+### hash索引
+
+- 利用hash函数计算字段的值，保证计算后的取值能更加均匀分布
+
+```mongodb
+db.collection.createIndex({_id: "hashed"})
+```
+
 ## 聚合框架
 
 - 类似于shell中的管道`|`，每个阶段接受特定形式的文档并产生特定的输出
@@ -2329,6 +2630,14 @@ db.users.dropIndex({"name": 1})
 - 顺序很重要：要确保一个阶段传递到下一个阶段的文档数量
 
 - 聚合框架能够使用索引
+
+| MongoDB 聚集操作语句                                                                                | SQL 语句                                                                      |
+|-----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| db.books.aggregate([ {$group: {_id:null, count:{$sum:1}}} ])                                        | Select count(*) as count from books                                           |
+| db.books.aggregate([ {$group: {_id:null, total:{$sum:"$num"}} ])                                    | Select sum(num) as total from books                                           |
+| db.books.aggregate([ {$group: {_id:"$book_id", total: {$sum:"$num"}}}])                             | Select book_id, sum(num) as total from books group by book_id                 |
+| db.books.aggregate([ {$group: {_id: {book_id:"$book_id", status:"$status"},total:{$sum:"$num"}}} ]) | Select book_id, status, sum(num) as total from books group by book_id, status |
+| db.books.aggregate([ {$group: {_id:"$book_id", count:{$sum:1}}}, {$match: {count;{$gt:1}}} | Select book_id count(*) from books group by book_id havin! count(*)>1 |
 
 - 阶段：
 
@@ -2672,6 +2981,23 @@ db.users.dropIndex({"name": 1})
         ```
     - `$group`：分组。类似于sql中的`GROUP BY`
         ```mongodb
+        // 插入测试文档
+        db.books.insertMany([
+            {"_id": 1, "book_id": 1, "num": 100},
+            {"_id": 2, "book_id": 2, "num": 200},
+            {"_id": 3, "book_id": 2, "num": 300},
+            {"_id": 4, "book_id": 1, "num": 400},
+        ])
+
+        // 对book_id进行分类，并统计数量
+        db.books.aggregate([
+            {$match:{}},
+            {$group:{_id:"$book_id", total:{$sum:"$num"}}}
+        ])
+        [ { _id: 1, total: 500 }, { _id: 2, total: 500 } ]
+        ```
+
+        ```mongodb
         db.users.aggregate([
             {$match: {"investments.url.com": "www.facebook.com"}},
             {$group: {
@@ -2708,6 +3034,93 @@ db.users.dropIndex({"name": 1})
         ]
         ```
 
+    - `$addFields`：添加新字段
+        ```mongodb
+        // 插入测试文档
+        db.books.insertMany([
+            {"_id": 1, "book_id": 1, "num": 100},
+            {"_id": 2, "book_id": 2, "num": 200},
+            {"_id": 3, "book_id": 2, "num": 300},
+            {"_id": 4, "book_id": 1, "num": 400},
+        ])
+
+        db.books.aggregate([
+            {$match:{}},
+            {$group:{_id:"$book_id", total:{$sum:"$num"}}},
+            {$addFields:{book_id:"$_id"}}
+        ])
+        [
+          { _id: 1, total: 500, book_id: 1 },
+          { _id: 2, total: 500, book_id: 2 }
+        ]
+        ```
+
+    - `$lookup`：mongodb3.2引入。解决关系型数据库的join查询
+        ```mongodb
+        // 插入测试文档
+        db.books.insertMany([
+            {"_id": 1, "book_id": 1, "num": 100},
+            {"_id": 2, "book_id": 2, "num": 200},
+            {"_id": 3, "book_id": 2, "num": 300},
+            {"_id": 4, "book_id": 1, "num": 400},
+        ])
+
+        // 插入要join的文档。type_id与book_id关联
+        db.booksAttr.insertMany([
+            {"_id": 1, "type_id": 1, "type_name": "human"},
+            {"_id": 2, "type_id": 2, "type_name": "music"},
+        ])
+
+        // join
+        db.books.aggregate([
+            {$match: {}}, // 相当于where过滤
+            {$lookup: {
+                from:"booksAttr", // 被查询的集合
+                localField:"_id", // 源表字段
+                foreignField: "type_id", // 被查询的字段
+                as: "booksAttr"}} // 结果输出在这个字段对应的值中
+        ])
+        [
+          {
+            _id: 1,
+            book_id: 1,
+            num: 100,
+            booksAttr: [ { _id: 1, type_id: 1, type_name: 'human' } ]
+          },
+          {
+            _id: 2,
+            book_id: 2,
+            num: 200,
+            booksAttr: [ { _id: 2, type_id: 2, type_name: 'music' } ]
+          },
+          { _id: 3, book_id: 2, num: 300, booksAttr: [] },
+          { _id: 4, book_id: 1, num: 400, booksAttr: [] }
+        ]
+
+        // group
+        db.books.aggregate([
+            {$match: {}}, // 相当于where过滤
+            {$group:{_id:"$book_id", total:{$sum:"$num"}}},
+            {$lookup: {
+                from:"booksAttr", // 被查询的集合
+                localField:"_id", // 源表字段
+                foreignField: "type_id", // 被查询的字段
+                as: "booksAttr"}} // 结果输出在这个字段对应的值中
+        ])
+        [
+          {
+            _id: 2,
+            total: 500,
+            booksAttr: [ { _id: 2, type_id: 2, type_name: 'music' } ]
+          },
+          {
+            _id: 1,
+            total: 500,
+            booksAttr: [ { _id: 1, type_id: 1, type_name: 'human' } ]
+          }
+        ]
+        ```
+
 - `$merge`和`$out`：写入新的集合，必须是最后一个阶段，如果集合存在会覆盖。
     - `$merge`和`$out`不能一起使用。
     - `$merge`是mongodb4.2引入，可以写入任何数据库（包含分片），是写入数据库的首选。`$out`只能写入相同的数据库，不能写入分片。
@@ -2736,13 +3149,32 @@ db.users.dropIndex({"name": 1})
 
 - mapreduce 可使用自定义 JavaScript 函数来执行 map 和 reduce 操作，以及可选的 finalize 操作。
 
-## 事务
+## 事务（transaction）
 
 - 一篇2019年的SIGMOD会议论文[《Implementation of Cluster-wide Logical Clock and Causal Consistency in MongoDB》](https://dl.acm.org/doi/10.1145/3299869.3314049)。讲述逻辑会话和因果一致性背后的机制提供了深层次的技术解释
+
+- 只有在副本集和分片才能使用事务
 
 - 使用事务必须是mongodb4.2及以上的版本
 
 - 事务支持跨副本集、分片
+
+- 和关系型数据库一样具有ACID特性
+    - 隔离性：mongodb支持已提交读(read committed)、未提交读(read uncommmitted)、快照（snapshot）
+    - mongodb默认使用快照（snapshot）隔离
+
+- WiredTiger使用多版本并发控制（MVCC）来隔离读写操作
+    - 文档级别：允许并发多个客户端的更新操作，对集合中的不同文档同时进行更新
+    - MVCC 通过非锁机制进行读写操作，是一种乐观并发控制模式。
+    - WiredTiger 仅在全局、数据库和集合级别使用意向锁。
+    - 当存储引擎检测到两个操作之间存在冲突时，将引发写冲突，从而导致 MongoDB 自动重试该操作。
+
+    - 步骤：
+        - 1.A事务首先从表中读取要修改的行数据，读取的库存值为100，行记录的版本号为1。
+        - 2.B事务也从中读取要修改的相同行数据，读取的库存值为100，行记录的版本号为1。
+        - 3.A事务修改库存值后提交，同时行记录版本号加1，变为2，大于A事物一开始读取行记录版本号1，A事务可以提交。
+        - 4.但B事务提交时发现此时行记录版本号已经变为2，产生冲突，B事务提交失败。
+        - 5.B事务尝试重新提交，此时再次读取的版本号为2，加1后版本号变为3，不会产生冲突，正常提交B事务。
 
 - mongodb有2种事务api
 
@@ -2760,6 +3192,46 @@ db.users.dropIndex({"name": 1})
     |--------------------------------|---------------------------------------------------------------------------------|
     | 需要显示调用来，启动和提交事务 | 启动事务、执行指定操作，提交（发生错误终止）                                    |
     | 不包含错误处理逻辑             | 自动为TransientTransactionError和UnknownTransactionCommitResult提供错误处理逻辑 |
+
+- read concern和write concern
+
+    | read concern值 | 说明                                                                                   |
+    |----------------|----------------------------------------------------------------------------------------|
+    | local          | 数据可能回滚。对于分片群集上的事务，local 不能保证数据是从整个分片的同一快照视图获取。 |
+    | majority       | 无法回滚数据。对于分片群集上的事务，不能保证数据是从整个分片的同一快照视图中获取。     |
+
+    | write concern值 | 说明                                                                              |
+    |-----------------|-----------------------------------------------------------------------------------|
+    | w:0             | 事务写入不关注是否成功，默认为成功。                                              |
+    | w:1             | 事务写入到主节点就开始往客户端发送确认写入成功。                                  |
+    | w:majority      | 大多数节点成功原则，例如一个复制集 3 个节点，2 个节点成功就认为本次事务写入成功。 |
+    | w:all           | 所有节点都写入成功，才认为事务提交成功。                                          |
+    | j:false         | 写操作到达内存就算事务成功。                                                      |
+    | j:true          | 写操作只有记录到日志文件才算事务成功。                                            |
+    | wtimeout:       | 写入超时时间，过期表示事务失败。                                                  |
+
+```mongodb
+// 只有在副本集和分片才能使用事务
+// 开启session
+session = db.getMongo().startSession( { readPreference: { mode: "primary" } } );
+// 在session开启1个事务
+session.startTransaction( { readConcern: { level: "local" }, writeConcern: { w: "majority" } } );
+
+// 一些操作
+try {
+   session.getDatabase("test").collection.insertOne( { abc: 1 } );
+} catch (error) {
+   // 回滚事务
+   session.abortTransaction();
+   throw error;
+}
+
+// 提交事务
+session.commitTransaction();
+
+// 关闭session
+session.endSession();
+```
 
 - 事务的限制：
     - 仅 WiredTiger 引擎支持事务。
@@ -2787,6 +3259,15 @@ db.users.dropIndex({"name": 1})
                 | 0           | 无法立即获取锁时，事务立即终止 |
                 | -1          | 将`maxTimeMS`参数作为超时时间  |
                 | 大于0的数字 | 指定超时时间（单位：秒）       |
+
+- 事务日志（Journal）
+    - 事务日志是一种WAL（Write Ahead Log）事务日志，目的是实现事务提交层面的数据持久化。
+    - 事务日志持久化的对象不是修改的数据，而是修改的动作，以日志形式先保存到事务日志缓存中，再根据相应的配置按一定的周期，将缓存中的日志数据写入日志文件中。
+        - 事务日志文件的大小达到100MB。
+
+    - 事务日志落盘的规则
+        - 1.按时间周期落盘：在默认情况下，以50毫秒为周期，将内存中的事务日志同步到磁盘中的日志文件。
+        - 2.提交写操作时强制同步落盘：当设置写操作的写关注为j:true时，强制将此写操作的事务日志同步到磁盘中的日志文件。
 
 ## 视图
 
@@ -3148,6 +3629,8 @@ db.users.dropIndex({"name": 1})
 
 ### 启动副本集
 
+- 以下是手动启动。可以使用[mlaunch命令](#mlaunch：快速启动实例，支持副本集和分片)快速启动
+
 - 实验：在单机服务器上，建立一个3节点的副本集
 
 - 1.为每个节点单独创建数据目录
@@ -3158,9 +3641,9 @@ db.users.dropIndex({"name": 1})
 - 2.启动mongod
     ```sh
     # 启动3个mongod
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &> /dev/null &
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &> /dev/null &
+    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &> /dev/null &
 
     # 默认情况下绑定到localhost(127.0.0.1)。--bind_ip参数可以指定ip，也可以在配置文件使用bind_ip
     # 在192.51.100.1服务器上运行mongod
@@ -3445,7 +3928,7 @@ db.users.dropIndex({"name": 1})
 
 ### 管理
 
-- 读偏好（read preference)：
+- 读偏好（readPreference)：
 
     - `primary`（默认值）：始终发送给主节点，没有主节点就报错
     - `primaryPreferred`：当主节点停止运行时，副本集会进入一个临时的只读模式
@@ -3455,6 +3938,21 @@ db.users.dropIndex({"name": 1})
 
     - `secondary`：如果可以接受旧数据。总是发送给从节点；如果没有从节点就报错，不会发送给主节点
     - `secondaryPreferred`：如果可以接受旧数据。总是发送给从节点；没有从节点，就发送给主节点
+
+    - 设置tag使读操作指向特定节点
+
+        - 只适用于readPreference参数：发送到从节点的值；如果是`primary`默认值，则不兼容
+
+        ```mongodb
+        conf = rs.conf()
+        conf.members[1].tags = { "city": "GZ" }
+        rs.reconfig(conf)
+        ```
+
+        ```
+        # Client实例构造语句
+        client=MongoClient('mongodb://host1:port,host2:port,host3:port?relicaSet=rs0&readPreference = secondary&readPreferenceTags=city:GZ')
+        ```
 
 - 副本集最多只能有50个成员，其中只有7个成员拥有投票权
     - 这是为了减少每个成员的心跳产生的网络流量
@@ -3616,6 +4114,8 @@ db.users.dropIndex({"name": 1})
     rs.reconfig(cfg);
     ```
 
+- mongodb3.6开始：客户端检查到primary连接丢失后，会让客户端先等待一定时间（默认30秒）。通过设置`serverSelectionTimeoutMS`参数修改
+
 - 心跳间隔时间内（默认2秒）有成员发现主节点不可用，就会立即开始选举：选举流程
 
     - 当一个从节点与主节点无法连接时：会通知并请求其他成员，将自己选举为主节点。
@@ -3666,11 +4166,17 @@ db.users.dropIndex({"name": 1})
     mongod --config ~/mongodb/mongodb.conf --oplogSize 200 &
     ```
 
-- oplog（日志）：包含主节点的每一次写操作。存在于主节点local数据库中的一个固定集合（类似于环形队列）。
+- oplog（日志）：包含主节点的每一次写操作。存在于主节点local数据库的`db.oplog.rs`是一个固定集合（类似于环形队列）。
 
     - 从节点通过查询此集合获取需要复制的操作
     - oplog的每个操作都是幂等的：无论是应用1次，还是多次结果都一样
         - 例子：set a 10是幂等的，add a 1则不是幂等
+
+    ```mongodb
+    use local
+    // 查看oplog
+    db.oplog.rs.find().sort({ts: -1}).limit(10)
+    ```
 
 - 每个从节点都维护着自己的oplog（日志），记录主节点复制的每个操作
 
@@ -3756,6 +4262,7 @@ db.users.dropIndex({"name": 1})
         // 查看大小
         // 如果启动的身份验证，要确保使用的用户具有修改local数据库的权限
         use local
+        db.oplog.rs.stats().maxSize
         db.oplog.rs.stats(1024*1024).maxSize
 
         // oplog必须大于990MB，不然会报错。除非mongod启动时设置
@@ -3770,7 +4277,7 @@ db.users.dropIndex({"name": 1})
 
 - 初始化同步
 
-    - 副本集成员启动时，会检查自身的有效状态，以缺点是否可以开始从其他成员同步数据
+    - 副本集成员启动时，会检查自身的有效状态，以确定是否可以开始从其他成员同步数据
 
     - 状态有效：会从另一个成员中复制数据的完整副本。几个步骤：
 
@@ -3835,6 +4342,53 @@ db.users.dropIndex({"name": 1})
 
         - `ROLLBACK`：成员正在回滚数据
 
+#### 解决oplog严重落后的问题
+
+- 问题：如果网络或节点故障，secondary的oplog数据远远落后与primary。secondary恢复后，可能出现primary节点的写操作日志还未复制过去就被覆盖了。也就是不可能追赶primary节点的最新修改数据
+
+- 解决方法
+
+    - 方法1：关闭secondary，手动删除secondary的data目录，重启进程后自动同步。
+        - 缺点：如果复制的数据较大，会消耗大量时间
+
+        - 关闭问题节点rs2
+            ```mongosh
+            use admin
+            db.shutdownServer()
+            ```
+
+        - 删除rs2的data目录
+            ```sh
+            rm -rf mongodb-rs2/data/*
+            ```
+
+        - 重新启动rs2
+
+    - 方法2：关闭secondary，手动删除secondary的data目录，将最新数据的节点的data目录复制过来，再重启进程
+        - 关闭问题节点rs2
+            ```mongosh
+            use admin
+            db.shutdownServer()
+            ```
+
+        - 删除rs2的data目录
+            ```sh
+            rm -rf mongodb-rs2/data/*
+            ```
+
+        - 关闭有最新数据的节点rs1
+            ```mongosh
+            use admin
+            db.shutdownServer()
+            ```
+
+        - 复制
+            ```sh
+            cp -rf mongodb-rs1/data mongodb-rs2/data
+            ```
+
+        - 重新启动
+
 ### 回滚
 
 - 因网络分区出现多主节点的回滚例子：
@@ -3843,9 +4397,9 @@ db.users.dropIndex({"name": 1})
 
     - 此时出现网络分区：
 
-        | 数据中心1 | 数据中心 |
-        |-----------|----------|
-        | 1主+1从   | 2：3从   |
+        | 数据中心1 | 数据中心2 |
+        |-----------|-----------|
+        | 1主+1从   | 3从       |
 
     - 数据中心1：继续处理自己的写操作。假设oplog到了126号
     - 数据中心2成员满足大多数：因此其中一个从节点会选举成为主节点。这个新的主节点会开始处理写操作。假设oplog到了128号
@@ -3996,6 +4550,10 @@ db.users.dropIndex({"name": 1})
 
 ![avatar](./Pictures/mongodb/shard.avif)
 
+- 一个分片实际就是一个复制集。每个分片只是保存一部分数据，复制集可以防止数据丢失
+
+- 默认情况：读/写操作都发生在每个分片的primary节点
+
 - 分片类似于集群和RAID10
     - 可以使用性能较弱的机器实现负载
     - 可以基于地理位置拆分文档，让靠近它们的客户端更快的访问
@@ -4021,6 +4579,8 @@ db.users.dropIndex({"name": 1})
 - mongos：路由进程，负责将客户端的操作路由到具体的分片上。因此它需要从`config配置服务器`获取元数据（分片的情况）
 
     - 默认端口为27017
+
+    - 不会保存任何数据库的数据
 
     - 应该启动一定数量的mongos进程，并尽量放在靠近所有分片的位置
         - 可以提高访问多个分片的查询性能
@@ -4097,28 +4657,16 @@ db.users.dropIndex({"name": 1})
                 - 如果config配置服务器不可用，无法获取新块的位置，就会向客户端返回一个错误。
             - 3.mongos重新发送请求，成功检索数据后返回客户端
 
-    - 如果迁移过程影响性能，可以在`config.settings`集合中指定一个时间窗口：只允许在下午1点到4点执行均衡
-
-        ```mongodb
-        // 开启均衡器
-        sh.setBalancerState(true)
-
-        // 设置activeWindow字段
-        use config
-        db.settings.update(
-            {_id: "balancer"},
-            {$set: { activeWindow: { start: "13:00", stop: "16:00" }}},
-            {upsert: true}
-        )
-        ```
-
 ### 启动分片
+
+- 以下是手动启动。可以使用[mlaunch命令](#mlaunch：快速启动实例，支持副本集和分片)快速启动
 
 - `ShardingTest()`的创建分片的方式，已经被抛弃
 
 - 实验：通过配置文件启动分片：
 
 - 所有配置文件在`mongodb/shard`目录下的`start.conf`
+    - 可以使用`mongodb-shard.sh`脚本直接启动
 
 - 启动顺序：config配置服务器->所有分片->mongos
     - 重启分片的顺序也一样，只是不需要初始化
@@ -4325,6 +4873,7 @@ db.users.dropIndex({"name": 1})
     ```mongodb
     // 回到mongos
     // 插入更多数据
+    use crm
     for (var i=1; i<10000; i++) {
         db.users.insertOne({'_id': i, "name": "joe"+i});
     }
@@ -4336,7 +4885,7 @@ db.users.dropIndex({"name": 1})
     db.users.ensureIndex({"name": 1})
     // 按片键分片存储
     sh.shardCollection("crm.users", {"name": 1})
-    // partitioned依然没有true??分片之前是单独的块，分片之后会被分为多个块
+    // partitioned依然没有true??分片之前是单独的块，分片之后会被分为多个块。但在collections字段下找到分片的集合。不清楚分片是否成功，还是只是未达到chunk的阈值
     sh.status()
       {
         database: {
@@ -4474,8 +5023,10 @@ sh.status()
         - 对于已分片的集合，不能在其他字段上创建唯一索引。
 
 - 片键的基数：和索引一样，基数越高，分片性能越好。
-    - 如果logLevel只有DEBUG、WARN、ERROR三个值，则mongodb无法分出超过三个以上的块
-        - 解决方法：可以使用该键和另一个拥有多样值的键组成复合片键。——比如loglevel和timestamp。总之键的组合要有很高的基数
+
+    - 问题：如果选择gender字段作为片键，由于只有男、女2个值，则mongodb无法分出超过2个以上的块。随着不断插入文档记录，每个块不断变大，但又不能分割
+
+    - 解决方法：可以使用该键和另一个拥有多样值的键组成复合片键。——比如loglevel和timestamp。总之键的组合要有很高的基数
 
 - 单独的mongod服务器，执行升序写操作时效率最高。分片则与之相反，写操作分发在集群中时，分片效率最高
 
@@ -4489,7 +5040,7 @@ sh.status()
 
 - 随机分发的片键：可以是用户名、电子邮件、UUID、MD5哈希值等（没有可识别模式的键）
     - 由于写操作是随即分发：分片应该以大致相同的速度增长，从而减少进行迁移操作的数量
-    - 哈希片键：如果不打算执行范围查询，哈希片键就是一个很好的选择
+    - 哈希片键：如果不打算执行范围查询，哈希片键就是一个很好的选择。因为hash会将读请求路由到所有分片
         - 不能使用`unique`选项；不能使用数组字段；浮点型会在哈希前取整（1和1.9会被哈希为同样的值）
         - 对于有一个不存在的集合创建哈希片键，`sh.shardCollection()`会立即创建一些空的块分发到分片集群中。
         ```mongodb
@@ -4500,7 +5051,7 @@ sh.status()
         sh.shardCollection("app.users", {"name": "hashed"})
         ```
 
-- 基于范围的片键：ip、经纬度、地址。在mongodb4.0.3之后，可以定义区域
+- 基于范围的片键(默认的分片策略)：ip、经纬度、地址。在mongodb4.0.3之后，可以定义区域
 
     | 函数                     | 说明                                 |
     |--------------------------|--------------------------------------|
@@ -4604,6 +5155,42 @@ sh.status()
 
         - 添加新的块不会有任何写操作，因为没有热点块在这个分片上面
 
+### 修改片键
+
+- 在MongoDB 4.2及更早版本中，不支持分片后修改片键。如果硬要修改
+    - 1.将集合中的所有数据dump到外部存储起来
+    - 2.删除原来分片的集合
+    - 3.创建一个新集合，设置新的片键
+    - 4.预先分割片键范围，确保数据均匀分布
+    - 5.重新将dump文件的数据恢复到集合中
+
+- 在mongodb4.4可以使用Refine a Shard Key
+    ```mongodb
+    db.adminCommand( {
+       refineCollectionShardKey: "test.orders",
+       key: { customer_id: 1, order_id: 1 }
+    } )
+    ```
+
+- 在mongodb5.0可以使用`reshardCollection`命令
+    ```mongodb
+    // 修改片键
+    db.adminCommand({
+      reshardCollection: "<database>.<collection>",
+      key: <shardkey>
+    })
+
+    // 要监视重新分片操作，您可以使用 $currentOp pipeline阶段：
+    db.getSiblingDB("admin").aggregate([
+      { $currentOp: { allUsers: true, localOps: false } },
+      {
+        $match: {
+          type: "op",
+          "originatingCommand.reshardCollection": "<database>.<collection>"
+        }
+      }
+    ])
+    ```
 ### 管理
 
 #### 手动分片。mongodb5.0支持在线数据重新分片
@@ -4687,6 +5274,159 @@ mongosync \
      --cluster1 "mongodb://192.0.2.20:27017,192.0.2.21:27017,192.0.2.22:27017"
 ```
 
+#### 块（chunk）管理
+
+- 对空集合进行分片时
+    - 如果是基于hash分片：则为每个分片创建2个chunk
+    - 如果是基于范围分片：只创建1个空chunk
+
+- 修改块大小
+
+    - 默认为128MB。允许的范围大小1到1024MB之间
+
+    - 如果chunk过大：
+        - 优点：减少分割和迁移的频率
+        - 缺点：增加chunk迁移时的io负载
+        - 如果chunk太小：则优缺点交换
+
+    - 修改后，不会立即改变
+        - 如果增加了块的大小：已经存在的块，通过插入或更新来增长，直到达到新大小
+        - 如果减少了块的大小：则需要花费一些时间才能将所有块拆分为新的大小
+            - 拆分操作是无法恢复的。
+
+    - 如果迁移过于频繁或者使用的文档太大，则可能需要增加块的大小
+
+    ```mongodb
+    use config
+
+    // 查看块大小
+    db.settings.find()
+
+    // 设置为64MB
+    db.settings.updateOne(
+       { _id: "chunksize" },
+       { $set: { _id: "chunksize", value: 64 } },
+       { upsert: true }
+    )
+    ```
+
+- 手动分割chunk的方法
+    ```mongosh
+    // 方法1：会查询匹配到第1个文档记录所在的chunk平均分割成2个
+    sh.splitFind("crm.users", {"name": "joe100"})
+
+    // 方法2：查询该文档所在的chunk,然后基于该文档记录所在的春困，进行分割
+    sh.splitAt("crm.users", {"name": "joe100"})
+
+    // 查看chunk分割后的情况
+    sh.status()
+    ```
+
+- 超大块（jumbo chunk）：无法拆分和无法移动的块
+
+    - 如果选择了`date`作为片键。则mongos每天最多只能创建1个块。
+        - 无法拆分：假设有一天的数据量比其他任何一天都要多，但这个块不能拆分，因为片键值是相同的
+        - 无法移动：而且如果这个块大于`config.settings`中最大块的大小时，均衡器将无法移动
+
+        ```mongodb
+        // 超大块会被标记为jumbo标志
+        sh.status()
+        ```
+
+    - 假设有3个分片shard1、shard2、shard3。写操作都分发到shard1（热点分片），均衡器只能移动非超大块，所以它只会将较小的块从热点分片移走
+
+        - shard1上会有越来越多的超大块，即使3个分片之间的块数量完全均衡，但shard1的填充速度会比其他2个分片要快
+
+    - 使用`dataSize`命令查看块大小。`dataSize`必须扫描整个块的数据确定它的大小
+
+        ```mongodb
+        // 查找块的范围
+        use config
+        var chunks = db.chunks.find({"ns": "crm.users",}).toArray()
+
+        use crm
+        db.runCommand({"dataSize", "users",
+            "keyPattern": {"data": 1}, // 片键
+            "min": chunks[0].min,
+            "max": chunks[0].max}
+            })
+        ```
+
+    - 手动移动超大块
+        ```mongodb
+        // 关闭均衡器
+        sh.setBalancerState(false)
+
+        // mongodb不允许移动超过最大块大小的块。调大块的大小，这里为10000MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 10000 } },
+           { upsert: true }
+        )
+
+        // 假设crm.users的NumberLong("8345072417171006784")为超大块，移动到rs0
+        sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
+
+        // 在crm数据库的分片rs1上执行splitChunk，直到块数量与rs0大致相同
+
+        // 设置为原来的大小。mongodb7.0默认为128MB
+        db.settings.updateOne(
+           { _id: "chunksize" },
+           { $set: { _id: "chunksize", value: 128 } },
+           { upsert: true }
+        )
+
+        // 开启均衡器
+        sh.setBalancerState(true)
+        ```
+
+#### 均衡器（Balancer）管理
+
+- 基本命令
+    ```mongodb
+    // 查看是否开启均衡器
+    sh.getBalancerState()
+
+    // 查看均衡器是否运行
+    sh.isBalancerRunning()
+
+    // 关闭均衡器
+    sh.stopBalancer()
+
+    // 开启均衡器
+    sh.setBalancerState(true)
+
+    // 只关闭对指定分片集合的chunk迁移功能
+    sh.disableBalancing("crm.users")
+    // 查看balancing字段会为false
+    sh.status()
+    // 开启
+    sh.enableBalancing("crm.users")
+    ```
+
+- 如果迁移过程影响性能，可以在`config.settings`集合中指定一个时间窗口：只允许在下午1点到4点执行均衡
+
+    ```mongodb
+    // 开启均衡器
+    sh.setBalancerState(true)
+
+    // 设置activeWindow字段
+    use config
+    db.settings.update(
+        {_id: "balancer"},
+        {$set: { activeWindow: { start: "13:00", stop: "16:00" }}},
+        {upsert: true}
+    )
+
+    // 如果希望balancer一直运行，删除对应的时间窗口
+    use config
+    db.settings.update(
+        {_id: "balancer"},
+        {$set: { activeWindow: true}},
+        {upsert: true}
+    )
+    ```
+
 #### 查看基本分片信息
 
 - 查看分片信息
@@ -4738,6 +5478,8 @@ mongosync \
     | lastmodEpoch                 | 集合创建的时间                                       |
 
 - 查看已经发生的拆分和迁移
+
+    - `changelog`集合会保存集合上发生的变更信息：如chunk拆分，chunk迁移、集合删除元数据信息
 
     - 拆分：
 
@@ -5119,7 +5861,12 @@ db.adminCommand({"connPoolStats": 1})
 ## 变更流（change stream）
 
 - 变更流（change stream）：允许应用追踪数据库中数据的实时变更
+
     - 监听到的变更事件包括：insert、update、replace、delete、drop、rename、dropDatabase 和 invalidate。
+
+    - 变更流（change stream）可以实现kafaka或rabbitmq等消息组件类似的功能。因此用户不再需要部署一套类似kafka等消息处理集群
+
+    - 如果需要实时同步到其他系统（如mysql、hbase）则需要自己编写代码
 
 - mongodb3.6之后：只能通过追踪`oplog`实现，是一个复杂且容易出错的操作
 
@@ -5139,88 +5886,47 @@ db.adminCommand({"connPoolStats": 1})
         - 可以为一个集合、一组集合、一个数据库、整个集群的所有数据的变更提供订阅机制
             - 使用了聚合框架：允许用户自定义过滤
 
+- 实验
+
+    - 启动以下python代码
+        ```py
+        from pymongo import MongoClient
+        import pprint
+        client = MongoClient("mongodb://localhost:27017/")
+        db = client.test
+
+        # 对collection集合开启变更流
+        cursor = db.collection.watch()
+        for doc in cursor:
+            print(doc)
+        ```
+
+    - 插入数据测试是否有输出
+        ```mongosh
+        db.collection.insertOne({"model": "sim"})
+        ```
+
+    - 管道模式（类似聚集查询）
+        ```py
+        from pymongo import MongoClient
+        import pprint
+        client = MongoClient("mongodb://localhost:27017/")
+        db = client.test
+
+        // 只输出model字段的值为sim
+        pipeline = [
+            {"$match": {"fullDocument.model": "sim"}},
+            {"$addFields": {"newField": "this is an added field"}}
+        ]
+
+        # 对collection集合开启变更流
+        cursor = db.collection.watch(pipeline=pipeline)
+        for doc in cursor:
+            print(doc)
+        ```
+
 ## 管理
 
-### 数据块管理
-
-- 修改块大小
-
-    - 默认为128MB。允许的范围大小1到1024MB之间
-
-    - 修改后，不会立即改变
-        - 如果增加了块的大小：已经存在的块，通过插入或更新来增长，直到达到新大小
-        - 如果减少了块的大小：则需要花费一些时间才能将所有块拆分为新的大小
-            - 拆分操作是无法恢复的。
-
-    - 如果迁移过于频繁或者使用的文档太大，则可能需要增加块的大小
-
-    ```mongodb
-    // 设置为64MB
-    use config
-    db.settings.updateOne(
-       { _id: "chunksize" },
-       { $set: { _id: "chunksize", value: 64 } },
-       { upsert: true }
-    )
-    ```
-
-- 超大块（jumbo chunk）：无法拆分和无法移动的块
-
-    - 如果选择了`date`作为片键。则mongos每天最多只能创建1个块。
-        - 无法拆分：假设有一天的数据量比其他任何一天都要多，但这个块不能拆分，因为片键值是相同的
-        - 无法移动：而且如果这个块大于`config.settings`中最大块的大小时，均衡器将无法移动
-
-        ```mongodb
-        // 超大块会被标记为jumbo标志
-        sh.status()
-        ```
-
-    - 假设有3个分片shard1、shard2、shard3。写操作都分发到shard1（热点分片），均衡器只能移动非超大块，所以它只会将较小的块从热点分片移走
-
-        - shard1上会有越来越多的超大块，即使3个分片之间的块数量完全均衡，但shard1的填充速度会比其他2个分片要快
-
-    - 使用`dataSize`命令查看块大小。`dataSize`必须扫描整个块的数据确定它的大小
-
-        ```mongodb
-        // 查找块的范围
-        use config
-        var chunks = db.chunks.find({"ns": "crm.users",}).toArray()
-
-        use crm
-        db.runCommand({"dataSize", "users",
-            "keyPattern": {"data": 1}, // 片键
-            "min": chunks[0].min,
-            "max": chunks[0].max}
-            })
-        ```
-
-    - 手动移动超大块
-        ```mongodb
-        // 关闭均衡器
-        sh.setBalancerState(false)
-
-        // mongodb不允许移动超过最大块大小的块。调大块的大小，这里为10000MB
-        db.settings.updateOne(
-           { _id: "chunksize" },
-           { $set: { _id: "chunksize", value: 10000 } },
-           { upsert: true }
-        )
-
-        // 假设crm.users的NumberLong("8345072417171006784")为超大块，移动到rs0
-        sh.moveChunk("crm.users", {name: NumberLong("8345072417171006784")}, "rs0")
-
-        // 在crm数据库的分片rs1上执行splitChunk，直到块数量与rs0大致相同
-
-        // 设置为原来的大小。mongodb7.0默认为128MB
-        db.settings.updateOne(
-           { _id: "chunksize" },
-           { $set: { _id: "chunksize", value: 128 } },
-           { upsert: true }
-        )
-
-        // 开启均衡器
-        sh.setBalancerState(true)
-        ```
 ### 文档、集合、数据库
 
 - 查看文档的存储在mongodb的大小
@@ -5493,7 +6199,7 @@ db.adminCommand({"connPoolStats": 1})
 
 - `readConcern`读策略：可以设置在写操作被持久化之前就看到写入的结果。
 
-    - 不要将`readConcern`读策略和读偏好（read preference)混淆，后者处理从何处读取数据的问题。
+    - 不要将`readConcern`读策略和读偏好（read preference)混淆，后者是处理从那个节点读取。
     - 和写`writeConcern`写策略一样，需要权衡性能的影响
 
     | 值（一致性依次由弱到强） |
@@ -5504,8 +6210,8 @@ db.adminCommand({"connPoolStats": 1})
     | linearizable             |
 
     - `local`（默认）：
-        - 读操作直接读取本地最新的数据，但不保证该数据已被写入大多数复制集成员。
-        - 数据可能会被回滚。
+        - 读操作直接读取本地最新的数据，但不保证该数据已被写入majority个复制集成员。
+        - 读取到回滚数据的问题：如果primary节点故障，secondary未来得及同步就成为新的primary，然后旧primary重新连接并回滚数据。可能会出现前后两次读取不一致，第一次读是脏读
         - 默认是针对主节点读。如果读取操作与因果一致的会话相关联，则针对副节点读。
 
     - `available`：在`local`值的基础上，在分片集群场景下，为了保证性能，可能返回孤儿文档。
@@ -5536,24 +6242,9 @@ db.adminCommand({"connPoolStats": 1})
             - 该快照提供与该事务开始之前的操作的因果一致性。
             - 它读取 majority committed 的数据，但可能读不到最新的已提交数据
 
-#### 事务与read concern和write concern
-
-| read concern值 | 说明                                                                                   |
-|----------------|----------------------------------------------------------------------------------------|
-| local          | 数据可能回滚。对于分片群集上的事务，local 不能保证数据是从整个分片的同一快照视图获取。 |
-| majority       | 无法回滚数据。对于分片群集上的事务，不能保证数据是从整个分片的同一快照视图中获取。     |
-
-| write concern值 | 说明                                                                              |
-|-----------------|-----------------------------------------------------------------------------------|
-| w:0             | 事务写入不关注是否成功，默认为成功。                                              |
-| w:1             | 事务写入到主节点就开始往客户端发送确认写入成功。                                  |
-| w:majority      | 大多数节点成功原则，例如一个复制集 3 个节点，2 个节点成功就认为本次事务写入成功。 |
-| w:all           | 所有节点都写入成功，才认为事务提交成功。                                          |
-| j:false         | 写操作到达内存就算事务成功。                                                      |
-| j:true          | 写操作只有记录到日志文件才算事务成功。                                            |
-| wtimeout:       | 写入超时时间，过期表示事务失败。                                                  |
-
 ## WiredTiger存储引擎
+
+- mongodb3.2将WiredTiger作为默认存储引擎
 
 - 使用 WiredTiger，如果没有 journal 记录，MongoDB 能且仅能从最后一个检查点恢复。
     - 如果需要恢复最后一次 checkpoint 之后所做的更改，那么开启日志是必要的。
@@ -5570,60 +6261,97 @@ db.adminCommand({"connPoolStats": 1})
     )
     ```
 
-- B+ 树（默认使用）
+### B+ 树（默认使用）
 
-    ![avatar](./Pictures/mongodb/B+Tree.avif)
+- 除了存储key外还会存储value
 
-    - 以 page 为单位往磁盘读写数据，B+ 树的每个节点为一个 page
+- 以 page 为单位往磁盘读写数据，B+ 树的每个节点为一个 page
 
-        | 三种类型的 page | 说明                                                                                              |
-        |-----------------|---------------------------------------------------------------------------------------------------|
-        | root page       | B+ 树的根节点                                                                                     |
-        | internal page   | 存储数据的中间索引节点                                                                            |
-        | leaf page       | 真正存储数据的叶子节点：包含页头（page header）、块头（block header）和真正的数据（key-value 对） |
+    | 三种类型的 page | 说明                                                                                              |
+    |-----------------|---------------------------------------------------------------------------------------------------|
+    | root page       | B+ 树的根节点                                                                                     |
+    | internal page   | 存储数据的中间索引节点                                                                            |
+    | leaf page       | 真正存储数据的叶子节点：包含页头（page header）、块头（block header）和真正的数据（key-value 对） |
 
-        | leaf page的字段  | 说明                                                    |
-        |------------------|---------------------------------------------------------|
-        | page header      | 定义了页的类型、页存储的记录条数等信息                  |
-        | block header块头 | 定义了页的校验和 checksum、块在磁盘上的寻址位置等信息。 |
-        | page             |                                                         |
+    | leaf page的字段  | 说明                                                    |
+    |------------------|---------------------------------------------------------|
+    | page header      | 定义了页的类型、页存储的记录条数等信息                  |
+    | block header块头 | 定义了页的校验和 checksum、块在磁盘上的寻址位置等信息。 |
+    | page             |                                                         |
 
-        | page字段  | 说明                                                                                       |
-        |-----------|--------------------------------------------------------------------------------------------|
-        | WT_ROW    | 从磁盘加载的key-value数组，每一条记录还有一个cell_offset变量，表示这条记录在page上的偏移量 |
-        | WT_UPDATE | 下个 checkpoint 之前被修改的数据。实现 MVCC                                                |
-        | WT_INSERT | 下个 checkpoint 之前新增的数据                                                             |
+    | page字段                   | 说明                                                                                                                                                |
+    |----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+    | WT_ROW（key/value）        | 数组变量。从磁盘加载的key-value数组，每一条记录还有一个cell_offset变量，表示这条记录在page上的偏移量                                                |
+    | WT_UPDATE（修改数据）      | 数组变量。每条修改的记录会有一个数组元素对应，如果某条记录被多次修改，则会将所有修改的值以链表形式存储。下个 checkpoint 之前被修改的数据。实现 MVCC |
+    | WT_INSERT_HEAD（插入数据） | 数组变量。跳表。通过key属性的offset和size计算此条记录要插入的位置。下个 checkpoint 之前新增的数据                                                   |
 
-    - Page 的生命周期状态机：
+    | page其他字段      | 说明                                                                                                                                                                        |
+    |-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | WT_PAGE_MODIFY    | 保存page事务、脏数据字节大小等与page修改相关的信息                                                                                                                          |
+    | read_gen          | 当page中的read generation值作为evict page使用时，对应page在LRU队列中位置，决定page被evict server淘汰出去的先后顺序                                                          |
+    | WT_PAGE_LOKKASIDE | 当page进行reconcile时，如果系统总还有之前读操作正在访问此page中修改的数据，则会将这些数据保存到lookaside table。再次读page时，可以利用lookaside table中数据重新构建内存page |
+    | WT_ADDR           | 当page被成功reconciled后，对应磁盘上块地址，会按照这个地址将page写入磁盘，块是磁盘上文件最小分配单元，一个page可能有多个块                                                  |
+    | checksum          | page的校验和，如果page从磁盘读到内存后没有任何修改，比较checksum可以得到相等结果，那么后续reconcile该page时不会将page再重新写入磁盘                                         |
+#### Page 的生命周期状态机
 
-        ![avatar](./Pictures/mongodb/B+Tree-Page的生命周期.avif)
+    ![avatar](./Pictures/mongodb/B+Tree-Page的生命周期.avif)
 
-        - `reconcile`过程：发生在 checkpoint 的时候，将内存中 Page 的修改转换成磁盘需要的 B+ Tree 结构。
-            - 新建一个 Page 来将修改了的数据做整合，然后原 Page 就会被 discarded，新 page 会被刷新到磁盘，同时加入 LRU 队列。
+    - 步骤：
+        - 1.page从磁盘读到内存
+        - 2.内存修改page
+        - 3.被修改的脏page在内存被reconcile，完成后淘汰这些page
+        - 4.选中page，将其加入淘汰队列，等待被evict线程淘汰出内存
+        - 5.evict线程会被干净的page直接从内存丢弃（没有作任何修改的page），将经过reconcile处理后的磁盘映像写入磁盘再丢弃脏page
 
-        - `evict`过程：是内存不够用了或者脏数据过多的时候触发的
-            - 由 eviction_target（内存使用量）和 eviction_dirty_target（内存脏数据量）来控制
-            - 根据 LRU 规则淘汰内存 Page 到磁盘。
-            - 默认是有后台的 evict 线程控制的。但是如果超过一定阈值就会把用户线程也用来淘汰，会严重影响性能，应该避免这种情况。用户线程参与 evict 的原因，一般是大量的写入导致磁盘 IO 抗不住了，需要控制写入或者更换磁盘。
+        | Page状态         | 说明                                                                                                                                                                                                                  |
+        |------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+        | WT_REF_DISK      | Page 在磁盘中。初始状态，page被evict后也会设置此状态                                                                                                                                                                  |
+        | WT_REF_DELETE    | 虽然Page在磁盘中，但Page 已经B-tree删除。                                                                                                                                                                             |
+        | WT_REF_READING   | Page 正在被某个线程从从磁盘读到内存                                                                                                                                                                                   |
+        | WT_REF_MEM       | Page 在内存中，且能正常读写。                                                                                                                                                                                         |
+        | WT_REF_LOCKED    | 内存淘汰过程（evict）正在锁住 Page，不允许其他线程访问                                                                                                                                                                |
+        | WT_REF_LOOKASIDE | 虽然Page在磁盘，当执行 reconcile 的时候，如果 page 正在被其他线程读取被修改的部分，这个时候会把数据存储在 lookaside table 里面。当页面再次被读时可以通过 lookaside table 重构出内存 Page。                           |
+        | WT_REF_LIMBO     | 虽然page在内存，但执行完 reconcile 之后，Page 会被刷到磁盘。这个时候如果 page 有 lookaside table 数据，并且还没合并过来之前就又被加载到内存了，就会是这个状态，需要先从 lookaside table 重构内存 Page 才能正常访问。 |
 
-        | Page状态  | 说明                                                                                                                                                                                               |
-        |-----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-        | DIST      | Page 在磁盘中                                                                                                                                                                                      |
-        | DELETE    | Page 已经在磁盘中从树中删除                                                                                                                                                                        |
-        | READING   | Page 正在被从磁盘加载到内存中                                                                                                                                                                      |
-        | MEM       | Page 在内存中，且能正常读写。                                                                                                                                                                      |
-        | LOCKED    | 内存淘汰过程（evict）正在锁住 Page                                                                                                                                                                 |
-        | LOOKASIDE | 在执行 reconcile 的时候，如果 page 正在被其他线程读取被修改的部分，这个时候会把数据存储在 lookasidetable 里面。当页面再次被读时可以通过 lookasidetable 重构出内存 Page。                           |
-        | LIMBO     | 在执行完 reconcile 之后，Page 会被刷到磁盘。这个时候如果 page 有 lookasidetable 数据，并且还没合并过来之前就又被加载到内存了，就会是这个状态，需要先从 lookasidetable 重构内存 Page 才能正常访问。 |
+    - page被读时：会检查page的状态是否为`WT_REF_MEM`，然后设置一个hazard指针指向要读的page
 
-    - 块设备管理模块：为 page 分配 block
-        - 定位文档位置时，先计算 block 的位置，通过 block 的位置找到它对应的 page，再通过 page 找到文档行数据的相对位置。
+    - `reconcile`过程：磁盘page被加载到内存后被修改，需要重新从内存写入磁盘
+        - 发生在 checkpoint 的时候，将内存中 Page 的修改转换成磁盘需要的 B+ Tree 结构。
+        - 步骤：
+            - 1.在内存中leaf page中修改和新插入的数据分别保存在page字段的`WT_UPDATE`和`WT_INSERT_HEAD`两个数组中。
+            - 2.创建一个page大小的buffer，将新插入和修改的key/value复制到这个buffer
+                - 如果复制的数据小于一个page大小：则直接将数据写入一页磁盘映像page中，再写入磁盘
+                - 如果复制的数据大于一个page大小：则将数据分割成多个磁盘映像，每个磁盘映像对应一个page，最后将所有磁盘映像写入磁盘
 
-- checkpoint 实现将内存中修改的数据持久化到磁盘，保证系统在因意外重启之后能快速恢复数据。
+    - `evict`过程：是内存不够用了或者脏数据过多的时候触发的
+        - 根据 LRU 规则淘汰内存 Page 到磁盘。
+        - 淘汰1个page时，会首先锁住这个page（设置为WT_REF_LOCKED状态），检查这个page中是否有其他线程还在使用（判断是否有hazard point指针指向它），如果有则不会淘汰这个page。
+        - 默认后台只使用1个 evict 线程
+            - 可以设置`thread_min`和`thread_max`设置线程数量。从而避免让application thread（应用线程）也被迫加入到page淘汰
+
+        | 参数                   | 默认配置值 | 说明                                                           |
+        | eviction_target        | 80%        | 内存使用量到达80%。触发work thread淘汰page                     |
+        | eviction_trigger       | 90%        | 内存使用量到达90%。触发application thread和work thread淘汰page |
+        | eviction_dirty_target  | 5%         | 当脏数据所占内存比例5%，触发work thread淘汰page                |
+        | eviction_dirty_trigger | 20%        | 当脏数据所占内存比例20%，触发application thread和work thread淘汰page               |
+
+        - 第1种情况触发时（也就是达到80%），如果内存使用量继续增长达到90%，就会触发第2种情况application thread(应用线程)的读/写操作等请求被阻塞，application thread也参与到内存的page淘汰
+            - 第3、4种情况的脏数据也是同理
+
+        - 特殊情况：page不断进行插入或更新操作时，如果page内存占用大于`memory_page_max`，则会强制触发page eviction。
+
+            - 首先将大page拆分成多个小的page，再通过reconcile将这些小的page保存到磁盘上，一旦reconcile写入磁盘的操作完成，这些page就能从内存中淘汰出去
+
+#### checkpoint
+- checkpoint有两个目的：
+    - 1.实现将内存中修改的数据持久化到磁盘
+    - 2.保证系统在因意外故障，重启之后能快速恢复数据。
+
+- checkpoint相当于一个日志，记录上一次checkpoint后相关数据的变化
+
+- 一个 checkpoint 就是一个内存 B+ Tree，其结构就是前面提到的 Page 组成的树
 
     ![avatar](./Pictures/mongodb/checkpoint.avif)
-
-    - 一个 checkpoint 就是一个内存 B+ Tree，其结构就是前面提到的 Page 组成的树
 
     | checkpoint字段       | 说明                                                               |
     |----------------------|--------------------------------------------------------------------|
@@ -5632,39 +6360,53 @@ db.adminCommand({"connPoolStats": 1})
     | discarded list pages | 上个 checkpoint 结束之后到本 checkpoint 结束前：被删掉的 page 列表 |
     | available list pages | 分配了但是没有使用的 page，新建 page 时直接从这里取。              |
 
-    - 流程：
+- 流程：
 
-        ![avatar](./Pictures/mongodb/checkpoint流程.avif)
+    ![avatar](./Pictures/mongodb/checkpoint流程.avif)
 
-        - 1.在系统启动或者集合文件打开时，从磁盘加载最新的 checkpoint。
-        - 2.根据 checkpoint 的 file size truncate 文件。
-            - 因为只有 checkpoint 确认的数据才是真正持久化的数据，它后面的数据可能是最新 checkpoint 之后到宕机之间的数据，不能直接用，需要通过 Journal 日志来回放。
-        - 3.根据 checkpoint 构建内存的 B+ Tree。
-        - 5.数据库 run 起来之后，各种修改操作都是操作 checkpoint 的 B+ Tree，并且会 checkpoint 会有专门的 list 来记录这些修改和新增的 page
-        - 6.在 60s 一次的 checkpoint 执行时，会创建新的 checkpoint，并且将旧的 checkpoint 数据合并过来。然后执行 reconcile 将修改的数据刷新到磁盘，并删除旧的 checkpoint。这时候会清空 allocated，discarded 里面的 page，并且将空闲的 page 加到 available 里面。
+    - 1.在系统启动或者集合文件打开时，从磁盘加载最新的 checkpoint。
+    - 2.根据 checkpoint 的 file size truncate 文件。
+        - 因为只有 checkpoint 确认的数据才是真正持久化的数据，它后面的数据可能是最新 checkpoint 之后到宕机之间的数据，不能直接用，需要通过 Journal 日志来回放。
+    - 3.根据 checkpoint 构建内存的 B+ Tree。
+    - 5.数据库 run 起来之后，各种修改操作都是操作 checkpoint 的 B+ Tree，并且会 checkpoint 会有专门的 list 来记录这些修改和新增的 page
+    - 6.在 60s 一次的 checkpoint 执行时，会创建新的 checkpoint，并且将旧的 checkpoint 数据合并过来。然后执行 reconcile 将修改的数据刷新到磁盘，并删除旧的 checkpoint。这时候会清空 allocated，discarded 里面的 page，并且将空闲的 page 加到 available 里面。
 
-- WiredTiger使用多版本并发控制（MVCC）来隔离读写操作
-    - 文档级别：允许并发多个客户端的更新操作，对集合中的不同文档同时进行更新
-    - MVCC 通过非锁机制进行读写操作，是一种乐观并发控制模式。
-    - WiredTiger 仅在全局、数据库和集合级别使用意向锁。
-    - 当存储引擎检测到两个操作之间存在冲突时，将引发写冲突，从而导致 MongoDB 自动重试该操作。
+- 查看checkpoint信息
 
-- 内存 cache：
+```sh
+# 进入data目录下后执行
+wt list -c
+```
 
-    - 数据量小的时候是纯内存读写，性能肯定非常好，当数据量过大时就会触发内存和磁盘间数据的来回交换，导致性能降低。
+#### [wt工具](https://github.com/wiredtiger/wiredtiger)
 
-    - 内存分配大小一般是不建议改的，除非你确实想把自己全部数据放到内存
+- 不仅包含创建表、删除表、查询数据、性能统计、dump数据等命令。还有`salvage`命令从损坏的表中恢复数据
 
-    - Wired Tiger 会将整个内存划分为 3 块：
+#### 内存 cache
 
-        - 1.WiredTiger cache：缓存前面提到的内存数据，默认大小 Max((RAM - 1G)/2,256M )，服务器 16G 的话，就是(16-1)/2 = 7.5G 。
-            - B+ 树缓存未压缩的数据，可以直接使用的数据。并通过淘汰算法确保内存占用在合理范围内。
-            - 这个内存配置一定要注意，因为 Wired Tiger 如果内存不够可能会导致数据库宕掉的。
+- 数据量小的时候是纯内存读写，性能肯定非常好，当数据量过大时就会触发内存和磁盘间数据的来回交换，导致性能降低。
 
-        - 2.索引 cache：换成索引信息，默认 500M
+- 内存分配大小一般是不建议改的，除非你确实想把自己全部数据放到内存
 
-        - 3.File System Cache：是经过压缩的数据，可以占用更少的内存空间，相对的就是数据不能直接用，需要解压
-            - 这个实际上不是存储引擎管理，是利用的操作系统的文件系统缓存，目的是减少内存和磁盘交互。剩下的内存都会用来做这个。
+- Wired Tiger 会将整个内存划分为 3 块：
+
+    - 1.internal cache：缓存前面提到的内存数据，默认大小 Max((RAM - 1G)/2,256M )，服务器 16G 的话，就是(16-1)/2 = 7.5G 。
+        - B+ 树缓存未压缩的数据，可以直接使用的数据。并通过淘汰算法确保内存占用在合理范围内。
+        - 这个内存配置一定要注意，因为 Wired Tiger 如果内存不够可能会导致数据库宕掉的。
+
+    - 2.索引 cache：换成索引信息，默认 500M
+
+    - 3.File System Cache：这个实际上不是存储引擎管理，是利用的操作系统的文件系统缓存，目的是减少内存和磁盘交互。剩下的内存都会用来做这个。
+
+    - 因此1份数据在磁盘、文件系统缓存、internal cache是3个位置的格式是不同的
+        - 1.在文件系统缓存与磁盘格式相同。文件系统缓存可以减少磁盘I/O次数
+        - 2.索引cache：使用前缀压缩算法，去掉索引字段上重复的前缀，减少对内存的占用
+        - 3.interl cache：使用块压缩算法，因此数据需要解压后才能被操作使用
+
+#### 其他
+
+- 块设备管理模块：为 page 分配 block
+    - 定位文档位置时，先计算 block 的位置，通过 block 的位置找到它对应的 page，再通过 page 找到文档行数据的相对位置。
 
 - Database File：存储压缩后的数据。每个 WiredTiger 表对应一个独立的磁盘文件。磁盘文件划分成多个按 4 KB 对齐的 extent，并通过 3 个链表来管理：available list（可分配的 extent 列表) ，discard list（废弃的 extent 列表）和 allocate list（当前已分配的 extent 列表）
 
@@ -5707,7 +6449,21 @@ ll | grep '5575423204468368826'
 
     - 3.全表扫描的查询：在数据量上千万之后基本不可用
 
-## 安全事项
+## 常见问题
+
+### journaling、oplog、log三种日志的区别
+
+- journaling：是一种wal（write ahead log）日志
+    - 当数据库发生以外故障恢复时，会使用级偶然令日志中保存的操作日志重新执行这些操作，确保数据一致性
+    - 默认情况以50毫秒为周期，将内存的事务日志同步到磁盘中的日志文件
+    - 默认限制100MB，超过后会创建一个新日志文件
+
+- oplog：是复制集不同节点之间进行数据异步同步时的操作日志。
+    - secondary会首先异步复制primary节点的oplog操作日志，如何将这些操作重新在secondary执行一遍
+
+- log：是mongodb启动、运行等过程日志文件，数据库在服务器上的启动信息、慢查询记录、数据库异常信息、客户端与服务器连接、断开等信息
+
+### 安全事项
 
 - `$where`：可以在查询中执行javascript代码
     - 为了安全起见，应该严格限制，禁止终端用户随意使用`$where`
@@ -5743,6 +6499,12 @@ rs.printSecondaryReplicationInfo()
 ### 监控
 
 - [官方文档](https://www.mongodb.com/docs/manual/administration/monitoring/)
+
+#### 监控参数
+
+- [OPPO百万级高并发MongoDB集群性能数十倍提升优化实践](#OPPO百万级高并发MongoDB集群性能数十倍提升优化实践)
+
+    - 于是提前部署好`mongostat`监控所有实例，同时在每个服务器上用`iostat -x`监控实时的IO状况，同时编写脚本实时采集`db.serverstatus()`、`db.printSlaveReplicationInfo()`、`db.printReplicationInfo()`等集群重要信息。
 
 #### mongodb自带的
 
@@ -6161,8 +6923,306 @@ mlaunch stop shard0002
         │    3    │ 'age        ' │ '50.0 %'  │ 'Undefined' │
         ```
 
+## 实践案例
+
+- [实践案例专栏](https://www.infoq.cn/profile/8D2D4D588D3D8A/publish)
+
+### [OPPO百万级高并发MongoDB集群性能数十倍提升优化实践](https://mongoing.com/archives/29934)
+
+- 背景：
+
+    - 总分片数量为14个
+
+    - 峰值流量超过100万/秒（主要是写流量，读流量较少；读流量走从节点）
+        - 峰值已经突破120万/秒，其中delete过期删除的流量不算在总流量里面(delete由主触发删除，但是主上面不会显示，只会在从节点拉取oplog的时候显示)。如果算上主节点的delete流量，峰值总tps超过150万/秒。
+
+    - 平均时延100ms
+        - 随着读写流量的进一步增加，时延抖动严重影响业务可用性。
+
+- 软件优化：在不增加服务器资源的情况下，首先做了如下软件层面的优化，并取得了理想的数倍性能提升：
+
+- 1.业务层面优化
+
+    - 该集群总文档近百亿条，每条文档记录默认保存三天，业务随机散列数据到三天后任意时间点随机过期淘汰。由于文档数目很多，白天平峰监控可以发现从节点经常有大量delete操作，甚至部分时间点delete删除操作数已经超过了业务方读写流量，因此考虑把delete过期操作放入夜间进行，过期索引添加方法如下:
+
+    - 由于文档数目很多，白天平峰监控可以发现从节点经常有大量delete操作，甚至部分时间点delete删除操作数已经超过了业务方读写流量，因此考虑把delete过期操作放入夜间进行，过期索引添加方法如下:
+
+        - Delete过期Tips1：通过随机散列expireAt在三天后的凌晨任意时间点，即可规避白天高峰期触发过期索引引入的集群大量delete，从而降低了高峰期集群负载，最终减少业务平均时延及抖动。
+
+            ```mongodb
+            // 在expireAt指定的绝对时间点过期，也就是7.22日凌晨1:00过期
+            db.collection.insert( {
+               //表示该文档在夜间凌晨1点这个时间点将会被过期删除
+               "expireAt": new Date('July 22, 2019 01:00:00'),
+               "logEvent": 2,
+               "logMessage": "Success!"
+               } )
+
+            // 在expireAt指定的时间往后推迟expireAfterSeconds秒过期，也就是当前时间往后推迟60秒过期
+            Db.collection.createIndex( { “expireAt”: 1 }, { expireAfterSeconds: 0 } )
+            Db.collection.createIndex( { “expireAt”: 1 }, { expireAfterSeconds: 60 } )
+            ```
+
+        - Delete过期Tips2：为何mongostat只能监控到从节点有delete操作，主节点没有？
+
+            - 原因是过期索引只在master主节点触发，触发后主节点会直接删除调用对应wiredtiger存储引擎接口做删除操作，不会走正常的客户端链接处理流程，因此主节点上看不到delete统计。
+
+            - 主节点过期delete后会生存对于的delete oplog信息，从节点通过拉取主节点oplog然后模拟对于client回放，这样就保证了主数据删除的同时从数据也得以删除，保证数据最终一致性。
+                - 从节点模拟client回放过程将会走正常的client链接过程，因此会记录delete count统计，详见如下代码:[官方文档](https://docs.mongodb.com/manual/tutorial/expire-data/)
+
+- 2.Mongodb配置优化(网络IO复用，网络IO和磁盘IO做分离)
+
+    - 由于集群tps高，同时整点有大量推送，因此整点并发会更高，mongodb默认的一个请求一个线程这种模式将会严重影响系统负载，该默认配置不适合高并发的读写应用场景。
+
+    - MongoDB内部网络线程模型实现原理：一个客户端链接，mongodb会创建一个线程处理该链接fd的所有读写请求及磁盘IO操作。
+
+    - Mongodb默认网络线程模型不适合高并发读写原因
+        - 1.在高并发的情况下，瞬间就会创建大量的线程，例如线上的这个集群，连接数会瞬间增加到1万左右，也就是操作系统需要瞬间创建1万个线程，这样系统load负载就会很高。
+        - 2.此外，当链接请求处理完，进入流量低峰期的时候，客户端连接池回收链接，这时候mongodb服务端就需要销毁线程，这样进一步加剧了系统负载，同时进一步增加了数据库的抖动，特别是在PHP这种短链接业务中更加明显，频繁的创建线程销毁线程造成系统高负债。
+        - 3.一个链接一个线程，该线程除了负责网络收发外，还负责写数据到存储引擎，整个网络I/O处理和磁盘I/O处理都由同一个线程负责，本身架构设计就是一个缺陷。
+
+    - 网络线程模型优化方法
+        - mongodb-3.6开始引入`serviceExecutor: adaptive`配置，该配置根据请求数动态调整网络线程数，并尽量做到网络IO复用来降低线程创建消耗引起的系统高负载问题。
+        - 此外，加上serviceExecutor: adaptive配置后，借助boost:asio网络模块实现网络IO复用，同时实现网络IO和磁盘IO分离。
+        - 通过网络链接IO复用和mongodb的锁操作来控制磁盘IO访问线程数，最终降低了大量线程创建和消耗带来的高系统负载，最终通过该方式提升高并发读写性能。
+
+    - 网络线程模型优化前后性能对比：
+
+        - 系统负载对比
+
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践1.avif)
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践2.avif)
+
+        - 慢日志对比
+
+            - 未优化配置的慢日志数(19621)：
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践3.avif)
+
+            - 优化配置后的慢日志数(5222):
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践4.avif)
+
+        - 平均时延对比：网络IO复用后时延降低了1-2倍。
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践5.avif)
+
+- 3.wiredtiger存储引擎优化
+
+    - 问题：
+
+        - 从上一节可以看出平均时延从200ms降低到了平均80ms左右，很显然平均时延还是很高，如何进一步提升性能降低时延？继续分析集群，我们发现磁盘IO一会儿为0，一会儿持续性100%，并且有跌0现象
+
+        - 图中是`iostat -x`命令，I/O写入一次性到2G，后面几秒钟内I/O会持续性阻塞，读写I/O完全跌0，avgqu-sz、await巨大，util次序性100%,在这个I/O跌0的过程中，业务方反应的TPS同时跌0
+
+            | `iostat -x`命令参数 | 说明                                              |
+            |---------------------|---------------------------------------------------|
+            | avgqu-sz            | 一个请求队列中有多少个请求                        |
+            | util                | 表示存储设备有多少时间未完成工作（繁忙）          |
+            | tps                 | 每秒发送到设备的传输数。更高的tps意味着处理器更忙 |
+
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践6.avif)
+
+        - 此外，在大量写入IO后很长一段时间util又持续为0%
+
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践7.avif)
+
+        - 总体IO负载曲线
+            - IO很长一段时间持续为0%，然后又飙涨到100%持续很长时间，当IO util达到100%后，分析日志发现又大量满日志，同时mongostat监控流量发现如下现象：
+
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践8.avif)
+
+        - 有了以上现象，我们可以确定问题是由于IO跟不上客户端写入速度引起
+
+    - 1.cachesize调整(为何cacheSize越大性能越差)
+
+        - 超时时间点和I/O阻塞跌0的时间点一致，因此如何解决I/O跌0成为了解决改问题的关键所在。
+
+        - mongodb文档首先转换为KV写入wiredtiger，在写入过程中，内存会越来越大，当内存中脏数据和内存总占用率达到一定比例，就开始刷盘。同时当达到checkpoint限制也会触发刷盘操作，查看任意一个mongod节点进程状态，发现消耗的内存过多，达到110G
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践9.avif)
+
+        - 于是查看mongod.conf配置文件，发现配置文件中配置的cacheSizeGB: 110G
+
+            - 可以看出，存储引擎中KV总量几乎已经达到110G，按照5%脏页开始刷盘的比例，峰值情况下cachesSize设置得越大，里面得脏数据就会越多，而磁盘IO能力跟不上脏数据得产生速度，这种情况很可能就是造成磁盘I/O瓶颈写满，并引起I/O跌0的原因。
+
+        - 此外，查看该机器的内存，可以看到内存总大小为190G，其中已经使用110G左右，几乎是mongod的存储引起占用，这样会造成内核态的`page cache`减少，大量写入的时候内核cache不足就会引起磁盘缺页中断。
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践10.avif)
+
+        - 解决办法：脏数据太多容易造成一次性大量I/O写入，把存储引擎cacheSize调小到50G，来减少同一时刻I/O写入的量，从而规避峰值情况下一次性大量写入的磁盘I/O打满阻塞问题。
+
+    - 2.脏数据淘汰比例调整
+
+        - 调整cachesize大小解决了5s请求超时问题，对应告警也消失了，但是问题还是存在，5S超时消失了，1s超时问题还是偶尔会出现。
+
+        - 调整cacheSize从120G到50G后，如果脏数据比例达到5%，则极端情况下如果淘汰速度跟不上客户端写入速度，这样还是容易引起I/O瓶颈，最终造成阻塞。
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践11.avif)
+
+        - 解决办法：从上表中可以看出，如果脏数据及总内占用存达到一定比例，后台线程开始选择page进行淘汰写盘，如果脏数据及内存占用比例进一步增加，那么用户线程就会开始做page淘汰，这是个非常危险的阻塞过程，造成用户请求验证阻塞。平衡cache和I/O的方法: 调整淘汰策略，让后台线程尽早淘汰数据，避免大量刷盘，同时降低用户线程阀值，避免用户线程进行page淘汰引起阻塞。
+
+            - 总体思想是让后台evict尽量早点淘汰脏页page到磁盘，同时调整evict淘汰线程数来加快脏数据淘汰，调整后mongostat及客户端超时现象进一步缓解。
+
+            - 优化调整存储引起配置如下:
+                ```
+                eviction_target: 75%
+                eviction_trigger：97%
+                eviction_dirty_target: %3
+                eviction_dirty_trigger：25%
+                evict.threads_min：8
+                evict.threads_max：12
+                ```
+
+    - 3.checkpoint优化
+
+        - 触发checkpoint的条件默认又两个，触发条件如下:
+            - 固定周期做一次checkpoint快照，默认60s
+            - 增量的redo log(也就是journal日志)达到2G
+
+        - 如果我们把checkpoint的周期缩短，那么两个checkpoint期间的脏数据相应的也就会减少，磁盘IO 100%持续的时间也就会缩短。
+
+            - checkpoint=(wait=25,log_size=1GB)
+
+    - 优化前后IO对比：
+
+        - IO负载对比：
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践12.avif)
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践13.avif)
+
+        - 时延对比：该集群有几个业务同时使用
+            - 时间延迟进一步降低并趋于平稳，从平均80ms到平均20ms左右，但是还是不完美，有抖动。
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践14.avif)
+
+
+- 4.磁盘IO优化
+
+    - 问题：如第前面章节所述，当wiredtiger大量淘汰数据时，发现只要每秒磁盘写入量超过500M/s，接下来的几秒钟内util就会持续100%，w/s几乎跌0，于是开始怀疑磁盘硬件存在缺陷。
+
+        ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践6.avif)
+
+        - 从上图可以看出磁盘为nvMe的ssd盘，查看相关数据可以看出该盘IO性能很好，支持每秒2G写入，iops能达到15万，而我们线上的盘只能每秒写入最多500M。
+
+    - 通过大量的线下测试以及服务器厂商的配合，nvme的ssd io瓶颈问题得以解决，经过和厂商确认分析，最终定位到IO问题是linux内核版本不匹配引起，如果大家nvme ssd盘有同样问题，记得升级linux版本到3.10.0-957.27.2.el7.x86_64版本，升级后nvme ssd的IO能力达到近2G/s写入。
+
+    - 于是开始对线上的主从mongod实例的服务器硬件进行升级，升级后开始替换线上该集群的实例。
+
+        - 我们称IO升级后的服务器为高IO服务器，未升级的服务器为低IO服务器
+
+        - 1.替换一个分片的从节点为升级操作系统后的高IO服务器(IO问题得以解决，IO能力从之前的500M/s写入达到了近2G/s）
+        - 2.从节点在高IO服务器跑了一周后，我们确定升级后的高IO服务器运行稳定，为了谨慎起见，我们虽然确定该高IO服务器在从节点运行没有问题，但是我们需要进一步在主节点验证是否稳定
+            - 于是我们做了一次主从切换，该高IO服务器变为主节点运行，也就是集群中某个分片的主节点服务器变为了高IO服务器，但是从节点还是低IO服务器。
+
+        - 3.主节点在高IO服务器跑了数周后，我们确定主节点在高IO服务器运行正常，于是我们得下结论: 升级后的服务器运行稳定。
+
+        - 4.确定高IO服务器没问题后，我们开始批量替换mongod实例到该服务器。为了保险起见，毕竟只验证了一台高IO服务器在主从运行都没问题，于是我们考虑只把整个集群的**主节点**替换为高IO服务器
+
+            - 当时我认为客户端都是用的默认配置，数据写到主节点就会返回OK，虽然从节点IO慢，但是还是可以追上oplog速度的，这样客户端时延不会因为以前主节点IO有问题而抖动
+
+    - 主节点硬件升级后续优化：
+
+        - 上一节，我们替换了分片的所有主节点为高IO服务器，从节点还是以前未升级的低IO服务器。
+
+        - 由于业务方默认没有设置WriteConncern，因此认为客户端写到主成功就会返回客户端OK，即使从服务器性能差也不会影响客户端写主。
+
+        - 在升级主服务器后，我继续优化存储引擎把eviction_dirty_trigger：25%调整到了30%。
+
+        - 由于受到超大流量的高并发冲击，会从平峰期的几十万TPS瞬间飙升到百万级别，而且该毛刺几乎每天都会出现好几次，比较容易复现。
+
+            - 于是提前部署好`mongostat`监控所有实例，同时在每个服务器上用`iostat -x`监控实时的IO状况，同时编写脚本实时采集`db.serverstatus()`、`db.printSlaveReplicationInfo()`、`db.printReplicationInfo()`等集群重要信息。
+
+        - 问题：当某个时间点监控出现毛刺后，于是开始分析mongostat，我们发现一个问题，即使在平峰期，脏数据比例也会持续增长到阀值(30%)，我们知道当脏数据比例超过eviction_dirty_trigger：30%阀值，用户线程就会进行evict淘汰，这样用户线程就会阻塞直到腾出内存空间，因此淘汰刷盘过程业务访问很慢。
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践15.avif)
+
+            - 从上图可以看出，集群TPS才40-50万左右的时候某个分片的主节点出现了脏数据达到eviction_dirty_trigger：30%阀值，于是整个集群访问时延就会瞬间增加，原因是一个分片的用户线程需要刷盘，导致这个分片的访问时延上升(实际上其他分片的访问时延还是正常的)，最终把整体平均时延拉上去了。
+
+        - 为什么普通平峰期也会有抖动？这很明显不科学。
+
+            - 于是获取出问题的主节点的一些监控信息，得出以下结论：
+                - IO正常，IO不是瓶颈。
+                - 分析抖动的时候的系统top负载，负载正常。
+                - 该分片的TPS才4万左右，显然没到到分片峰值。
+                - `db.printSlaveReplicationInfo()`看到主从延迟较高。
+
+            - 当客户端时延监控发现时间延迟尖刺后，我们发现主节点所有现象一切正常，系统负载、IO、TPS等都没有到达瓶颈，但是有一个唯一的异常，就是主从同步延迟持续性增加，如下图所示：
+
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践16.avif)
+            - 同时对应低IO服务器的从节点上面的io状况如下图:
+
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践17.avif)
+
+                - 从节点的IO性能一塌乌涂，这也正是主从延迟增加的根源。
+
+                - 从上图可以看出在时延尖刺的同样时间点，主从延迟超大。
+                    - 于是怀疑时延尖刺可能和从节点拉取Oplog速度有关系，于是把整个mongostat、iostat、top、db.printSlaveReplicationInfo()、db.serverstatus()等监控持续跑了两天，记录下了两天内的一些核心系统和mongo监控指标。
+                    - 两天后，对着客户端时延尖刺时间点分析对应监控数据，发现一个共同的现象，尖刺出现时间点和脏数据eviction_dirty_trigger超过阀值时间点一致，同时主从延迟在这个时间点都有很大的延迟。
+            - 到这里，我越来越怀疑问题和从节点拉取oplog速度有关。之前认为业务方默认没有设置WriteConncern，也就是默认写入到Primary就向客户端发送确认，可能应答客户端前还有其他流程会影响服务的返回OK给客户端。于是查看官方mongodb-3.6的ProductionNotes，从中发现了如下信息：
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践18.avif)
+                - 从ProductionNotes可以看出，mongodb-3.6默认启用了 read concern “majority”功能，于是怀疑抖动可能和该功能有关。为了避免脏读，mongodb增加了该功能，启用该功能后，mongodb为了确保带有带有参数readConcern(“Majority”)的客户端读取到的数据确实是同步到大多数实例的数据，因此mongodb必须在内存中借助snapshot 及主从通信来维护更多的版本信息，这就增加了wiredtiger存储引擎对内存的需求。
+                - 由于从节点是低IO服务器，很容易造成阻塞，这样拉取oplog的速度就会跟不上进度，造成主节点消耗大量的内存来维护快照信息，这样就会导致大量的内存消耗，最终导致脏数据瞬间剧增，很快达到eviction_dirty_trigger阀值，业务也因此抖动。
+
+                - 因为mongodb-3.6默认开启enableMajorityReadConcern功能，我们在这个过程中出现过几次严重的集群故障，业务流量有段时间突然暴涨，造成时延持续性达到几千ms，写入全部阻塞，现象如下:
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践19.avif)
+                    - 该问题的根源也是因为enableMajorityReadConcern功能引起，由于从节点严重落后主节点，导致主节点为了维护各种snapshot快照，消耗大量内存，同时从节点和主节点的oplog延后，导致主节点维护了更多的内存版本，脏数据比例持续性增长，直到从节点追上oplog。
+
+            - 解决方法：由于我们的业务不需要readConcert功能，因此我们考虑禁用该功能(配置文件增加配置replication.enableMajorityReadConcern=false)。
+
+    - 禁用ReadConcern Majority功能，我们继续把所有分片的从节点由之前的低IO服务器替换为升级后的高IO服务器，升级后所有主从硬件资源性能完全一样
+
+        - 通过禁用enableMajorityReadConcern功能，并统一主从服务器硬件资源后，查看有抖动的一个接口的时间延迟，如下图所示：
+
+            ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践20.avif)
+
+        - 总结: MajorityReadConcern功能禁用并升级从节点到高IO服务器后，总体收益如下：
+            - 平均时延从2-4ms降低到1ms左右。
+            - 峰值时延毛刺从80ms降低到40ms。
+            - 之前出现的脏数据比例突破30%飙涨到50%的问题彻底解决。
+            - 尖刺持续时间变短。
+
+        - 问题：我们发现有一个业务接口还是偶尔有40ms时延尖刺，分析发现主要是eviction_dirty_trigger达到了我们配置的阀值，业务线程开始淘汰page cache，这样就造成业务线程很慢，最终导致平均时延尖刺。
+        - 解决方法：对存储引擎调优，调整后配置如下：
+            ```
+            eviction_target:75%
+            eviction_trigger：97%
+            eviction_dirty_target: %3
+            eviction_dirty_trigger：30%
+            evict.threads_min：14
+            evict.threads_max：18
+            checkpoint=(wait=20,log_size=1GB)
+            ```
+
+            - 时延最大尖刺时间从前面的45ms降低到了35ms，同时尖刺出现的频率明显降低了
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践21.avif)
+            - 从此图可以看出，在个别时间点还是有一次时延尖刺，对照该尖刺的时间点分析提前部署好的mongostat和iostat监控，得到如下信息：
+
+                - 在峰值TPS百万级别的时候，部分节点evict淘汰速率已经跟不上写入速度，因此出现了用户线程刷盘的情况。
+
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践22.avif)
+
+            - 在这个时间点分析对应机器的系统负载、磁盘io状况、内存状况等，发现系统负载、比较正常，但是对应服务器磁盘IO偏高
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践23.avif)
+            - 同时分析对应服务器对应时间点的慢日志，我们发现尖刺出现时间的的慢日志统计如下：
+                - 分析两个时间点慢日志可以看出，慢日志出现的条数和时间延迟尖刺出现的时间点一致，也就是磁盘IO负载很高的时候。
+
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践24.avif)
+                ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践25.avif)
+
+            - 结论：通过上面的分析可以看出，当磁盘IO比较高(util超过50%)的时候，慢日志和时延都会增加，他们之间成正比关系，IO依然时性能瓶颈点。
+
+- 疑问：量高的时候通过调整存储引擎evict和checkpoint配置，IO写入分散到了不同时间点，相比以起集中再一个时间点写入有了很大改善。但是，还是会出现部分时间点IO写入接近为0，其他时间点IO 100%的现象。
+
+- 遗留问题：当峰值tps持续性达到100万左右的时候，有明显的磁盘IO问题，但是IO写入在不同时间点很不均衡，有时候在流量持续性高峰期存在如下现象
+
+    ![avatar](./Pictures/mongodb/OPPO百万级高并发MongoDB集群性能数十倍提升优化实践26.avif)
+
+    - 有时候高峰期不同时间点磁盘IO不均衡，如果我们能把IO平均散列到各个不同时间点，这样或许可以解决IO瓶颈问题。我试着通过继续调大evict线程数来达到目的，但是当线程数超过一定值后效果不明显。后续会持续分析wiredtiger存储引擎代码实现来了解整个机制，分析有时候磁盘IO严重分布不均衡代码实现原理。
+
+# 第三方mongodb
+
+## mongodb atlas
+
+- mongodb atlas是云版本mongodb。可以运行在主流云平台，如AWS、GCP、Azure
+
+## [TencentDB for MongoDB](https://www.tencentcloud.com/document/product/240)
+
 # reference
 
 - [官方文档的gptai](https://www.mongodb.com/docs/)
 - [官方文档](https://www.mongodb.com/docs/manual/)
 - [mongodb中文社区](https://mongoing.com/)
+
+- [分布式文档数据库mongodb-3.6(mongos、mongod、wiredtiger存储引擎)源码中文注释分析，持续更新。后期重点进行mongodb-4.4最新版本内核源码分析](https://github.com/y123456yz/reading-and-annotate-mongodb-3.6?spm=a2c6h.12873639.article-detail.7.3f291969XElWnV&file=reading-and-annotate-mongodb-3.6)

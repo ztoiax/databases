@@ -654,6 +654,45 @@ tiup playground v5.0.0 --db 2 --pd 3 --kv 3 --monitor
 http://127.0.0.1:3000
 ```
 
+# 数据库对比
+
+## B-tree和lsm-tree的数据库使用情况
+
+- B-tree：一般被关系型数据库使用
+    - oracle、 sql server、 db2、 mysql(innodb)、 postgresql
+
+- lsm-tree：
+    - 列数据库：cassandra、hbase
+    - google bigtable、leveldb、rocksdb、elasticsearch（lucene）
+
+## mongodb的大数据平台优势
+
+| 数据库类型      | 数据量大 | 速度与并发 | 多结构数据 | 事务支持 |
+|-----------------|----------|------------|------------|----------|
+| RDBMS           | 较差     | 一般       | 差         | 很好     |
+| MPP（数据仓库） | 较好     | 较差       | 差         | 很好     |
+| Hadoop          | 很好     | 差         | 很好       | 差       |
+| mongodb         | 较好     | 很好       | 很好       | 较好     |
+| newsql          | 较好     | 很好       | 差         |          |
+
+- newsql、rdbms、mpp就是对多结构数据支持不特别理想，mongodb也有一些缺点，不适合进行多表关联
+
+- hadoop适合离线批量数据
+
+- mongodb适合实时处理大数据
+
+- mongodb提供spark连接器，
+
+- mongodb对比HDFS的优势：
+
+    - HDFS的每个文件大小为64MB - 128MB。而mongodb更细粒化
+
+    - mongodb支持索引，而hdfs没有，因此读取更快
+
+    - mongodb更易于修改写入后的数据
+
+    - 可以使用aggregate进行数据筛选处理
+
 # AI工具
 
 - [sqlchat](https://github.com/sqlchat/sqlchat)
