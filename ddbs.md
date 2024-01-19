@@ -38,9 +38,9 @@
 
     - Consistency(一致性)：每次读取都会收到最新写入
 
-    - Availability(可用性)：每个请求都会收到一个(非错误)响应,但不保证它包含最新的写入
+    - Availability(可用性)：一个节点故障后，集群还能否响应客户端的读写请求
 
-    - Partition tolerance(分区容错)：节点之间的网络丢包或延迟, 不影响系统运行
+    - Partition tolerance(分区容错)：出现网络分区后，系统是否能保持运作
 
 - 在网络分区存在的情况下, 没有一个分布式系统, 能确保没有网络故障
 
@@ -50,7 +50,7 @@
 
         - AP: 则不能保证message是最新, 系统返回错误或超时(DNS)
 
-        - CP: 节点如有错误, 部分数据可能会丢失
+        - CP: 要淘汰数据的备份节点。节点如有错误, 部分数据可能会丢失
 
         - CA: 分布式事务使用**两阶段**提交, 如出现网络分区会阻塞
 
@@ -74,6 +74,20 @@
 
 - [Michael Stonebraker: Errors in Database Systems, Eventual Consistency, and the CAP Theorem](https://cacm.acm.org/blogs/blog-cacm/83396-errors-in-database-systems-eventual-consistency-and-the-cap-theorem/fulltext)
     - 对cap理论, 提出意见
+
+### BASE理论
+
+- BASE理论：是CAP理论的补充，主要来源于对大规模互联网系统分布式总结
+    - Basically Available（基本可⽤）
+    - Soft state（软状态）
+    - Eventually Consistent（最终⼀致性）
+
+- 相比CAP理论来说，BASE理论将一致性分为：强一致性和弱一致性
+    - 选择Basically Available（基本可⽤），也就是弱一致性
+
+- 对一致性和可用性权衡的结果：在达到Eventually Consistent（最终⼀致性）之前，系统会处于一个中间状态
+    - 1.Basically Available（基本可⽤）：损失部分可用性，比如响应时间变长，或者部分服务被降级
+    - 2.Soft state（软状态）：数据存在不一致，但不影响系统基本使用
 
 ### [PACELC理论](https://en.wikipedia.org/wiki/PACELC_theorem)
 
@@ -326,8 +340,9 @@
 - [awesome-consensus: 一致性算法列表](https://github.com/dgryski/awesome-consensus)
 
 - [腾讯技术工程: 分布式之系统底层原理](https://mp.weixin.qq.com/s?sub=&__biz=MjM5ODYwMjI2MA==&mid=2649756192&idx=1&sn=b3cca59cf43b15a0f15cef97dbb26f0b&chksm=becc815b89bb084dde98d92356e7f0a67ffa7ee2f64d0104d74e5709733e3d560f161a40ab7a&scene=19&subscene=10000&clicktime=1624521004&enterid=1624521004&ascene=0&devicetype=android-30&version=2800063d&nettype=WIFI&abtest_cookie=AAACAA%3D%3D&lang=zh_CN&exportkey=Ax%2FGPgyBCBMZ%2FKC9WGPpRSs%3D&pass_ticket=YZNCdN21ca7%2BXyA%2BktOjD%2FoxrX%2F6Zuc6h0zU71gwRLYcW7tQd7hPplXykEybT2RR&wx_header=1)
+
 ### Paxos
-??
+
 - [the parttime parliament论文pdf](https://lamport.azurewebsites.net/pubs/lamport-paxos.pdf)
 
 - [Paxos Made Simple论文pdf](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf)
@@ -398,13 +413,13 @@
 
 - 三种状态:
 
-    - leader: 与client通信, 所有对系统的更改都需要经过leader, 一个网络分区一个leader
+    - leader（领导者）: 会向其他节点发送心跳。 所有对系统的更改都需要经过leader, 一个网络分区一个leader
 
         - 一般是协调器(coordinator), 与paxos不同的是, 在raft是一种优化
 
-    - follower: leader外的其他结点
+    - follower（追随者）: leader外的其他结点。响应leader和cadidate的投票请求，如果一定时间内没有受到leader的心跳，则会转换为candidate
 
-    - Candidate: follower选举leader时的状态
+    - Candidate（候选者）: follower选举leader时的状态，获得大多数投票后会成为leader
 
 - 基于日志的协议:
 
@@ -424,11 +439,11 @@
 
         - 如果出现split vote(有两个candidate), 并且得票一样: 则回到第一步重新选举
 
-    - 5.leader定期(heartbeat timeout)发送`Append Entries` 消息给follower
+    - 5.leader定期发送心跳(heartbeat timeout) `Append Entries` 消息给follower
 
     - 6.follower响应并返回`Append Entries`消息
 
-        - 如果follower超时(heartbeat timeout)收不到消息, 则leader故障了, 回到第一步重新选举. follower 强制复制 leader 的日志
+        - 如果follower超时心跳(heartbeat timeout)收不到消息, 则leader故障了, 回到第一步重新选举. follower 强制复制 leader 的日志
 
 - 追加日志流程:
 

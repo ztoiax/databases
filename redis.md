@@ -8309,6 +8309,17 @@ slowlog reset
     echo never > /sys/kernel/mm/transparent_hugepage/enabled
     ```
 
+
+    - 添加到`/etc/rc.local`
+        ```
+        if test -f /sys/kernel/mm/transparent_hugepage/enabled; then
+            echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        fi
+        if test -f /sys/kernel/mm/transparent_hugepage/defrag; then
+            echo never > /sys/kernel/mm/transparent_hugepage/enabled
+        fi
+        ```
+
 - 使用NTP时间同步服务：像sentinel和cluster需要多个node。如果node时间不一致，对于异常情况的日志排查是非常困难的。
 
     ```sh
