@@ -1239,3 +1239,5 @@ Nested-Loop Join(嵌套循环连接)
         pip install harlequin-mysql
         harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
         ```
+
+    - [Chat with your SQL database 📊. Accurate Text-to-SQL Generation via LLMs using RAG](https://github.com/vanna-ai/vanna)

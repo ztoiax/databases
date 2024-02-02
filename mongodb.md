@@ -160,120 +160,6 @@
 
         - `config`： 当 MongoDB 使用分片设置时，config 数据库可用来保存分片的相关信息。
 
-## 如何部署mongodb
-
-- 使用RAID10
-    - 不要使用RAID5，它非常非常慢
-
-- `WiredTiger`存储引擎支持多线程。
-    - 如果在速度和核心数选择：选择速度。——mongodb更擅长在单个处理器上利用更多周期，而不是增加并行度
-
-- mongodb通常不使用交换空间。极端情况下`WiredTiger`存储引擎会使用一些交换空间
-
-- 内存如果过度分配，mongodb获取的内存实际并不存在，则无法很好的工作
-    ```sh
-    # 禁止内存过度分配
-    echo 2 > /proc/sys/vm/overcommit_memory
-    ```
-
-- 虚拟机的神秘内存：虚拟层有时无法正确处理内存分配
-    - 100GB RAM的虚拟机，但允许访问的只有60GB
-    - 相反的情况：20GB RAM的虚拟机，但100GB数据都能放入其中
-
-- 虚拟机IO问题：可能与其他租户共享一个产品，每个人都有可能竞争磁盘IO
-
-- 关闭NUMA
-
-    - 如果mongodb以NUMA运行，性能降低时，会打印警告信息
-
-    - 问题例子：cpu1内存满了，cpu1需要淘汰本地的内存数据，但此时cpu2的内存还没有满。这会导致mongodb运行速度变慢
-
-    - 关闭numa启动mongodb，需要执行以下2个步骤
-
-    - 1.关闭`/proc/sys/vm/zone_reclaim_mode` ：当某个 Node 内存不足时，系统可以从其他 Node 寻找空闲内存，也可以从本地内存中回收内存。
-        ```sh
-        # 关闭
-        echo 0 > /proc/sys/vm/zone_reclaim_mode
-        ```
-
-    - 2.以numactl启动mongodb实例
-        ```sh
-        # --interleave=all内存分配是应该尽量均匀地分布在各个节点上，启动mongodb
-        numactl --interleave=all mongod --config ~/mongodb/mongodb.conf
-        ```
-
-- 关闭大内存页（THP）（默认开启）：THP会导致更多的磁盘IO。如果数据不能放在内存，磁盘刷新时需要写入几MB而不是几KB
-
-    - 虽说THP是为了数据库而开发的功能。但mongodb的顺序访问比关系数据库要少的多
-
-    ```sh
-    # 关闭THP
-    echo never > /sys/kernel/mm/transparent_hugepage/enabled
-    echo never > /sys/kernel/mm/transparent_hugepage/defrag
-    ```
-
-- 选择磁盘调度算法：
-
-    - 没有调度算法（NOOP）：不对文件系统和应用程序的 I/O 做任何处理
-
-        - 应用场景：
-            - 1.虚拟机 I/O 中，此时磁盘 I/O 调度算法交由物理机系统负责。
-            - 2.SSD。SSD不存在机械磁盘中的局部问题
-
-    - 优先级调度算法（DEADLINE）：在CFS的基础上分为读、写两个FIFO队列
-        - 最适合磁盘密集型的数据库
-        - 应用场景：非虚拟机的物理机
-
-- 关闭文件系统的访问时间追踪
-    - mongodb使用的数据文件流量非常大，关闭时间追踪可以提升性能
-    ```
-    # 默认为relatime，修改为noatime。需要重新启动才能生效
-    /dev/sda1 /data xfs rw,noatime 1 2
-    ```
-
-- 修改限制
-
-    - 1.进程运行创建线程数的限制
-
-        - mongodb每接受一个连接，就会创建一个线程。
-
-            - 如果有3000个连接，就会有3000个线程
-
-        - 客户端随着流量的增加动态的创建子进程
-            - 假设有20个应用程序服务器，每个应用程序服务器可以创建100个子进程，而每个子进程又可以创建10个连接到mongodb的线程。20 * 100 * 10 = 20000个连接
-
-        ```sh
-        # 查看最大线程数
-        cat /proc/sys/kernel/threads-max
-        # 设置最大线程数
-        ulimit -u 1024
-        ```
-
-    - 2.进程允许打开文件描述符数的限制
-
-        - 每个传入和传出的连接都需要文件描述符
-
-        ```sh
-        # 修改打开的文件描述符数量（默认为1024）
-        ulimit -n 20000
-        ```
-
-- 时间同步：1秒之内最安全
-    - 使用ntp保持时间同步
-
-
-### 安全事项
-```sh
-# 应该严格限制外部对mongodb的访问。指定监听端口
-mongod --bing_ip
-
-# 禁止执行javascript代码
-mongod --noscripting
-
-# 默认数据传输不加密。启用加密。需要创建密钥
-mongod --tlsMode
-```
-
 ## mongosh
 
 - mongosh是一个功能齐全的javascript解释器，并且包含了一些扩展语法（语法糖）
@@ -290,13 +176,20 @@ mongod --tlsMode
     - `~/mongodb/mongodb.conf`配置文件
 
         ```
-        dbpath=/home/tz/mongodb/
         port=27017
-        # 目录为dbpath下
-        logpath=log.log
+        # data目录
+        dbpath=/home/tz/mongodb/data/
+        # log目录
+        logpath=/home/tz/mongodb/log/mongodb.log
         ```
 
-    - 配置文件开启实例
+    - 创建data和log的目录
+        ```sh
+        cd ~/mongodb
+        mkdir data log
+        ```
+
+    - 通过配置文件，开启实例
         ```sh
         mongod --config ~/mongodb/mongodb.conf &
         ```
@@ -5744,7 +5637,7 @@ db.adminCommand({"connPoolStats": 1})
             mongorestore --oplogReplay --dir ./dump
             ```
 
-#### 容灾
+### 容灾
 
 - 容灾指标：
     - RPO（recovery point objective）：指目标恢复时间点，当灾难发生时，系统最多发生的丢失数据时长
@@ -6702,35 +6595,6 @@ db.currentOp()
             ulimit -n 64000
             ```
 
-- 数据库配置
-
-    - 启用journal日志，是wal日志。mongodb采用缓冲延迟刷盘机制，写入数据最高60s丢失风险。journal可以将损失风险降低到100ms以内
-
-        - 以下是配置文件
-        ```yml
-        storage:
-            journal:
-                enabled: true
-        ```
-
-    - 日志和数据分离
-        - 建议将运行日志、journal预写日志、数据文件存放到不同的磁盘
-        - 可以开启`directoryPerDB`将不同数据库的数据文件使用单独的目录挂载
-
-        - 以下是配置文件：将/data/mongodb、/data/mongodb/log、/data/mongodb/journal单独挂载
-        ```yml
-        storage:
-            dbPath: "/data/mongodb"
-            engine: wiredTiger
-            directoryPerDB: true
-            journal:
-                enable: true
-        systemLog:
-            destination: file
-            path: "/data/mongodb/log/mongodb.log"
-            logAppend: true
-        ```
-
     - 保持时钟同步：务必保持集群个节点时钟同步，最好延迟不要超过1s
 
         - 在mongodb3.4中，副本集节点在时间跳变会导致主备节点切换
@@ -6753,6 +6617,147 @@ db.currentOp()
             - 尽量避免使用短连接，一些应用处理产生的bug，很容易产生连接泄漏问题
             - mongodb服务端：可以通过配置`net.maxIncomingConnections`来限制最高的并发数，建议不大于1万
             - 客户端方面：驱动默认为每个远程主机连接设置100连接数。结合自身吞吐量、请求时延进行调整
+
+### 如何部署mongodb
+
+- 使用RAID10
+    - 不要使用RAID5，它非常非常慢
+
+- `WiredTiger`存储引擎支持多线程。
+    - 如果在速度和核心数选择：选择速度。——mongodb更擅长在单个处理器上利用更多周期，而不是增加并行度
+
+- mongodb通常不使用交换空间。极端情况下`WiredTiger`存储引擎会使用一些交换空间
+
+- 内存如果过度分配，mongodb获取的内存实际并不存在，则无法很好的工作
+    ```sh
+    # 禁止内存过度分配
+    echo 2 > /proc/sys/vm/overcommit_memory
+    ```
+
+- 虚拟机的神秘内存：虚拟层有时无法正确处理内存分配
+    - 100GB RAM的虚拟机，但允许访问的只有60GB
+    - 相反的情况：20GB RAM的虚拟机，但100GB数据都能放入其中
+
+- 虚拟机IO问题：可能与其他租户共享一个产品，每个人都有可能竞争磁盘IO
+
+- 关闭NUMA
+
+    - 如果mongodb以NUMA运行，性能降低时，会打印警告信息
+
+    - 问题例子：cpu1内存满了，cpu1需要淘汰本地的内存数据，但此时cpu2的内存还没有满。这会导致mongodb运行速度变慢
+
+    - 关闭numa启动mongodb，需要执行以下2个步骤
+
+    - 1.关闭`/proc/sys/vm/zone_reclaim_mode` ：当某个 Node 内存不足时，系统可以从其他 Node 寻找空闲内存，也可以从本地内存中回收内存。
+        ```sh
+        # 关闭
+        echo 0 > /proc/sys/vm/zone_reclaim_mode
+        ```
+
+    - 2.以numactl启动mongodb实例
+        ```sh
+        # --interleave=all内存分配是应该尽量均匀地分布在各个节点上，启动mongodb
+        numactl --interleave=all mongod --config ~/mongodb/mongodb.conf
+        ```
+
+- 关闭大内存页（THP）（默认开启）：THP会导致更多的磁盘IO。如果数据不能放在内存，磁盘刷新时需要写入几MB而不是几KB
+
+    - 虽说THP是为了数据库而开发的功能。但mongodb的顺序访问比关系数据库要少的多
+
+    ```sh
+    # 关闭THP
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    echo never > /sys/kernel/mm/transparent_hugepage/defrag
+    ```
+
+- 选择磁盘调度算法：
+
+    - 没有调度算法（NOOP）：不对文件系统和应用程序的 I/O 做任何处理
+
+        - 应用场景：
+            - 1.虚拟机 I/O 中，此时磁盘 I/O 调度算法交由物理机系统负责。
+            - 2.SSD。SSD不存在机械磁盘中的局部问题
+
+    - 优先级调度算法（DEADLINE）：在CFS的基础上分为读、写两个FIFO队列
+        - 最适合磁盘密集型的数据库
+        - 应用场景：非虚拟机的物理机
+
+- 关闭文件系统的访问时间追踪
+    - mongodb使用的数据文件流量非常大，关闭时间追踪可以提升性能
+    ```
+    # 默认为relatime，修改为noatime。需要重新启动才能生效
+    /dev/sda1 /data xfs rw,noatime 1 2
+    ```
+
+- 修改限制
+
+    - 1.进程运行创建线程数的限制
+
+        - mongodb每接受一个连接，就会创建一个线程。
+
+            - 如果有3000个连接，就会有3000个线程
+
+        - 客户端随着流量的增加动态的创建子进程
+            - 假设有20个应用程序服务器，每个应用程序服务器可以创建100个子进程，而每个子进程又可以创建10个连接到mongodb的线程。20 * 100 * 10 = 20000个连接
+
+        ```sh
+        # 查看最大线程数
+        cat /proc/sys/kernel/threads-max
+        # 设置最大线程数
+        ulimit -u 1024
+        ```
+
+    - 2.进程允许打开文件描述符数的限制
+
+        - 每个传入和传出的连接都需要文件描述符
+
+        ```sh
+        # 修改打开的文件描述符数量（默认为1024）
+        ulimit -n 20000
+        ```
+
+- 时间同步：1秒之内最安全
+    - 使用ntp保持时间同步
+
+### mongodb配置文件
+
+- 启用journal日志，是wal日志。mongodb采用缓冲延迟刷盘机制，写入数据最高60s丢失风险。journal可以将损失风险降低到100ms以内
+
+    - 以下是配置文件
+    ```yml
+    storage:
+        journal:
+            enabled: true
+    ```
+
+- 日志和数据分离
+    - 建议将运行日志、journal预写日志、数据文件存放到不同的磁盘
+    - 可以开启`directoryPerDB`将不同数据库的数据文件使用单独的目录挂载
+
+    - 以下是配置文件：将/data/mongodb、/data/mongodb/log、/data/mongodb/journal单独挂载。??无法启动
+    ```yml
+    storage:
+        dbPath: "/data/mongodb"
+        engine: wiredTiger
+        directoryPerDB: true
+        journal:
+            enable: true
+    systemLog:
+        destination: file
+        path: "/data/mongodb/log/mongodb.log"
+        logAppend: true
+    ```
+
+```sh
+# 应该严格限制外部对mongodb的访问。指定监听端口
+mongod --bing_ip
+
+# 禁止执行javascript代码
+mongod --noscripting
+
+# 默认数据传输不加密。启用加密。需要创建密钥
+mongod --tlsMode
+```
 
 ## 常见问题
 
