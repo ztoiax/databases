@@ -9546,28 +9546,49 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
 ## centos7 安装 redis6.0.9
 
-源码安装:
+- 源码安装:
 
-```sh
-# 安装依赖
-yum install gcc make -y
+    ```sh
+    # 安装依赖
+    yum install gcc make -y
 
-# 官网下载
-curl -LO https://download.redis.io/releases/redis-6.0.9.tar.gz
+    # 官网下载
+    curl -LO https://download.redis.io/releases/redis-6.0.9.tar.gz
 
-# 国内用户可以去华为云镜像下载 https://mirrors.huaweicloud.com/redis/
-curl -LO https://mirrors.huaweicloud.com/redis/redis-6.0.9.tar.gz
-tar xzf redis-6.0.9.tar.gz
-cd redis-6.0.9
-make
-```
+    # 国内用户可以去华为云镜像下载 https://mirrors.huaweicloud.com/redis/
+    curl -LO https://mirrors.huaweicloud.com/redis/redis-6.0.9.tar.gz
+    tar xzf redis-6.0.9.tar.gz
+    cd redis-6.0.9
+    make
+    ```
 
-使用 `yum` 包管理器安装:
+- 使用 `yum` 包管理器安装:
 
-```sh
-# epel源可以直接安装(版本为redis-3.2.12-2.el7)
-yum install redis -y
-```
+    ```sh
+    # epel源可以直接安装(版本为redis-3.2.12-2.el7)
+    yum install redis -y
+    ```
+
+- 在centos上新安装的redis。需要做2步准备工作，才能远程连接redis
+
+    - 1.redis配置文件`/etc/redis.conf`：需要设置`bind *`不然只允许本机访问
+
+        ```
+        bind *
+        ```
+
+    - 2.防火墙需要开启6379端口
+
+        ```sh
+        # 查看redis的端口6379是否开启。no表示没有开启
+        firewall-cmd --query-port=6379/tcp
+
+        # 开启端口。如果需要将规则保存至zone配置文件中，重启后也会自动加载，需要加入参数--permanent
+        firewall-cmd --add-port=6379/tcp --permanent
+
+        # 添加规则后需要重启防火墙
+        firewall-cmd --reload
+        ```
 
 ## [docker install](https://www.runoob.com/docker/docker-install-redis.html)
 
