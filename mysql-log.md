@@ -1,3 +1,21 @@
+<!-- vim-markdown-toc GFM -->
+
+* [日志](#日志)
+    * [普通日志](#普通日志)
+    * [BINLOG (二进制日志)](#binlog-二进制日志)
+        * [mysqlbinlog 日志分析](#mysqlbinlog-日志分析)
+    * [canal](#canal)
+* [性能优化](#性能优化)
+    * [profile 记录查询响应时间](#profile-记录查询响应时间)
+    * [记录计数器](#记录计数器)
+    * [慢查询优化](#慢查询优化)
+        * [pt-query-digest(percona-toolkit)](#pt-query-digestpercona-toolkit)
+        * [mysqldumpslow](#mysqldumpslow)
+        * [mysqlsla](#mysqlsla)
+* [reference](#reference)
+
+<!-- vim-markdown-toc -->
+
 # 日志
 
 | 日志类型   | 日志说明                               |

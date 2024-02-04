@@ -1,3 +1,33 @@
+<!-- vim-markdown-toc GFM -->
+
+* [DDBS(分布式数据库)](#ddbs分布式数据库)
+    * [shared-nothing 不共享架构](#shared-nothing-不共享架构)
+    * [CAP理论](#cap理论)
+        * [BASE理论](#base理论)
+        * [PACELC理论](#pacelc理论)
+    * [分布式事务](#分布式事务)
+        * [提交协议(确保事务的原子性)](#提交协议确保事务的原子性)
+            * [2PC(Two Phase Commit Protocol两阶段提交)](#2pctwo-phase-commit-protocol两阶段提交)
+                * [故障处理](#故障处理)
+            * [持久消息(presistent message)](#持久消息presistent-message)
+    * [分布式并发控制](#分布式并发控制)
+        * [单一锁管理器](#单一锁管理器)
+        * [分布式锁管理器](#分布式锁管理器)
+    * [可用性](#可用性)
+    * [一致性协议](#一致性协议)
+        * [Paxos](#paxos)
+            * [Multi-Paxos](#multi-paxos)
+        * [Raft](#raft)
+            * [Replicated State Machine(复制状态机)](#replicated-state-machine复制状态机)
+        * [ZooKeeper使用的Zab](#zookeeper使用的zab)
+    * [分布式查询](#分布式查询)
+        * [分布式连接](#分布式连接)
+    * [异构数据库](#异构数据库)
+    * [Amazon Dynamo](#amazon-dynamo)
+    * [PNUTS](#pnuts)
+
+<!-- vim-markdown-toc -->
+
 # DDBS(分布式数据库)
 
 - [Distributed Systems 3rd edition (2017)](https://www.distributed-systems.net/index.php/books/ds3/)
