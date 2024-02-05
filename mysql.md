@@ -84,8 +84,10 @@
         * [docker 主从复制](#docker-主从复制)
     * [mysqlbinlog](#mysqlbinlog)
         * [--flashback 闪回还原](#--flashback-闪回还原)
+    * [XtraBackup 热备份](#xtrabackup-热备份)
+        * [安装](#安装)
     * [导出不同文件格式](#导出不同文件格式)
-    * [高效强大的 mysql 软件](#高效强大的-mysql-软件)
+    * [第三方 mysql 软件](#第三方-mysql-软件)
         * [mycli](#mycli)
         * [mitzasql](#mitzasql)
         * [mydumper](#mydumper)
@@ -126,18 +128,6 @@
 <!-- vim-markdown-toc -->
 
 # mysql
-
-吐嘈一下`Mysql`排版比`MariaDB`更好
-
-- MariaDB
-
-![image](./Pictures/mysql/mariadb.avif)
-
-- Mysql
-
-![image](./Pictures/mysql/mysql.avif)
-
-[Centos7 安装 Mysql](#install)
 
 ## 基本命令
 
@@ -517,6 +507,24 @@ GROUP BY name
 SELECT color, SUM(quantitty) FROM sales
 GROUP BY color
 
+# 不使用WITH ROLLUP 统计每个颜色的销售数量,以及总量
+SELECT name, color, SUM(quantitty) FROM sales
+GROUP BY color, name
+
++-------+-------+----------------+
+| name  | color | SUM(quantitty) |
++-------+-------+----------------+
+| dress | black | 9              |
+| shirt | black | 10             |
+| skirt | black | 1              |
+| dress | red   | 5              |
+| shirt | red   | 1              |
+| skirt | red   | 5              |
+| dress | white | 10             |
+| shirt | white | 8              |
+| skirt | white | 5              |
++-------+-------+----------------+
+
 # WITH ROLLUP 统计每个颜色的销售数量,以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY color, name
@@ -780,13 +788,17 @@ FROM cnarea_2019;
 
 # 选取 level 的平均值和 id 的总值
 SELECT SUM(id),AVG(level)
-from ca;
+from cnarea_2019;
 
 # 查看总列数
 SELECT COUNT(1) as name from cnarea_2019;
 
 # 统计 level 的个数
 SELECT COUNT(DISTINCT level) as totals from cnarea_2019;
+
+# 通过标量子查询，查询salary大于salary平均数
+SELECT * FROM people WHERE salary >
+(SELECT avg(salary) FROM people);
 ```
 
 ##### 加密函数
@@ -945,15 +957,15 @@ ORDER BY FIELD (score, 90, 70)
 +----+-------+------+
 | id | score | year |
 +----+-------+------+
-| 29 | 80    | 2012 |
-| 31 | 60    | 2010 |
-| 32 | 50    | 2009 |
-| 33 | 40    | 2008 |
-| 34 | 30    | 2007 |
-| 35 | 20    | 2006 |
-| 36 | 10    | 2005 |
-| 28 | 90    | 2013 |
-| 30 | 70    | 2011 |
+| 2  | 80    | 2012 |
+| 4  | 60    | 2010 |
+| 5  | 50    | 2009 |
+| 6  | 40    | 2008 |
+| 7  | 30    | 2007 |
+| 8  | 20    | 2006 |
+| 9  | 10    | 2005 |
+| 1  | 90    | 2013 |
+| 3  | 70    | 2011 |
 +----+-------+------+
 ```
 
@@ -3386,9 +3398,12 @@ SELECT user,host FROM mysql.user;
 SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';')
 AS query FROM mysql.user;
 
-# 创建用户名为tz的用户
+# 创建用户名为tz的用户，并设置密码
 create user 'tz'@'127.0.0.1'
 identified by 'YouPassword';
+# 创建用户名为tz的用户，密码为空
+create user 'tz'@'127.0.0.1'
+identified by '';
 
 # 当前用户修改密码的命令
 SET PASSWORD = PASSWORD("NewPassword");
@@ -3398,16 +3413,17 @@ SET PASSWORD FOR 'tz'@'127.0.0.1' = PASSWORD('NewPassword');
 
 # grant (授权)
 # 只能 select china.cnarea_2019
-grant select on china.cnarea_2019 to 'tz'@'127.0.0.1';
+grant select on china.cnarea_2019 to 'tz'@'127.0.0.1' identified by "YouPassword";
 
 # 添加 insert 和 china所有表的权限
-grant select,insert on china.* to 'tz'@'127.0.0.1';
+grant select,insert on china.* to 'tz'@'127.0.0.1' identified by "YouPassword";
 
 # 添加所有数据库和表的权限
-grant all PRIVILEGES on *.* to 'tz'@'127.0.0.1';
+grant all PRIVILEGES on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
+grant all on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
 
 # 允许tz 用户授权于别的用户
-grant all on *.* to 'tz'@'127.0.0.1' with grant option;
+grant all on *.* to 'tz'@'127.0.0.1' with grant option identified by "YouPassword";
 
 # 刷新权限
 flush privileges;
@@ -3943,6 +3959,23 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
 
 ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
+## XtraBackup 热备份
+
+- XtraBackup：能对innodb和xtradb存储引擎进行热备份。也能对MyISAM存储引擎进行备份，只不过对于MyISAM的备份需要加表锁，会阻塞写操作。
+
+- 有2个工具
+    - `xtrabackup`：只能备份innodb和xtradb存储引擎数据表
+    - `innobackupex`：是通过perl脚本对xtrabackup进行封装和功能扩展，除了能备份innodb和xtradb存储引擎的数据表外，还可以备份MyISAM数据表和frm文件。
+        - 由于MyISAM不支持事务，在对MyISAM表备份之前，需要对全库进行加读锁，阻塞写操作。如果在从库进行的话，还会影响主从同步，从而造成延迟。
+        - 备份时是根据配置文件`my.cnf`获取备份文件的信息
+
+### 安装
+
+```sh
+rpm -ivh
+yum install -y percona-xtrabackup
+```
+
 ## 导出不同文件格式
 
 ```sh
@@ -3963,7 +3996,7 @@ FIELDS TERMINATED BY ',' ENCLOSED BY '"'
 LINES TERMINATED BY '\r\n';
 ```
 
-## 高效强大的 mysql 软件
+## 第三方 mysql 软件
 
 - [MySQL 常用工具选型和建议](https://zhuanlan.zhihu.com/p/86846532)
 
