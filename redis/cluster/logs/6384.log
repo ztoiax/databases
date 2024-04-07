@@ -1,0 +1,44 @@
+5712:S 20 Aug 2023 22:18:33.344 * FAIL message received from eaf4548fff6106be87d672019ecb600f2481f18d about 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+5712:S 20 Aug 2023 22:18:33.344 # Cluster state changed: fail
+5712:S 20 Aug 2023 22:18:34.375 # Cluster state changed: ok
+5712:S 20 Aug 2023 22:35:33.703 * Clear FAIL state for node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9: master without slots is reachable again.
+5712:signal-handler (1692555103) Received SIGTERM scheduling shutdown...
+5712:S 21 Aug 2023 02:11:44.060 # User requested shutdown...
+5712:S 21 Aug 2023 02:11:44.060 * Saving the final RDB snapshot before exiting.
+5712:S 21 Aug 2023 02:11:44.067 * DB saved on disk
+5712:S 21 Aug 2023 02:11:44.067 * Removing the pid file.
+5712:S 21 Aug 2023 02:11:44.067 # Redis is now ready to exit, bye bye...
+23196:C 06 Feb 2024 17:49:42.108 # WARNING: Changing databases number from 16 to 1 since we are in cluster mode
+23202:C 06 Feb 2024 17:49:42.108 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+23202:C 06 Feb 2024 17:49:42.108 * Redis version=7.2.4, bits=64, commit=00000000, modified=0, pid=23202, just started
+23202:C 06 Feb 2024 17:49:42.108 * Configuration loaded
+23202:M 06 Feb 2024 17:49:42.108 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+23202:M 06 Feb 2024 17:49:42.108 * monotonic clock: POSIX clock_gettime
+23202:M 06 Feb 2024 17:49:42.108 # Failed to write PID file: Permission denied
+23202:M 06 Feb 2024 17:49:42.109 * Running mode=cluster, port=6384.
+23202:M 06 Feb 2024 17:49:42.109 * Node configuration loaded, I'm ba17a754f45ce4ac259768d973de8354eee10a1b
+23202:M 06 Feb 2024 17:49:42.109 * Server initialized
+23202:M 06 Feb 2024 17:49:42.110 * Loading RDB produced by version 7.2.4
+23202:M 06 Feb 2024 17:49:42.110 * RDB age 5 seconds
+23202:M 06 Feb 2024 17:49:42.110 * RDB memory usage when created 1.56 Mb
+23202:M 06 Feb 2024 17:49:42.110 * Done loading RDB, keys loaded: 3, keys expired: 0.
+23202:M 06 Feb 2024 17:49:42.110 * DB loaded from disk: 0.000 seconds
+23202:M 06 Feb 2024 17:49:42.110 * Before turning into a replica, using my own master parameters to synthesize a cached master: I may be able to synchronize with the new master with just a partial transfer.
+23202:M 06 Feb 2024 17:49:42.110 * Ready to accept connections tcp
+23202:S 06 Feb 2024 17:49:42.110 * Discarding previously cached master state.
+23202:S 06 Feb 2024 17:49:42.110 * Before turning into a replica, using my own master parameters to synthesize a cached master: I may be able to synchronize with the new master with just a partial transfer.
+23202:S 06 Feb 2024 17:49:42.110 * Connecting to MASTER 127.0.0.1:6381
+23202:S 06 Feb 2024 17:49:42.110 * MASTER <-> REPLICA sync started
+23202:S 06 Feb 2024 17:49:42.110 * Cluster state changed: ok
+23202:S 06 Feb 2024 17:49:42.110 * Non blocking connect for SYNC fired the event.
+23202:S 06 Feb 2024 17:49:42.122 * Master replied to PING, replication can continue...
+23202:S 06 Feb 2024 17:49:42.128 * Trying a partial resynchronization (request 1cda1650a038e29b77adc93f490f83eb0b2484bb:36538).
+23202:S 06 Feb 2024 17:49:42.128 * Successful partial resynchronization with master.
+23202:S 06 Feb 2024 17:49:42.128 * Master replication ID changed to 5236235c42b7b0f2bc3d1606f73cc1984f7a9982
+23202:S 06 Feb 2024 17:49:42.128 * MASTER <-> REPLICA sync: Master accepted a Partial Resynchronization.
+23202:signal-handler (1707214591) Received SIGTERM scheduling shutdown...
+23202:S 06 Feb 2024 18:16:31.593 * User requested shutdown...
+23202:S 06 Feb 2024 18:16:31.593 * Saving the final RDB snapshot before exiting.
+23202:S 06 Feb 2024 18:16:31.608 * DB saved on disk
+23202:S 06 Feb 2024 18:16:31.608 * Removing the pid file.
+23202:S 06 Feb 2024 18:16:31.608 # Redis is now ready to exit, bye bye...

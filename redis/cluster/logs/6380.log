@@ -1,0 +1,38 @@
+4801:M 20 Aug 2023 22:18:33.344 * Marking node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 as failing (quorum reached).
+4801:M 20 Aug 2023 22:18:33.344 # Cluster state changed: fail
+4801:M 20 Aug 2023 22:18:34.334 # Failover auth granted to a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3 for epoch 13
+4801:M 20 Aug 2023 22:18:34.375 # Cluster state changed: ok
+4801:M 20 Aug 2023 22:35:33.713 * Clear FAIL state for node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9: master without slots is reachable again.
+4801:signal-handler (1692555104) Received SIGTERM scheduling shutdown...
+4801:M 21 Aug 2023 02:11:44.010 # User requested shutdown...
+4801:M 21 Aug 2023 02:11:44.010 * 1 of 1 replicas are in sync when shutting down.
+4801:M 21 Aug 2023 02:11:44.010 * Saving the final RDB snapshot before exiting.
+4801:M 21 Aug 2023 02:11:44.020 * DB saved on disk
+4801:M 21 Aug 2023 02:11:44.020 * Removing the pid file.
+4801:M 21 Aug 2023 02:11:44.020 # Redis is now ready to exit, bye bye...
+23168:C 06 Feb 2024 17:49:42.085 # WARNING: Changing databases number from 16 to 1 since we are in cluster mode
+23174:C 06 Feb 2024 17:49:42.085 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+23174:C 06 Feb 2024 17:49:42.085 * Redis version=7.2.4, bits=64, commit=00000000, modified=0, pid=23174, just started
+23174:C 06 Feb 2024 17:49:42.085 * Configuration loaded
+23174:M 06 Feb 2024 17:49:42.086 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+23174:M 06 Feb 2024 17:49:42.086 * monotonic clock: POSIX clock_gettime
+23174:M 06 Feb 2024 17:49:42.086 # Failed to write PID file: Permission denied
+23174:M 06 Feb 2024 17:49:42.086 * Running mode=cluster, port=6380.
+23174:M 06 Feb 2024 17:49:42.087 * Node configuration loaded, I'm eaf4548fff6106be87d672019ecb600f2481f18d
+23174:M 06 Feb 2024 17:49:42.087 * Server initialized
+23174:M 06 Feb 2024 17:49:42.087 * Loading RDB produced by version 7.2.4
+23174:M 06 Feb 2024 17:49:42.087 * RDB age 5 seconds
+23174:M 06 Feb 2024 17:49:42.087 * RDB memory usage when created 1.56 Mb
+23174:M 06 Feb 2024 17:49:42.087 * Done loading RDB, keys loaded: 3, keys expired: 0.
+23174:M 06 Feb 2024 17:49:42.087 * DB loaded from disk: 0.000 seconds
+23174:M 06 Feb 2024 17:49:42.087 * Ready to accept connections tcp
+23174:M 06 Feb 2024 17:49:42.123 * Replica 127.0.0.1:6383 asks for synchronization
+23174:M 06 Feb 2024 17:49:42.123 * Partial resynchronization request from 127.0.0.1:6383 accepted. Sending 0 bytes of backlog starting from offset 36538.
+23174:M 06 Feb 2024 17:49:44.095 * Cluster state changed: ok
+23174:signal-handler (1707214591) Received SIGTERM scheduling shutdown...
+23174:M 06 Feb 2024 18:16:31.618 * User requested shutdown...
+23174:M 06 Feb 2024 18:16:31.618 * 1 of 1 replicas are in sync when shutting down.
+23174:M 06 Feb 2024 18:16:31.619 * Saving the final RDB snapshot before exiting.
+23174:M 06 Feb 2024 18:16:31.629 * DB saved on disk
+23174:M 06 Feb 2024 18:16:31.629 * Removing the pid file.
+23174:M 06 Feb 2024 18:16:31.629 # Redis is now ready to exit, bye bye...

@@ -1,3789 +1,244 @@
-<!-- vim-markdown-toc GFM -->
-
-* [mysql](#mysql)
-    * [基本命令](#基本命令)
-        * [连接数据库](#连接数据库)
-        * [常用 SQL 命令](#常用-sql-命令)
-    * [下载数据库进行 SQL 语句 学习](#下载数据库进行-sql-语句-学习)
-    * [DQL(查询)](#dql查询)
-        * [SELECT](#select)
-            * [where: 行(元组)条件判断](#where-行元组条件判断)
-            * [Order by (排序)](#order-by-排序)
-            * [regexp (正则表达式)](#regexp-正则表达式)
-            * [Group by (分组)](#group-by-分组)
-                * [WITH ROLLUP](#with-rollup)
-            * [子查询](#子查询)
-                * [IN, NOT IN](#in-not-in)
-                * [标量子查询](#标量子查询)
-                * [关量子查询](#关量子查询)
-                * [with(临时表)](#with临时表)
-            * [集合操作](#集合操作)
-                * [UNION(并操作)](#union并操作)
-                * [EXCEPT(差操作)](#except差操作)
-                * [INTERSECT(交操作)](#intersect交操作)
-            * [聚集函数(aggregation)](#聚集函数aggregation)
-                * [基本聚集函数](#基本聚集函数)
-                * [加密函数](#加密函数)
-                * [rank(): 排名](#rank-排名)
-                * [分窗](#分窗)
-        * [JOIN(关联查询): 改变表关系](#join关联查询-改变表关系)
-            * [INNER JOIN(内连接)](#inner-join内连接)
-                * [STRAIGHT_JOIN](#straight_join)
-            * [LEFT JOIN(左连接)](#left-join左连接)
-            * [RIGHT JOIN(左连接)](#right-join左连接)
-            * [FULL OUTER JOIN(全连接)](#full-outer-join全连接)
-    * [查询优化](#查询优化)
-        * [查询过程](#查询过程)
-        * [查询中的JOIN(关联查询)](#查询中的join关联查询)
-        * [COUNT()函数优化](#count函数优化)
-        * [延迟关联](#延迟关联)
-        * [hint(优化器提示)](#hint优化器提示)
-        * [松散索引(loose index scan)](#松散索引loose-index-scan)
-        * [自定义变量](#自定义变量)
-    * [DML (增删改操作)](#dml-增删改操作)
-        * [CREATE(创建)](#create创建)
-            * [数据类型](#数据类型)
-            * [列字段完整性约束](#列字段完整性约束)
-            * [基本使用](#基本使用)
-            * [FOREIGN KEY(外键)](#foreign-key外键)
-        * [Insert](#insert)
-            * [INSERT... SELECT...](#insert-select)
-            * [INSERT ... ON DUPLICATE KEY UPDATE ...](#insert--on-duplicate-key-update-)
-            * [LOAD DATA](#load-data)
-        * [REPLACE](#replace)
-        * [UPDATE](#update)
-            * [case结构](#case结构)
-        * [Delete and Drop (删除)](#delete-and-drop-删除)
-            * [删除重复的数据](#删除重复的数据)
-    * [VIEW (视图)](#view-视图)
-    * [Stored Procedure and Function (自定义存储过程 和 函数)](#stored-procedure-and-function-自定义存储过程-和-函数)
-        * [Stored Procedure (自定义存储过程)](#stored-procedure-自定义存储过程)
-        * [ALTER](#alter)
-            * [ALTER优化](#alter优化)
-    * [INDEX(索引)](#index索引)
-        * [EXPLAIN](#explain)
-        * [B+树匹配原则](#b树匹配原则)
-            * [前缀索引](#前缀索引)
-        * [HASH INDEX](#hash-index)
-            * [自适应哈希(adaptive hash index)](#自适应哈希adaptive-hash-index)
-        * [覆盖索引](#覆盖索引)
-        * [Multiple-Column Indexes (多列索引)](#multiple-column-indexes-多列索引)
-        * [SQL语法索引](#sql语法索引)
-            * [索引状态](#索引状态)
-    * [DCL](#dcl)
-        * [帮助文档](#帮助文档)
-        * [用户权限设置](#用户权限设置)
-            * [revoke (撤销):](#revoke-撤销)
-            * [授予权限,远程登陆](#授予权限远程登陆)
-        * [配置(varibles)操作](#配置varibles操作)
-    * [表损坏](#表损坏)
-    * [mysqldump 备份和恢复](#mysqldump-备份和恢复)
-        * [主从同步 (Master Slave Replication )](#主从同步-master-slave-replication-)
-            * [主服务器配置](#主服务器配置)
-            * [从服务器配置](#从服务器配置)
-        * [docker 主从复制](#docker-主从复制)
-    * [mysqlbinlog](#mysqlbinlog)
-        * [--flashback 闪回还原](#--flashback-闪回还原)
-    * [XtraBackup 热备份](#xtrabackup-热备份)
-        * [安装](#安装)
-    * [导出不同文件格式](#导出不同文件格式)
-    * [第三方 mysql 软件](#第三方-mysql-软件)
-        * [mycli](#mycli)
-        * [mitzasql](#mitzasql)
-        * [mydumper](#mydumper)
-        * [XtraBackup](#xtrabackup)
-        * [binlog2sql](#binlog2sql)
-        * [percona-toolkit 运维监控工具](#percona-toolkit-运维监控工具)
-        * [innotop](#innotop)
-        * [dbatool](#dbatool)
-        * [undrop-for-innodb(\*数据恢复)](#undrop-for-innodb数据恢复)
-        * [osqueryi](#osqueryi)
-        * [mytop](#mytop)
-        * [MyRocks:lsm存储引擎](#myrockslsm存储引擎)
-* [安装 MySql](#安装-mysql)
-    * [Centos 7 安装 MySQL](#centos-7-安装-mysql)
-    * [docker 安装](#docker-安装)
-    * [常见错误](#常见错误)
-        * [登录错误](#登录错误)
-            * [修复](#修复)
-                * [修改密码成功后](#修改密码成功后)
-                * [如果出现以下报错(密码不满足策略安全)](#如果出现以下报错密码不满足策略安全)
-                    * [修复](#修复-1)
-        * [ERROR 2013 (HY000): Lost connection to MySQL server during query(导致无法 stop slave;)](#error-2013-hy000-lost-connection-to-mysql-server-during-query导致无法-stop-slave)
-        * [ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (111)(连接不了数据库)](#error-2002-hy000-cant-connect-to-local-mysql-server-through-socket-varrunmysqldmysqldsock-111连接不了数据库)
-        * [ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined](#error-1075-42000-incorrect-table-definition-there-can-be-only-one-auto-column-and-it-must-be-defined)
-        * [启动错误](#启动错误)
-    * [极限值测试](#极限值测试)
-    * [benchmark(基准测试)](#benchmark基准测试)
-        * [sysbench](#sysbench)
-    * [日志](#日志)
-    * [存储引擎](#存储引擎)
-    * [设计规范](#设计规范)
-        * [基本规范](#基本规范)
-* [reference](#reference)
-* [第三方资源](#第三方资源)
-* [新闻资源](#新闻资源)
-* [online tools](#online-tools)
-
-<!-- vim-markdown-toc -->
-
 # mysql
 
-## 基本命令
+## 安装 MySql
 
-### 连接数据库
+### Centos 7 安装 MySQL
 
-| 参数 | 内容                 |
-| ---- | -------------------- |
-| -u   | 用户                 |
-| -p   | 密码                 |
-| -S   | 使用 socks 进行连接  |
-| -h   | 连接指定 ip 的数据库 |
-| -e   | 执行 shell 命令      |
-| -P   | 连接端口             |
+- 从 CentOS 7 开始,`yum` 安装 `MySQL` 默认安装的会是 `MariaDB`
+
+- 安装mariadb
+    ```sh
+    # 不要用yum命令安装。如果使用yum install -y mysql安装，是没有systemd 的unit的
+    systemctl start mariadb
+    Failed to start mariadb.service: Unit not found.
+
+    # 使用dnf命令安装
+    dnf install mariadb-server
+    ```
+
+- 安装mysql8
+    - 整个过程需要科学上网
+
+    ```sh
+    # 下载
+    wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm
+
+    # 安装源
+    rpm -Uvh mysql80-community-release-el7-3.noarch.rpm
+
+    # 查看安装是否成功
+    yum repolist enabled | grep "mysql.*-community.*"
+
+    # 查看当前MySQL Yum Repository中所有MySQL版本(每个版本在不同的子仓库中)
+    yum repolist all | grep mysql
+
+    # 切换版本
+    yum-config-manager --disable mysql80-community
+    yum-config-manager --enable mysql57-community
+
+    # 安装
+    yum install mysql-community-server
+    ```
+
+- /etc/mysql/my.cnf
+    ```sh
+    [mysqld]
+    # 允许MySQL监听所有网络接口
+    bind-address = 0.0.0.0
+    ```
+
+<span id="docker"></span>
+
+### [docker 安装](https://www.runoob.com/docker/docker-install-mysql.html)
 
 ```sh
-# 首先要连接进数据库
-mysql -uroot -pYouPassword
+# 下载镜像
+docker pull mysql:latest
 
-# -h 连接192.168.100.208主机的数据库
-mysql -uroot -pYouPassword -h192.168.100.208 -P3306
+# 查看本地镜像
+docker images
 
-# -S 使用socket连接(mysql不仅监听3306端口,还监听mysql.sock)
-mysql -uroot -pYouPassword -S/tmp/mysql.sock
+# -p端口映射
+docker run -itd --name mysql-tz -p 3306:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
 
-# -e 可以执行 sql 命令(这里是show databases;)
-mysql -uroot -pYouPassword -e "show databases"
+# 查看运行镜像
+docker ps
+
+#进入容器
+docker exec -it mysql-tz bash
+
+#登录 mysql
+mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
 ```
 
-[如需,连接远程 server 的数据库 (可跳转至用户权限设置)](#user)
+## 主从复制 (Master Slave Replication )
 
-### 常用 SQL 命令
+- 原理
+    - master提交完事务后，写入binlog
+    - slave连接到master，获取binlog
+    - master创建dump线程，推送binglog到slave
+    - slave启动一个IO线程读取同步过来的master的binlog，记录到relay log中继日志中
+    - slave再开启一个sql线程读取relay log事件并在slave执行，完成同步
+    - slave记录自己的binglog
 
-在 `linux` 终端输入的命令是 `shell` 命令
+    ![image](./Pictures/mysql/主从复制原理.avif)
 
-而 `SQL` 命令指进入数据库里的命令
+- mysql默认的复制方式是异步的：主库把日志发送给从库后不关心从库是否已经处理，这样会产生一个问题就是假设主库挂了，从库处理失败了，这时候从库升为主库后，日志就丢失了。
 
-- **注意:** SQL 命令后面要加 `;`
+- 全同步复制：主库写入binlog后强制同步日志到从库，所有的从库都执行完成后才返回给客户端，但是很显然这个方式的话性能会受到严重影响。
 
-- SQL 命令**大小写不敏感** `CREATE` 或 `create` 都可以
+- 半同步复制：和全同步不同的是，半同步复制的逻辑是这样，从库写入日志成功后返回ACK确认给主库，主库收到至少一个从库的确认就认为写操作完成。
 
-- 而表(table)是要**区分大小写**的
+### 主从复制不会复制已经存在的数据库数据。因此需要自己导入
 
-```sql
-# 创建名为 tz 的数据库
-create database tz;
+- 在master服务器上：导出主从复制设置的数据库
 
-# 查看数据库
-show databases;
+    ```sh
+    # 导出
 
-# 使用tz数据库
-use tz;
-
-# 查看tz数据库里的表
-show tables;
-
-# 查看 information_scema 数据库里的表
-show tables from information_scema;
-
-# 查看数据库状态
-show status;
-
-# 查看上一次查询成本(单位:数据页)
-show status like 'Last_query_cost'
-
-# 插入次数;
-show status like "com_insert%";
-
-# 删除次数;
-show status like "com_delete%";
-
-# 查询次数;
-show status like "com_select%";
-
-# 服务器运行时间
-show status like "uptime";
-
-# 连接次数
-show status like 'connections';
-
-# 插入次数;
-show status like "com_insert%";
-
-# 删除次数;
-show status like "com_delete%";
-
-# 查询次数;
-show status like "com_select%";
-
-# 服务器运行时间
-show status like "uptime";
-
-# 连接次数
-show status like 'connections';
-
-# 查看数据库队列
-show processlist;
-
-# 查看数据库保存目录
-show variables like 'data%';
-
-# SQL FUNCTION
-# 查看当前使用哪个数据库
-select database();
-
-# 查看当前登录用户
-select user();
-
-# 查看数据库版本
-select version();
-```
-
-## 下载数据库进行 SQL 语句 学习
-
-```sql
-# 连接数据库后,创建china数据库
-create database china;
-```
-
-```sh
-# 下载2019年中国地区表,一共有 783562 条数据
-git clone https://github.com/kakuilan/china_area_mysql.git
-# 如果网速太慢,使用这条国内通道
-git clone https://gitee.com/qfzya/china_area_mysql.git
-
-# 导入表到 china 库
-cd china_area_mysql
-mysql -uroot -pYouPassward china < cnarea20191031.sql
-```
-
-## DQL(查询)
-
-### SELECT
-
-**语法:**
-
-> ```sql
-> SELECT 列名称 FROM 表名称
-> ```
-
-- 语句顺序为: `FROM` -> `WHERE` -> `SELECT`
-
----
-
-```sql
-# 连接数据库后,进入 china 数据库
-use china;
-
-# 查看表 cnarea_2019 的字段(列)
-desc cnarea_2019
-
-# 将 cnarea_2019 表改名为 ca ,方便输入
-alter table cnarea_2019 rename ca;
-# 改回来
-alter table ca rename cnarea_2019;
-
-# 从表 cnarea_2019 选取所有列(*表示所有列)
-select *
-from cnarea_2019;
-
-# 如果刚才将表改成 ca 名,就是以下命令
-select *
-from ca;
-
-# 从表 cnarea_2019 选取 name 列
-select name
-from cnarea_2019;
-
-# 从表 cnarea_2019 选取 name 和 id 列
-select id,name
-from cnarea_2019;
-
-# distinct 过滤重复的数据
-select distinct level
-from cnarea_2019;
-
-# limit 只显示前2行
-select *
-from cnarea_2019
-limit 2;
-
-# limit 选取所有列,但只显示100到70000行
-select * from cnarea_2019
-limit 100,70000;
-
-# LEFT() 选取name列, 但只显示前2字符
-SELECT LEFT(name, 2)
-FROM cnarea_2019
-
-# RIGHT() 选取name列, 但只显示后3字符
-SELECT RIGHT(name, 3)
-FROM cnarea_2019
-```
-
-#### where: 行(元组)条件判断
-
-**语法:**
-
-> ```sql
-> SELECT 列名称 FROM 表名称 WHERE 列名称 条件
-> ```
-
----
-
-
-```sql
-# 结尾处加入 \G 以列的方式显示
-select * from cnarea_2019
-where id=1\G;
-
-MariaDB [china]> select * from cnarea_2019 where id=1\G;
-*************************** 1. row ***************************
-         id: 1
-      level: 0
-parent_code: 0
-  area_code: 110000000000
-   zip_code: 000000
-  city_code:
-       name: 北京市
- short_name: 北京
-merger_name: 北京
-     pinyin: BeiJing
-        lng: 116.407526
-        lat: 39.904030
-```
-
-```sql
-# 选取 id 小于10的数据
-select * from cnarea_2019
-where id < 10;
-
-# 选取 10<=id<=30 的数据
-select * from cnarea_2019
-where id<=30 and id>=10;
-
-# 选取 id 等于10 和 id等于20 的数据
-select * from cnarea_2019
-where id in (10,20);
-
-# 选取 not null(非空) 和 id 小于 10 的数据
-select * from ca
-where id is not null
-and id < 10;
-
-# 选取 50行到55行的数据
-SELECT * FROM cnarea_2019
-WHERE id BETWEEN 50 AND 55;
-```
-
-#### Order by (排序)
-
-**语法:**
-
-> ```sql
-> SELECT 列名称 FROM 表名称 ORDER BY 列名称
-> # or
-> SELECT 列名称 FROM 表名称 WHERE 列名称 条件 ORDER BY 列名称
-> ```
-
----
-
-```sql
-# 以 level 字段进行排序
-select * from cnarea_2019
-order by level;
-
-# 选取 id<=10 ,以 level 字段进行排序
-select * from cnarea_2019
-where id<=10
-order by level;
-
-# desc 降序
-select * from cnarea_2019
-where id<=10
-order by level desc;
-
-# level 降序,再以 id 顺序显示
-select * from cnarea_2019
-where id<=10
-order by level desc,
-id ASC;
-```
-
-#### regexp (正则表达式)
-
-```sql
-# 选取以 '广州' 开头的 name 字段
-select name from cnarea_2019
-where name regexp '^广州';
-
-# 选取包含 '广州' 的name 字段
-select name from cnarea_2019
-where name regexp '.*广州';
-```
-
-#### Group by (分组)
-
-- 创建表people, people1
-
-```sql
-# 创建表people
-create table people(
-    `id` int (8) auto_increment,
-    `name` varchar(50),
-    `salary` varchar(50),
-    primary key (`id`)
-);
-
-# 插入数据
-INSERT INTO people (name, salary) VALUES
-('a1','1000'),
-('a2','2000'),
-('a3','3000'),
-('b1','1000'),
-('b2','2000'),
-('b3','3000'),
-('c1','1000'),
-('c2','2000'),
-('c3','3000');
-
-# 创建表people1
-CREATE TABLE people1(
-    `id` int (8) AUTO_INCREMENT,
-    `name` varchar(50),
-    `salary` varchar(50),
-    primary key (`id`)
-);
-
-# 插入数据
-INSERT INTO people1 (name, salary) VALUES
-('c1','1000'),
-('c2','2000'),
-('c3','3000'),
-('d', 3000),
-(null,'3000'),
-('d', null),
-(null, null);
-
-
-# 统计salary(工资)大于1000的人数
-SELECT salary, COUNT(salary) FROM people
-GROUP BY salary
-HAVING salary > 1000;
-
-# 统计salary为1000的人数
-SELECT COUNT(name) FROM people
-WHERE salary = 1000;
-```
-
-##### WITH ROLLUP
-
-```sql
-CREATE TABLE sales(
-    `id` int (8) AUTO_INCREMENT,
-    `name` varchar(50),
-    `color` varchar(50),
-    `quantitty` int (8),
-    primary key (`id`)
-);
-
-# 插入数据
-INSERT INTO sales (name, color, quantitty) VALUES
-('shirt', 'black', 10),
-('shirt', 'white', 8),
-('shirt', 'red', 1),
-('dress', 'black', 9),
-('dress', 'white', 10),
-('dress', 'red', 5),
-('skirt', 'black', 1),
-('skirt', 'white', 5),
-('skirt', 'red', 5);
-
-# name
-SELECT name, SUM(quantitty) FROM sales
-GROUP BY name
-
-# color
-SELECT color, SUM(quantitty) FROM sales
-GROUP BY color
-
-# 不使用WITH ROLLUP 统计每个颜色的销售数量,以及总量
-SELECT name, color, SUM(quantitty) FROM sales
-GROUP BY color, name
-
-+-------+-------+----------------+
-| name  | color | SUM(quantitty) |
-+-------+-------+----------------+
-| dress | black | 9              |
-| shirt | black | 10             |
-| skirt | black | 1              |
-| dress | red   | 5              |
-| shirt | red   | 1              |
-| skirt | red   | 5              |
-| dress | white | 10             |
-| shirt | white | 8              |
-| skirt | white | 5              |
-+-------+-------+----------------+
-
-# WITH ROLLUP 统计每个颜色的销售数量,以及总量
-SELECT name, color, SUM(quantitty) FROM sales
-GROUP BY color, name
-WITH ROLLUP
-
-+--------+--------+----------------+
-| name   | color  | SUM(quantitty) |
-+--------+--------+----------------+
-| dress  | black  | 9              |
-| shirt  | black  | 10             |
-| skirt  | black  | 1              |
-| <null> | black  | 20             |
-| dress  | red    | 5              |
-| shirt  | red    | 1              |
-| skirt  | red    | 5              |
-| <null> | red    | 11             |
-| dress  | white  | 10             |
-| shirt  | white  | 8              |
-| skirt  | white  | 5              |
-| <null> | white  | 23             |
-| <null> | <null> | 54             |
-+--------+--------+----------------+
-
-# name 统计每个品类的销售数量, 以及总量
-SELECT name, color, SUM(quantitty) FROM sales
-GROUP BY name, color
-WITH ROLLUP
-
-+--------+--------+----------------+
-| name   | color  | SUM(quantitty) |
-+--------+--------+----------------+
-| dress  | black  | 9              |
-| dress  | red    | 5              |
-| dress  | white  | 10             |
-| dress  | <null> | 24             |
-| shirt  | black  | 10             |
-| shirt  | red    | 1              |
-| shirt  | white  | 8              |
-| shirt  | <null> | 19             |
-| skirt  | black  | 1              |
-| skirt  | red    | 5              |
-| skirt  | white  | 5              |
-| skirt  | <null> | 11             |
-| <null> | <null> | 54             |
-+--------+--------+----------------+
-```
-#### 子查询
-
-##### IN, NOT IN
-
-- `()`: 表示集合
-
-- `IN`: 判断在集合中的字段
-
-- `NOT IN`: 判断不在集合中的字段
-
-```sql
-# IN
-SELECT * FROM people
-WHERE salary IN (1000, 3000);
-
-# NOT IN
-SELECT * FROM people
-WHERE salary NOT IN (1000, 3000);
-
-# 子查询1000工资的人
-SELECT name FROM people
-WHERE name IN
-    (SELECT name FROM people
-    WHERE salary = 1000);
-# 等同于以上
-SELECT name FROM people
-WHERE name IN ('a1', 'b1', 'c1');
-
-+------+
-| name |
-+------+
-| a1   |
-| b1   |
-| c1   |
-+------+
-```
-
-##### 标量子查询
-
-> 可以出现在 `SELECT`, `HAVING`, `WHERE`
-
-```sql
-SELECT id, name,
-    (SELECT count(*) FROM people1)
-    AS count_people1
-FROM people
-
-+----+------+---------------+
-| id | name | count_people1 |
-+----+------+---------------+
-| 1  | a1   | 7             |
-| 2  | a2   | 7             |
-| 3  | a3   | 7             |
-| 4  | b1   | 7             |
-| 5  | b2   | 7             |
-| 6  | b3   | 7             |
-| 7  | c1   | 7             |
-| 8  | c2   | 7             |
-| 9  | c3   | 7             |
-+----+------+---------------+
-```
-
-##### 关量子查询
-
-```sql
-# IN()函数子查询
-SELECT * FROM people WHERE id IN
-(SELECT id FROM people1
-WHERE id > 5);
-
-# 使用关联子查询代替以上IN函数子查询.结果一样, 效率更高
-SELECT * FROM people WHERE EXISTS
-(SELECT * FROM people1
-WHERE id > 5
-AND people.id = people1.id);
-
-+----+------+--------+
-| id | name | salary |
-+----+------+--------+
-| 6  | b3   | 3000   |
-| 7  | c1   | 1000   |
-+----+------+--------+
-```
-
-##### with(临时表)
-
-```sql
-# 创建临时表p
-WITH p (name, salary) AS
-    (SELECT name, salary FROM people)
-SELECT * FROM p
-
-# with 实现people, people1的内连接
-WITH p (id, name) AS
-    (SELECT id, name FROM people),
-    p1 (id, name) AS
-    (SELECT id, name FROM people1)
-SELECT * FROM p, p1
-    WHERE p.id = p1.id;
-
-# 等同于以上
-SELECT p.id, p.name, p1.id, p1.name
-FROM people as p
-INNER JOIN people1 as p1
-ON p.id = p1.id;
-
-+----+------+----+--------+
-| id | name | id | name   |
-+----+------+----+--------+
-| 1  | a1   | 1  | c1     |
-| 2  | a2   | 2  | c2     |
-| 3  | a3   | 3  | c3     |
-| 4  | b1   | 4  | d      |
-| 5  | b2   | 5  | <null> |
-| 6  | b3   | 6  | d      |
-| 7  | c1   | 7  | <null> |
-+----+------+----+--------+
-```
-
-#### 集合操作
-
-> 默认去除重复行
-
-##### UNION(并操作)
-
-```sql
-SELECT name FROM people
-UNION
-SELECT name FROM people1
-
-+--------+
-| name   |
-+--------+
-| a1     |
-| a2     |
-| a3     |
-| b1     |
-| b2     |
-| b3     |
-| c1     |
-| c2     |
-| c3     |
-| d      |
-| <null> |
-+--------+
-
-# UNION ALL保留重复行
-SELECT name FROM people
-UNION ALL
-SELECT name FROM people1
-```
-
-##### EXCEPT(差操作)
-
-> 从左边的集合去除右边的集合
-
-```sql
-# people表去除people1表的重复行
-
-SELECT name FROM people
-EXCEPT
-SELECT name FROM people1
-
-+------+
-| name |
-+------+
-| a1   |
-| a2   |
-| a3   |
-| b1   |
-| b2   |
-| b3   |
-+------+
-```
-
-##### INTERSECT(交操作)
-
-```sql
-SELECT name FROM people
-INTERSECT
-SELECT name FROM people1
-
-+------+
-| name |
-+------+
-| c1   |
-| c2   |
-| c3   |
-+------+
-```
-
-#### 聚集函数(aggregation)
-
-**语法**
-
-> ```sql
-> SELECT function(列名称) FROM 表名称
-> ```
-
-##### 基本聚集函数
-
-| 聚集函数             | 操作                  |
-|----------------------|-----------------------|
-| MAX()                | 最大值                |
-| MIN()                | 最小值                |
-| SUM()                | 总值                  |
-| AVG()                | 平均值                |
-| COUNT(1)             | 总行数,等同于COUNT(*) |
-| COUNT(DISTINCT name) | 总行数,去除重复行       |
-
-```sql
-# MAX(), MIN()
-SELECT MAX(id),MIN(level) as max
-FROM cnarea_2019;
-
-# 选取 level 的平均值和 id 的总值
-SELECT SUM(id),AVG(level)
-from cnarea_2019;
-
-# 查看总列数
-SELECT COUNT(1) as name from cnarea_2019;
-
-# 统计 level 的个数
-SELECT COUNT(DISTINCT level) as totals from cnarea_2019;
-
-# 通过标量子查询，查询salary大于salary平均数
-SELECT * FROM people WHERE salary >
-(SELECT avg(salary) FROM people);
-```
-
-##### 加密函数
-
-```sql
-select md5('123');
-
-# 保留两位小数
-select format(111.111,2);
-
-# 加锁函数
-select get_lock('lockname',10);
-select is_free_lock('lockname');
-select release_lock('lockname');
-```
-
-##### rank(): 排名
-
-- `rank() OVER (ORDER BY salary)`
-
-- `rank() OVER (ORDER BY salary nulls last)`
-
-```sql
-SELECT name, salary,
-rank() OVER (ORDER BY salary DESC) AS salary_rank
-FROM people
-# or
-SELECT name, salary, (1 + (SELECT COUNT(*)
-                      FROM people1 AS B
-                      WHERE B.salary > A.salary)) AS salary_rank
-FROM people as A
-ORDER BY salary_rank
-
-+------+--------+-------------+
-| name | salary | salary_rank |
-+------+--------+-------------+
-| c3   | 3000   | 1           |
-| b3   | 3000   | 1           |
-| a3   | 3000   | 1           |
-| c2   | 2000   | 4           |
-| b2   | 2000   | 4           |
-| a2   | 2000   | 4           |
-| a1   | 1000   | 7           |
-| c1   | 1000   | 7           |
-| b1   | 1000   | 7           |
-+------+--------+-------------+
-
-# rank()对相等的值, 赋予相等的排名. 加上name字段让排名不相等
-
-SELECT name, salary,
-rank() OVER (ORDER BY salary, name desc) AS salary_rank
-FROM people
-
-+------+--------+-------------+
-| name | salary | salary_rank |
-+------+--------+-------------+
-| c1   | 1000   | 1           |
-| b1   | 1000   | 2           |
-| a1   | 1000   | 3           |
-| c2   | 2000   | 4           |
-| b2   | 2000   | 5           |
-| a2   | 2000   | 6           |
-| c3   | 3000   | 7           |
-| b3   | 3000   | 8           |
-| a3   | 3000   | 9           |
-+------+--------+-------------+
-```
-
-##### 分窗
-
-```sql
-CREATE TABLE class(
-    `id` int (8) AUTO_INCREMENT,
-    `score` int (8),
-    `year`  int (8),
-    primary key (`id`)
-);
-
-# 插入数据
-INSERT INTO class (score, year) VALUES
-(90, 2013),
-(80, 2012),
-(70, 2011),
-(60, 2010),
-(50, 2009),
-(40, 2008),
-(30, 2007),
-(20, 2006),
-(10, 2005);
-
-# 累加. 9代表最大计算9行, 如果有第10行,则只会计算2到10行
-SELECT score, year,
-SUM(score) OVER (order by score rows 9 preceding) AS score_sum
-FROM class;
-# or使用unbounded
-SELECT score, year,
-SUM(score) OVER (order by score rows unbounded preceding) AS score_sum
-FROM class;
-
-+-------+------+-----------+
-| score | year | score_sum |
-+-------+------+-----------+
-| 10    | 2005 | 10        |
-| 20    | 2006 | 30        |
-| 30    | 2007 | 60        |
-| 40    | 2008 | 100       |
-| 50    | 2009 | 150       |
-| 60    | 2010 | 210       |
-| 70    | 2011 | 280       |
-| 80    | 2012 | 360       |
-| 90    | 2013 | 450       |
-+-------+------+-----------+
-
-# 平均数
-SELECT score, year,
-AVG(score) OVER (order by score rows 9 preceding) AS score_avg
-FROM class;
-
-+-------+------+------------+
-| score | year | score_avg  |
-+-------+------+------------+
-| 10    | 2005 | 10.0000    |
-| 20    | 2006 | 15.0000    |
-| 30    | 2007 | 20.0000    |
-| 40    | 2008 | 25.0000    |
-| 50    | 2009 | 35.0000    |
-| 60    | 2010 | 45.0000    |
-| 70    | 2011 | 55.0000    |
-| 80    | 2012 | 65.0000    |
-| 90    | 2013 | 75.0000    |
-+-------+------+------------+
-
-# following 显示2行之后的值
-SELECT score, year,
-SUM(score) OVER (order by score rows between 9 preceding and 2 following) AS score_sum
-FROM class;
-
-+-------+------+-----------+
-| score | year | score_sum |
-+-------+------+-----------+
-| 10    | 2005 | 60        |
-| 20    | 2006 | 100       |
-| 30    | 2007 | 150       |
-| 40    | 2008 | 210       |
-| 50    | 2009 | 280       |
-| 60    | 2010 | 360       |
-| 70    | 2011 | 450       |
-| 80    | 2012 | 450       |
-| 90    | 2013 | 450       |
-+-------+------+-----------+
-
-# FIELD() 指定score列值, 不进行ORDER BY
-SELECT * FROM class
-ORDER BY FIELD (score, 90, 70)
-
-+----+-------+------+
-| id | score | year |
-+----+-------+------+
-| 2  | 80    | 2012 |
-| 4  | 60    | 2010 |
-| 5  | 50    | 2009 |
-| 6  | 40    | 2008 |
-| 7  | 30    | 2007 |
-| 8  | 20    | 2006 |
-| 9  | 10    | 2005 |
-| 1  | 90    | 2013 |
-| 3  | 70    | 2011 |
-+----+-------+------+
-```
-
-### JOIN(关联查询): 改变表关系
-
-**语法:**
-
-> ```sql
-> SELECT 列名称
-> FROM 表名称1
-> INNER JOIN 表名称2
-> ON 表名称1.列名称=表名称2.列名称
-> ```
-
----
-
-```sql
-# 创建表j
-CREATE TABLE j(
-    id   int (8),
-    name varchar(50) NOT NULL UNIQUE,
-    date DATE
-);
-
-# 插入数据
-insert into j (id,name,date) values
-(1,'tz1','2020-10-24'),
-(10,'tz2','2020-10-24'),
-(100,'tz3','2020-10-24');
-
-# 查看结果
-select * from j;
-+------+------+------------+
-| id   | name | date       |
-+------+------+------------+
-| 1   | tz1 | 2020-10-24 |
-| 10  | tz2 | 2020-10-24 |
-| 100 | tz3 | 2020-10-24 |
-+------+------+------------+
-```
-
-#### INNER JOIN(内连接)
-
-- people表
-
-```sql
-# INNER JOIN
-SELECT * FROM people INNER JOIN people1
-ON people.id = people1.id;
-# JOIN
-SELECT * FROM people JOIN people1
-ON people.id = people1.id;
-# or
-SELECT * FROM people, people1
-WHERE people.id = people1.id;
-
-+----+------+--------+----+--------+--------+
-| id | name | salary | id | name   | salary |
-+----+------+--------+----+--------+--------+
-| 1  | a1   | 1000   | 1  | c1     | 1000   |
-| 2  | a2   | 2000   | 2  | c2     | 2000   |
-| 3  | a3   | 3000   | 3  | c3     | 3000   |
-| 4  | b1   | 1000   | 4  | d      | 3000   |
-| 5  | b2   | 2000   | 5  | <null> | 3000   |
-| 6  | b3   | 3000   | 6  | d      | <null> |
-| 7  | c1   | 1000   | 7  | <null> | <null> |
-+----+------+--------+----+--------+--------+
-```
-
-- cnarea_2019表
-
-```sql
-# 选取 j 表的 id,name,date 字段以及 cnarea_2019 表的 name 字段
-select j.id,j.date,cnarea_2019.name
-from j,cnarea_2019
-where cnarea_2019.id=j.id;
-
-# 或者
-select j.id,j.name,j.date,cnarea_2019.name
-from j inner join  cnarea_2019
-on cnarea_2019.id=j.id;
-
-+------+------+------------+--------------------------+
-| id   | name | date       | name                     |
-+------+------+------------+--------------------------+
-|    1 | tz1  | 2020-10-24 | 北京市                   |
-|   10 | tz2  | 2020-10-24 | 黄图岗社区居委会         |
-|  100 | tz3  | 2020-10-24 | 安德路社区居委会         |
-+------+------+------------+--------------------------+
-```
-
-##### STRAIGHT_JOIN
-
-- 和 `inner join` 语法,结果相同,只是左表总是在右表之前读取
-
-- 因为 `Nest Loop Join` 的算法,用更小的数据表驱动更大数据表,**更快**.
-
-```sql
-# 先读取 j 再读取 cnarea_2019 或者说 驱动表是j 被驱动表是cnarea_2019.
-# 因为 j 表的数据更小所以更快
-select j.id,j.name,j.date,cnarea_2019.name
-from j straight_join cnarea_2019
-on j.id=cnarea_2019.id;
-```
-
-#### LEFT JOIN(左连接)
-
-```sql
-# 左连接,以左表(j)id 字段个数进行选取.所以结果与inner join一样
-select j.id,j.name,j.date,cnarea_2019.name
-from j left join  cnarea_2019
-on cnarea_2019.id=j.id;
-
-+------+------+------------+--------------------------+
-| id   | name | date       | name                     |
-+------+------+------------+--------------------------+
-|    1 | tz1  | 2020-10-24 | 北京市                   |
-|   10 | tz2  | 2020-10-24 | 黄图岗社区居委会         |
-|  100 | tz3  | 2020-10-24 | 安德路社区居委会         |
-+------+------+------------+--------------------------+
-
-# 插入一条高于 cnarea_2019表id最大值 的数据
-insert into j (id,name,date) value
-(10000000,'tz一百万','2020-10-24');
-
-# 再次左连接,因为 cnarea_2019 没有id 10000000(一百万)的数据,所以这里显示为 null
-
-select j.id,j.name,j.date,cnarea_2019.name
-from j left join cnarea_2019
-on j.id = cnarea_2019.id;
-
-+----------+-------------+------------+--------------------------+
-| id       | name        | date       | name                     |
-+----------+-------------+------------+--------------------------+
-|        1 | tz1         | 2020-10-24 | 北京市                   |
-|       10 | tz2         | 2020-10-24 | 黄图岗社区居委会         |
-|      100 | tz3         | 2020-10-24 | 安德路社区居委会         |
-| 10000000 | tz一百万    | 2020-10-24 | NULL                     |
-+----------+-------------+------------+--------------------------+
-```
-
-#### RIGHT JOIN(左连接)
-
-```sql
-# 右连接,以右表(cnarea_2019)id字段个数进行选取.左表id没有的数据为null.因为cnarea_2019表数据量太多这里limit 10
-
-select j.id,j.date,cnarea_2019.name,cnarea_2019.pinyin
-from j right join cnarea_2019
-on j.id=cnarea_2019.id
-limit 10;
-
-+------+------------+--------------------------+-------------+
-| id   | date       | name                     | pinyin      |
-+------+------------+--------------------------+-------------+
-|    1 | 2020-10-24 | 北京市                   | BeiJing     |
-|   10 | 2020-10-24 | 黄图岗社区居委会         | HuangTuGang |
-|  100 | 2020-10-24 | 安德路社区居委会         | AnDeLu      |
-| NULL | NULL       | 直辖区                   | BeiJing     |
-| NULL | NULL       | 东城区                   | DongCheng   |
-| NULL | NULL       | 东华门街道               | DongHuaMen  |
-| NULL | NULL       | 多福巷社区居委会         | DuoFuXiang  |
-| NULL | NULL       | 银闸社区居委会           | YinZha      |
-| NULL | NULL       | 东厂社区居委会           | DongChang   |
-| NULL | NULL       | 智德社区居委会           | ZhiDe       |
-+------+------------+--------------------------+-------------+
-```
-
-#### FULL OUTER JOIN(全连接)
-
-```sql
-# 如果mysql不支持 full outer,可以使用 union
-SELECT * FROM new LEFT JOIN cnarea_2019 ON new.id = cnarea_2019.id
-
-UNION
-
-SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
-```
-
-## 查询优化
-
-- 把查询看作是一个任务, 它由多个子任务构成, 优化方法如下:
-
-    - 1.优化子任务的响应时间
-
-    - 2.减少子任务数量
-
-- 查询慢的原因往往是访问的数据太多:
-
-    - 1.查询了不需要的数据:
-
-        - 查询大量的数据, 但只使用少量的数据
-
-    - 2.使用了语句`SELECT *` 查询了所有列, 特别是连接多个表还查询所有列
-
-- 慢查询日志记录以下3个指标:
-
-    - 1.响应时间(最重要的指标, 查询优化实际指减少查询的响应时间):
-
-        - 排队时间:等待某些资源的时间, 如等待io, 等待锁...
-
-        - 服务时间:真正花费的时间
-
-    - 2.扫描行数
-
-        <span id="#explain-type"></span>
-        - 访问类型(`EXPLAIN` 的`type` 字段):访问类型决定了访问的快慢和访问的行数
-
-            - 以下`type`的排列顺序为, 从慢到快, 从行数多到少:
-
-                - ALL(全表)-> index(索引)-> range(范围)-> ref(唯一性索引)-> const(常数:单个值)
-
-    - 3.返回行数
-
-        - `EXPLAIN` 的`Extra` 字段为`Using where`时:表示从返回的数据过滤不匹配的记录
-
-### 查询过程
-
-- 查询过程:
-
-    ![image](./Pictures/mysql/select-procedure.avif)
-
-    - 1.client发送查询给server
-
-        - mysql的client/server协议是**半双工**, 要么server 发送 client, 要么client 发送 server
-
-            - client 发送一个数据包给 server
-
-            - server 返回多个数据包给 client
-
-                - server会将查询结果缓存至内存, 全部数据包返回客户端后, 才释放
-
-            - `max_allowed_packet` 变量可设置数据包大小
-
-    - 2.server检查查询缓存, 如果命中返回结果给client, 否则进入下一个阶段
-
-    - 3.进入SQL解析器, 预处理, 优化器生成执行计划
-
-        - 如果出现任何错误(如语法错误), 都可能会终止查询
-
-        - 1.SQL解析器:生成解析树
-
-        - 1.预处理器:检测权限
-
-    - 4.根据执行计划, 调用存储引擎API查询
-
-        - 优化器会预测并选择成本最低的执行计划
-
-            - 需要向存储引擎获取统计信息
-
-            - 动态优化:根据查询上下文, where的条件值等
-
-                - 静态优化:不依赖查询上下文
-
-            - 有很多原因会导致优化器选择错误的执行计划
-
-            - 不要自以为比优化器聪明
-
-        - 优化类型:
-
-            - 重新排序连接表的顺序
-
-            - `IN()`函数代替`OR`子句: IN()的时间复杂度是log n; OR的时间复杂度是n
-
-        - `last_query_cost` 变量表示上一次查询大概需要随机页查找.这里为10个数据页
-
-            ```sql
-            SHOW STATUS LIKE 'last_query_cost';
-            +-----------------+-----------+
-            | Variable_name | Value |
-            +-----------------+-----------+
-            | Last_query_cost | 10.499000 |
-            +-----------------+-----------+
-            ```
-
-    - 5.返回结果给client
-
-### 查询中的JOIN(关联查询)
-
-- mysql认为每一次查询都是一次join
-
-    - 以下查询会先将单个查询结果放到临时表(旧版的mysql临时表没有索引)中, 再读取临时表进行join
-
-        - 1.`UNION` 查询
-
-            - UNION + LIMIT语句优化
-
-            ```sql
-            -- 两个表的所有行, 放入同一临时表内, 再取出前5条记录
-            (SELECT * FROM people)
-            UNION ALL
-            (SELECT * FROM people1)
-            LIMIT 5
-
-            -- 两个表的前5行, 放入同一临时表内(只包含10条记录), 再取出前5条记录
-            (SELECT * FROM people LIMIT 5)
-            UNION ALL
-            (SELECT * FROM people1 LIMIT 5)
-            LIMIT 5
-            ```
-
-        - 2.子查询
-
-### COUNT()函数优化
-
-- 查询大量的数据, 但只使用少量的数据:
-
-    ```sql
-    -- 共扫描9行, 只获取2行
-    SELECT COUNT(*) FROM people
-    WHERE ID > 7;
-
-    -- 优化:通过总行数减去多数行
-    SELECT (SELECT COUNT(*) FROM people) - COUNT(*) FROM people
-    WHERE ID <= 7;
-    ```
-
-- 使用`EXPLAIN` 获取扫描行数的近似值, 并不是所有业务都需要精确的COUNT()值, 如谷歌的搜索结果:
-
-    ```sql
-    EXPLAIN SELECT COUNT(*) FROM people\G;
-    ```
-
-- 使用COUNT()代替SUM():
-    ```sql
-    SELECT SUM(salary = 1000),
-    SUM(salary = 2000) FROM people;
-
-    -- 使用COUNT()代替SUM()
-    SELECT COUNT(salary = 1000 or null),
-    COUNT(salary = 2000 or null) FROM people;
-    ```
-
-### 延迟关联
-
-- 通过子查询查找覆盖索引的字段. 这叫作延迟关联(deferred join)
-
-- `LIMIT 50, 5`:需要查询55条记录, 但只返回最后5条, 前50条被抛弃
-    ```sql
-    SELECT * FROM cnarea_2019 LIMIT 50, 5;
-
-    -- 延迟关联进行优化
-    SELECT * FROM cnarea_2019
-    INNER JOIN
-    (SELECT id FROM cnarea_2019 LIMIT 50, 5)
-    as lim USING(id);
-    ```
-
-### hint(优化器提示)
-
-- 不要自以为比优化器聪明
-
-    - mysql版本升级后, 优化器提示可能会失效
-
-| 语句           | 操作                             |
-|----------------|----------------------------------|
-| STRAINGHT_JOIN | 按照语句的顺序进行join(关联查询) |
-
-### [松散索引(loose index scan)](http://mysqlserverteam.com/what-is-the-scanning-variant-of-a-loose-index-scan/)
-
-- 松散索引:
-    ![image](./Pictures/mysql/lis-regular.avif)
-
-- 非松散索引:
-    ![image](./Pictures/mysql/lis-scanning.jpr)
-
-- `EXPLAIN` 的`Extra` 字段为`Using index for group-by`:表示使用了松散索引
-    - 在`GROUP BY` 分组中查询最大, 最小值可以使用松散索引
-    ```sql
-    -- 创建索引
-    CREATE INDEX salary ON people(salary)
-
-    EXPLAIN SELECT salary, MAX(id)
-    FROM people
-    GROUP BY salary\G
-
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | people
-    type          | range
-    possible_keys | <null>
-    key           | salary
-    key_len       | 203
-    ref           | <null>
-    rows          | 10
-    Extra         | Using index for group-by
-    ```
-
-### 自定义变量
-
-- 自定义变量几乎可以在任何表达式上使用
-
-    - 不能在常量的地方使用, 如LIMIT, 表名, 列名
-
-    ```sql
-    -- 定义变量
-    SET @avg_people := (SELECT AVG(id) FROM people);
-
-    -- 在查询中使用变量
-    SELECT * FROM people1
-    WHERE ID > @avg_people;
-    ```
-
-- 避免重复查询刚更新的数据:
-
-    ```sql
-    UPDATE index_test SET date = NOW()
-    WHERE last_name = '王';
-    SELECT * FROM index_test;
-
-    -- 将修改的值定义为变量. 虽然依然是2次查询, 但第2次无需访问数据表, 因此更快
-    UPDATE index_test SET date = NOW()
-    WHERE last_name = '王'
-    AND @now :=NOW();
-    SELECT @now;
-    ```
-
-- SELECT 和 WHERE 子句是在不同阶段执行的, 因此变量也不一样
-
-    ```sql
-    SET @rownum = 0;
-    SELECT *, @rownum := @rownum + 1 FROM people
-    WHERE @rownum <= 1;
-
-    +----+------+--------+------------------------+
-    | id | name | salary | @rownum := @rownum + 1 |
-    +----+------+--------+------------------------+
-    | 1  | a1   | 1000   | 1                      |
-    | 2  | a2   | 2000   | 2                      |
-    +----+------+--------+------------------------+
-
-    SET @rownum = 0;
-    SELECT *, @rownum FROM people
-    WHERE (@rownum := @rownum + 1) <= 1;
-
-    +----+------+--------+---------+
-    | id | name | salary | @rownum |
-    +----+------+--------+---------+
-    | 1  | a1   | 1000   | 1       |
-    +----+------+--------+---------+
-    ```
-
-## DML (增删改操作)
-
-- 有的地方把 DML 语句(增删改)和 DQL 语句(查询)统称为 DML 语句
-
-### CREATE(创建)
-
-**语法:**
-
-> ```sql
-> CREATE TABLE 表名称
-> # 注意:列属性可添加和不添加,并且不区分大小写
-> (
->   列名称1 数据类型 列属性,
->   列名称2 数据类型 列属性,
->   列名称3 数据类型 列属性,
-> ....
-> )
-> ```
-
-#### 数据类型
-
-![image](./Pictures/mysql/MySQL-Data-Types.avif)
-
-- 不同的存储引擎,有不同的实现
-
-- mysql不支持自定义数据类型
-
-- 最好指定为`NOT NULL`, 除非真需要存储 `NULL`
-
-- 选择存储最小的数据类型
-
-- INT(整数):
-
-    | 类型      | 位数 |
-    |-----------|------|
-    | TINYINT   | 8位  |
-    | SMALLINT  | 16位 |
-    | MEDIUMINT | 24位 |
-    | INT       | 32位 |
-    | BIGINT    | 64位 |
-
-    - 宽度 `INT(1)` 和 `INT(20)` 的存储和计算是一样的
-
-    - 整型比字符串的 CPU 操作更低
-
-    - 使用整数保存ip地址
-
-        - ipv4通过`INET_ATON()`, `INET_NTOA()` 函数进行转换. `IS_IPV4()`判断是否为ipv4地址
-
-        - ipv6通过`INET6_ATON()`, `INET6_NTOA()` 函数进行转换. `IS_IPV6()`判断是否为ipv6地址
-
-        ```sql
-        CREATE TABLE ipv4_test(
-            ipv4 TINYINT UNSIGNED
-        );
-
-        INSERT INTO ipv4_test VALUES
-        (INET_ATON('192.168.1.1'));
-
-        SELECT INET_NTOA(ipv4) FROM ipv4_test;
-
-        SELECT IS_IPV4(ipv4) FROM ipv4_test;
-        ```
-
-- FLOAT(浮点):
-
-    | 类型    | 位数     |
-    |---------|----------|
-    | FLOAT   | 32位     |
-    | DOUBLE  | 64位     |
-    | DECIMAL | 存储格式 |
-
-    - `FLOAT` 和 `DOUBLE` 并不精确, 在财务数据里像0.01的值, 并不能精确表示
-
-    - 使用`DECIMAL(m, d)` m为总位数(范围:1到65位), d为小数点右边的位数
-
-        - 计算时会转换为`DOUBLE` 类型
-
-        ```sql
-        CREATE TABLE decimal_test(
-            data DECIMAL(6, 4) NOT NULL
-        );
-
-        INSERT INTO decimal_test VALUES
-        (0.99999);
-        ```
-
-        - 超过d的位数, 会四舍五入.以下为0.0600
-
-            ```sql
-            INSERT INTO decimal_test VALUES
-            (0.059999);
-            ```
-
-- TIMEMESTAMP, DATATIME(日期时间)
-
-    | 类型    | 位数     |
-    |---------|----------|
-    | TIMESTAMP   | 32位     |
-    | DATATIME  | 64位     |
-
-    - `TIMEMESTAMP` 和 unix 时间相同,从 '1970-01-01 00:00:01' UTC -> '2038-01-19 03:14:07' UTC
-
-    - `DATATIME` 从 1001 - 9999 年
-
-    - 因尽量使用`TIMEMESTAMP`类型
-
-        ```sql
-        CREATE TABLE time_test(
-            ts TIMESTAMP,
-            dt DATETIME
-        );
-
-        INSERT INTO time_test VALUES
-        ('2021-7-3 13:40:30', '2021-7-3 13:40:30'),
-        (NOW(), NOW());
-        ```
-
-    - 如果超过unix时间就会报错
-
-        ```sql
-        INSERT INTO time_test(ts) VALUES
-        ('2038-7-3 13:40:30');
-        ```
-
-        ![image](./Pictures/mysql/time_test.avif)
-
-- BIT(位):
-
-    - BIT(1): 一个位; 最大BIT(64): 64个位
-
-    - BIT()的存储需要最小整数类型
-
-        - BIT(17) 需要存储在24个位的MEDIUMINT类型
-
-    - 插入57的二进制数, 由于57的ASCII码为字符9, 因此显示为字符9
-
-        ```sql
-        CREATE TABLE bit_test(
-            b bit(8)
-        );
-
-        INSERT INTO bit_test VALUES
-        (b'00111001');
-
-        SELECT b, b+0 FROM bit_test
-        ```
-
-        ![image](./Pictures/mysql/bit_test.avif)
-
-        - 因此应该谨慎使用BIT类型
-
-    - 如果需要存储true/false值, 可以使用`char(0)`类型, 值为`NULL`, `''`(长度为0的空字符串)
-
-        ```sql
-        CREATE TABLE tf_test(
-            tf char(0)
-        );
-
-        - ''为空字符串
-        INSERT INTO tf_test VALUES
-        (NULL),
-        ('');
-
-        SELECT * FROM tf_test
-        ```
-        ![image](./Pictures/mysql/tf_test.avif)
-
-- SET:
-
-    - 可以存储多个true/false值
-
-    - set添加或删除字符串需要执行`ALTER TABLE` 操作
-
-        - [快速ALTER TABLE](#alter_frm)
-
-    ```sql
-    CREATE TABLE set_test(
-        acl SET('READ', 'WRITE', 'DELETE')
-    );
-
-    - 注意:中间不能有空格'READ, WRITE'
-    INSERT INTO set_test VALUES
-    ('READ,WRITE'),
-    ('WRITE,DELETE');
-
-    - FIND_IN_SET() 查找带有'WRITE'行
-    SELECT * FROM set_test
-    WHERE FIND_IN_SET('WRITE',acl)
-    ```
-
-    - 使用整数存储
-
-        ```sql
-        SET @READ   := 1<<0,
-            @WRITE  := 1<<1,
-            @DELETE := 1<<2;
-
-        CREATE TABLE set_int_test(
-            acl TINYINT DEFAULT 0
-        );
-
-        INSERT INTO set_int_test VALUES
-        (@READ + @WRITE),
-        (@WRITE + @DELETE);
-
-        SELECT * FROM set_int_test WHERE acl & @READ;
-        ```
-        ![image](./Pictures/mysql/set_int_test.avif)
-
-- 字符串:
-
-    - VARCHAR:
-
-      - 可变长度,需要额外记录长度
-
-        - 当长度 <= 255 时,需要 1 个字节
-
-        - 当长度 > 255 时,需要 2 个字节
-
-        - `varchar(1)`,需要 2 个字节
-
-        - `varchar(256)`,需要 258 个字节
-
-        - 如果update字符串, 页不能容纳update后的大小, innodb就会分裂页
-
-    - CHAR:
-
-      - 定长字符串,不容易产生碎片
-
-        - 适合存储 MD5 这些定长值
-
-    - char类型会删除末尾的空格, 而varchar则不会
-
-        ```sql
-        CREATE TABLE char_test(
-            char_col CHAR(10),
-            varchar_col VARCHAR(10)
-        );
-
-        INSERT INTO char_test(char_col, varchar_col) VALUES
-            (' string', ' string1'),
-            (' string ', ' string1 ');
-
-        - CONCAT()函数连接字符串, 以下命令为连接单引号''
-        SELECT CONCAT("'", char_col, varchar_col, "'")
-        FROM char_test;
-        ```
-
-        ![image](./Pictures/mysql/char_test.avif)
-
-
-    - BINARY, VARBINARY类似于CHAR, VARCHAR
-
-        - 使用BINARY(16)保存uuid
-
-            - 通过`UNHEX()`, `HEX()` 函数进行转换
-
-            ```sql
-            CREATE TABLE uuid_test(
-                uuid BINARY(16)
-            );
-
-            INSERT INTO uuid_test VALUES
-            (UNHEX('FDFE0000000000005A55CAFFFEFA9089'));
-
-            SELECT HEX(uuid) FROM uuid_test;
-            ```
-
-    - TEXT(字符串), BLOB(二进制字符串):
-
-        - TEXT使用两个字节存储字符串大小
-
-        - 一个字符大小为一个字节
-
-        | TEXT类型     | BLOB类型     | 大小                     |
-        | ------------ | ------------ | ------------------------ |
-        | TINYTEXT     | TINYBLOB     | 255字节                  |
-        | TEXT         | BLOB         | 65536字节(64K)           |
-        | MEDIUMTEXT   | MEDIUMBLOB   | 16,777,215字节(16M)      |
-        | LONGTEXT     | LONGBLOB     | 4,294,967,295 字节(4G)   |
-
-        - BLOB:没有排序规则和字符集, 用于图片, 视频存储
-
-        - 尽量避免使用TEXT, BLOB类型
-
-        - 不能把全部字符用作索引, 只能索引字符的部分前缀
-
-    - EMUM(枚举):
-
-        ```sql
-        CREATE TABLE emum_test(
-            emum_col ENUM('xiaomi', 'huawei', 'meizu')
-        );
-
-        INSERT INTO emum_test(emum_col) VALUES
-            ('huawei'),
-            ('meizu'),
-            ('xiaomi');
-
-        SELECT emum_col FROM emum_test;
-        SELECT emum_col + 0 FROM emum_test;
-        ```
-
-        - 实际存储的是整数, 而不是字符串, 因此查询需要进行字符串转换, 有额外开销
-
-            - 与varchar连接varchar相比: emum连接emum要快很多, 而emum连接varchar要慢很多
-
-        - emum添加或删除字符串需要执行`ALTER TABLE` 操作
-
-            - [快速ALTER TABLE](#alter_frm)
-
-        ![image](./Pictures/mysql/emum_test.avif)
-
-#### 列字段完整性约束
-
-- NOT NULL(值不能为空)
-
-  - NULL 很难优化
-
-- UNIQUE 唯一性索引
-
-  > - 列(字段) 内的数据不能出现重复
-
-    - PRIMARY KEY ( `列名称` ) 设置主键
-      > - 和 UNIQUE(唯一性索引) 一样.列(字段) 内的数据不能出现重复
-      >
-      > - 主键一定是唯一性索引,唯一性索引并不一定就是主键.
-      >
-      > - 主键列不允许空值,而唯一性索引列允许空值.
-
-- CHECK
-
-    - 列字段的值必须满足条件
-
-    - 复杂的CHECK
-
-        - `CHECK (col in (select * from table_name))`
-
-#### 基本使用
-
-```sql
-# 创建 new 数据库设置 id 为主键,不能为空,自动增量
-CREATE TABLE new(
-    `id` int (8) AUTO_INCREMENT,            # AUTO_INCREMENT 自动增量(每条新记录递增 1)
-    `name` varchar(50) NOT NULL UNIQUE,     # NOT NULL 设置不能为空 # UNIQUE 设置唯一性索引
-    `date` DATE DEFAULT '2020-10-24',       # DEFAULT 设置默认值
-    INDEX date(date),                       # INDEX 创建索引
-    PRIMARY KEY (`id`),                     # 设置主健为 id 字段(列)
-    CHECK (name in ('tz', 'tz1', 'tz2'))    # CHECK 设置name必须满足in内的集合
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; # 编码为 utf8mb4 .因为utf-8,不是真正的utf-8 显示 emoj 会报错
-
-# desc 查看 new 表里的字段
-desc new;
-+-------+-------------+------+-----+------------+----------------+
-| Field | Type        | Null | Key | Default    | Extra          |
-+-------+-------------+------+-----+------------+----------------+
-| id   | int(8)      | NO  | PRI | <null>     | auto_increment |
-| name | varchar(50) | NO  | UNI | <null>     |                |
-| date | date        | YES | MUL | 2020-10-24 |                |
-+-------+-------------+------+-----+------------+----------------+
-
-# 查看 new 表详细信息
-show create table new\G;
-***************************[ 1. row ]***************************
-Table        | new
-Create Table | CREATE TABLE `new` (
-  `id` int(8) NOT NULL AUTO_INCREMENT,
-  `name` varchar(50) NOT NULL,
-  `date` date DEFAULT '2020-10-24',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `name` (`name`),
-  KEY `date` (`date`),
-  CONSTRAINT `CONSTRAINT_1` CHECK (`name` in ('tz','tz1','tz2'))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-
-# 查看表索引
-show index from new
-
-# CREATE TEMPORARY 创建临时表(断开与数据库的连接后,临时表就会自动销毁)
-CREATE TEMPORARY TABLE temp (`id` int);
-```
-
-#### [FOREIGN KEY(外键)](https://www.mysqltutorial.org/mysql-foreign-key/)
-
-- 1.父表和子表必须使用相同的存储引擎
-
-- 2.外键必须要有索引
-    - 子表创建后, 父表的外键索引不能删除
-
-- 3.外键和引用键中的对应列必须具有相似的数据类型.整数类型的大小和符号必须相同.字符串类型的长度不必相同.
-
-
-```sql
-CREATE TABLE foreign_test(
-    `date` date,
-    FOREIGN KEY (date) REFERENCES new(date)
-         ON DELETE CASCADE
-         ON UPDATE NO ACTION
-);
-```
-
-- `CASCADE`: 允许对父表外键对应值进行操作
-
-- `NO ACTION`: 不允许对父表外键对应值进行操作
-
-### Insert
-
-**语法**
-
-> ```sql
-> INSERT INTO 表名称 (列1, 列2,...) VALUES (值1, 值2,....)
-> ```
-
-```sql
-# 设置初始值为100
-ALTER TABLE new AUTO_INCREMENT=100;
-
-# 插入一条数据
-insert into new (name,date) values
-('tz','2020-10-24');
-
-# 插入多条数据
-insert into new (name,date) values
-('tz1','2020-10-24'),
-('tz2','2020-10-24'),
-('tz3','2020-10-24');
-
-# 查看
-select * from new;
-
-# 可以看到 id 字段自动增量
-MariaDB [china]> select * from new;
-+-----+------+------------+
-| id  | name | date       |
-+-----+------+------------+
-| 100 | tz   | 2020-10-24 |
-| 102 | tz1  | 2020-10-24 |
-| 103 | tz2  | 2020-10-24 |
-| 104 | tz3  | 2020-10-24 |
-+-----+------+------------+
-```
-
-#### INSERT... SELECT...
-
-- 把 cnarea_2019 表里的字段,导入进 newcn 表.
-  **语法:**
-  > ```sql
-  > INSERT INTO 新表名称 (列1, 列2,...) SELECT (列1, 列2,....) FROM 旧表名称;
-  > ```
-
-```sql
-
-# 创建名为 newcn 数据库
-create table newcn (
-    id int(4) unique auto_increment,
-    name varchar(50)
-);
-
-# 导入 1 条数据
-insert into newcn (id,name)
-select id,name from cnarea_2019
-where id=1;
-
-# 可多次导入
-insert into newcn (id,name)
-select id,name from cnarea_2019
-where id >= 2 and id <=10 ;
-
-# 查看结果
-select * from newcn;
-+------+--------------------------+
-| id   | name                     |
-+------+--------------------------+
-| 1  | 北京市           |
-| 2  | 直辖区           |
-| 3  | 东城区           |
-| 4  | 东华门街道       |
-| 5  | 多福巷社区居委会 |
-| 6  | 银闸社区居委会   |
-| 7  | 东厂社区居委会   |
-| 8  | 智德社区居委会   |
-| 9  | 南池子社区居委会 |
-| 10 | 黄图岗社区居委会 |
-+------+--------------------------+
-
-# 插入包含 广州 的数据
-insert into newcn (id,name)
-select id,name from cnarea_2019
-where name regexp '广州.*';
-```
-
-#### [INSERT ... ON DUPLICATE KEY UPDATE ...](https://dev.mysql.com/doc/refman/8.0/en/insert-on-duplicate.html)
-
-```sql
-CREATE TABLE duplicate_test (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  a INT UNIQUE, -- 唯一性
-  PRIMARY KEY (id)
-);
-
-INSERT INTO duplicate_test(a) VALUES
-(1),
-(2);
-
-+----+---+
-| id | a |
-+----+---+
-| 1  | 1 |
-| 2  | 2 |
-+----+---+
-```
-
-```sql
--- 由于c有唯一属性, 因此会报错
-INSERT INTO duplicate_test(a) VALUES
-(1);
-
--- ON DUPLICATE KEY UPDATE, 如果字段是UNIQUE, 并且已经值已经存在, 则修改
-INSERT INTO duplicate_test (a) VALUES (1)
-  ON DUPLICATE KEY UPDATE a=a+2;
-
-+----+---+
-| id | a |
-+----+---+
-| 2  | 2 |
-| 1  | 3 |
-+----+---+
-
--- 如果修改后的值也已经存在, 则会报错
-INSERT INTO duplicate_test (a) VALUES (1)
-  ON DUPLICATE KEY UPDATE a=a+1;
-```
-
-#### [LOAD DATA](https://dev.mysql.com/doc/refman/8.0/en/load-data.html)
-
-```sql
--- 创建源数据表
-CREATE TABLE load_data_test (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  data VARCHAR(64) DEFAULT NULL,
-  ts TIMESTAMP,
-  PRIMARY KEY (id)
-);
-
-INSERT INTO load_data_test VALUES
-(1, 'one', '2014-08-20 18:47:00'),
-(2, 'two', '2015-08-20 18:47:00'),
-(3, 'three', '2016-08-20 18:47:00');
-
--- 将表数据输出/tmp/test文件
-SELECT * INTO OUTFILE '/tmp/test'
-  FIELDS TERMINATED BY ','
-  FROM load_data_test;
-
--- 创建导入数据的表
-CREATE TABLE load_data1_test (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  data VARCHAR(64) DEFAULT NULL,
-  ts TIMESTAMP,
-  PRIMARY KEY (id)
-);
-
--- 导入数据
-LOAD DATA INFILE '/tmp/test' INTO TABLE load_data1_test
-  FIELDS TERMINATED BY ',';
-```
-
-### [REPLACE](https://dev.mysql.com/doc/refman/5.6/en/replace.html)
-
-- 与INSERT语句不同之处是, 可以插入主键,唯一性索引相同的值, 即修改
-
-```sql
-CREATE TABLE replace_test (
-  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  data VARCHAR(64) DEFAULT NULL,
-  ts TIMESTAMP,
-  PRIMARY KEY (id)
-);
-
--- 初始插入.使用REPLACE也一样
-INSERT INTO replace_test
-VALUES (1, 'Old', '2014-08-20 18:47:00');
-
--- 此语句会报错
-INSERT INTO replace_test
-VALUES (1, 'New', '2014-08-20 18:47:42');
-
--- 使用REPLACE成功修改
-REPLACE INTO replace_test
-VALUES (1, 'New', '2014-08-20 18:47:42');
-```
-
-### UPDATE
-
-**语法:**
-
-> ```sql
-> UPDATE 表名称 SET 列名称 = 新值 WHERE 列名称 = 某值
-> ```
-
-```sql
-# 修改 id=1 的 city_code 字段为111
-update cnarea_2019
-set city_code=111
-where id=1;
-
-# 对每个 id-3 填回刚才删除的 id1,2,3
-update cnarea_2019
-set id=(id-3)
-where id>2;
-
-# 对小于level平均值进行加1
-update cnarea_2019
-set level=(level+1)
-where level<=(select avg(level) from cnarea_2019);
-
-# 把 广州 修改为 北京,replace() 修改列的某一部分值
-update cnarea_2019
-set name=replace(name,'广州','北京')
-where name regexp '广州.*';
-
-# 把以 北京 和 深圳 开头的数据,修改为 广州
-update cnarea_2019
-set name=replace(name,'深圳','广州'),
-name=replace(name,'北京','广州')
-where name regexp '^深圳' or name regexp '^北京';
-```
-
-#### case结构
-
-```sql
-# 工资只有1000的人, 升2倍
-UPDATE people
-set salary = salary * 2
-WHERE salary = 1000
-
-# 工资只有2000的人, 升1.5倍
-UPDATE people
-set salary = salary * 1.5
-WHERE salary = 2000
-
-# 工资大于2000的人, 升1.2倍
-UPDATE people
-set salary = salary * 1.2
-WHERE salary > 2000
-
-# 注意:以上顺序不能倒转
-# 使用case语句避免顺序倒转
-UPDATE people
-SET salary = case
-    when salary = 1000 then salary * 2
-    when salary = 2000 then salary * 1.5
-    else salary * 1.2
-    end
-```
-
-### Delete and Drop (删除)
-
-**语法:**
-
-> ```sql
-> # 删除特定的值
-> DELETE FROM 表名称 WHERE 列名称 = 值;
-> ```
-
-```sql
-# 删除 id1
-delete from cnarea_2019
-where id=1;
-# 删除 id2和4
-delete from cnarea_2019
-where id in (2,4);
-
-# 查看结果
-select level, count(*) as totals from cnarea_2019
-group by level;
-
-# 删除表
-delete from cnarea_2019;
-
-# 删除表(无法回退)
-truncate table cnarea_2019;
-
-# 这两者的区别简单理解就是 drop 语句删除表之后,可以通过日志进行回复,而 truncate 删除表之后永远恢复不了,所以,一般不使用 truncate 进行表的删除.
-```
-
-**语法:**
-
-> ```sql
-> # 删除数据库,表,函数,存储过程
-> DROP 类型 名称;
-> # 或者 先判断是否存在后,再删除
-> DROP 类型 if exists 名称;
-> ```
-
-| 类型      |
-| --------- |
-| TABLE     |
-| DATABASE  |
-| FUNCTION  |
-| PROCEDURE |
-
-```sql
-# 删除 cnarea_2019 表
-drop table cnarea_2019;
-
-# 先判断 cnarea_2019 表是否存在,如存在则删除
-drop table if exists cnarea_2019;
-
-# 删除 china 数据库
-drop database china;
-
-# 先判断 chinaa 数据库是否存在,如存在则删除
-drop table if exists china;
-
-# 删除后,可以这样恢复数据库
-create database china;
-mysql -uroot -pYouPassward china < china_area_mysql.sql
-```
-
-#### 删除重复的数据
-
-```sql
-# 创建表
-create table clone (
-    `id` int (8),
-    `name` varchar(50),
-    `date` DATE
-);
-
-# 插入数据
-insert into clone (id,name,date) values
-(1,'tz','2020-10-24'),
-(2,'tz','2020-10-24'),
-(2,'tz','2020-10-24'),
-(2,'tz1','2020-10-24'),
-(2,'tz1','2020-10-24');
-
-# 通过 ALTER IGNORE 加入 主健(PRIMARY KEY) 删除重复的数据
-ALTER IGNORE TABLE clone
-ADD PRIMARY KEY (id, name);
-# 或者 ALTER IGNORE 加入 唯一性索引(UNIQUE)
-ALTER IGNORE TABLE clone
-ADD UNIQUE KEY (id, name);
-
-select * from clone;
-+----+------+------------+
-| id | name | date       |
-+----+------+------------+
-|  1 | tz   | 2020-10-24 |
-|  2 | tz   | 2020-10-24 |
-|  2 | tz1  | 2020-10-24 |
-+----+------+------------+
-
-# 成功后可以删除 (这是主健)
-alter table ca drop primary key;
-
-# 成功后可以删除 (这是unique)
-alter table clone drop index id;
-alter table clone drop index name;
-```
-
-[误删数据进行回滚,跳转至**事务**](#transaction)
-
-```sql
-# 创建 a,b 两表
-CREATE TABLE a(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL
-) ENGINE=INNODB;
-
-CREATE TABLE b(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    a_id INT NOT NULL,
-    CONSTRAINT fk_a
-    FOREIGN KEY (a_id)
-    REFERENCES a(id)
-) ENGINE=INNODB;
-
-# 插入a 表 id 为1
-insert into a (id,name) value
-(1,'in a');
-
-# 插入b 表 外键a_id 必须和刚才插入 a 表的 id 值一样
-insert into b (id,a_id) value
-(10,1);
-
-# 尝试插入b 表新数据
-insert into b (id,a_id) value
-(20,2);
-
-# 因为a表没有id为2的数据,所以报错
-ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint fails (`china`.`b`, CONSTRAINT `b_ibfk_1` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`))
-```
-
-b 表:
-
-```sql
-# 尝试修改b 表的 外键a_id 值
-update b
-set a_id = 2
-where id = 1;
-```
-
-虽然没有报错,但 a_id 并没有修改:
-
-![image](./Pictures/mysql/foreign.avif)
-
-delete 也一样:
-
-```sql
-delete from b
-where id =1;
-```
-
-![image](./Pictures/mysql/foreign1.avif)
-
-a 表:
-
-```sql
-# 因为没有权限,修改失败
-update a set id = 2 where id = 1;
-ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails (`china`.`b`, CONSTRAINT `fk_a` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`))
-```
-
-添加权限:
-
-```sql
-# 删除外键
-ALTER TABLE b DROP FOREIGN KEY fk_a;
-
-# 重新添加外键,并授予权限
-ALTER TABLE b
-    ADD CONSTRAINT a_id
-    FOREIGN KEY (a_id)
-    REFERENCES a (id)
-    ON UPDATE CASCADE
-    ON DELETE CASCADE;
-
-# 修改a 表
-update a
-set id = 2
-where id = 1;
-
-# 查看结果
-select * from b;
-```
-
-![image](./Pictures/mysql/foreign2.avif)
-
-又或者删除 b 表后重新新建,并授予权限:
-![image](./Pictures/mysql/foreign3.avif)
-
-删除 a 表 刚才的数据:
-
-```sql
-delete from a
-where id = 2;
-
-# 查看结果
-select * from b;
-```
-
-此时 a 表的数据删除,b 表对应的数据也会删除:
-![image](./Pictures/mysql/foreign4.avif)
-
-如果创建外键表时,没有指定 CONSTRAINT ,系统会自动生成(我这里为 b_ibfk_1):
-
-```sql
-# 查看CONSTRAINT
-show create table b\G;
-*************************** 1. row ***************************
-       Table: b
-Create Table: CREATE TABLE `b` (
-  `id` int(11) DEFAULT NULL,
-  `a_id` int(11) DEFAULT NULL,
-  KEY `a_id_index` (`a_id`),
-  CONSTRAINT `b_ibfk_1` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-1 row in set (0.000 sec)
-```
-
-## VIEW (视图)
-
-- [深入解析 MySQL 视图 VIEW](https://www.cnblogs.com/geaozhang/p/6792369.html)
-
-视图(view)是一种虚拟存在的表,是一个逻辑表,本身并不包含数据.作为一个 select 语句保存在数据字典中的.
-
-
-性能:从数据库视图查询数据可能会很慢,特别是如果视图是基于其他视图创建的.
-
-- 基表:用来创建视图的表叫做基表
-
-    - 修改视图数据, 基表也会修改(视图没有指定的基表列字段为`null`)
-
-    - 修改基表数据, 视图也会修改
-
-**语法:**
-
-> ```sql
-> CREATE VIEW 视图名 (字段名) AS SELECT '值1' UNION SELECT '值2'...;
-> # 基表视图
-> CREATE VIEW 视图名 AS SELECT 字段名 FROM 表名...;
-> ```
-
-```sql
-# 查看当前数据下的视图
-show full tables
-where table_type = 'view';
-
-# 创建视图
-create view v (day)
-as select '1' union select '2';
-
-# 查看视图
-select * from v;
-+-----+
-| day |
-+-----+
-| 1   |
-| 2   |
-+-----+
-# 删除视图
-drop view v;
-
-# 以 clone表 为基表,创建视图名为 v
-create view v as
-select * from clone;
-
-# 查看视图信息
-show create view v\G;
-
-# 嵌套 v视图 名为 vv,并且 id <= 2
-create view vv as select * from v
-where id <= 2;
-
-# 此时如果把 id 改为 3.注意这里 v 视图 和 clone 表的数据也会被更改
-update vv
-set id = 3
-where id = 1;
-
-# 因为 vv视图有where id <= 2的限制, 所以不满足条件的值不显示
-select * from vv;
-+----+------+------------+
-| id | name | date |
-+----+------+------------+
-|  2 | tz   | 2020-10-24 |
-|  2 | tz1  | 2020-10-24 |
-+----+------+------------+
-
-# 对vv视图修改的值,在v视图的也被修改
-select * from v;
-+----+------+------------+
-| id | name | date       |
-+----+------+------------+
-|  3 | tz   | 2020-10-24 |
-|  2 | tz   | 2020-10-24 |
-|  2 | tz1  | 2020-10-24 |
-+----+------+------------+
-
-# 和刚才的 vv视图 一样 这次 vvv视图 加入with check option;
-create view vvv as select * from v
-where id <= 2
-with check option;
-
-# 此时对不满足条件的值,进行修改会报错
-update vvv set id = 3 where id = 2;
-ERROR 1369 (44000): CHECK OPTION failed `china`.`vvv`
-```
-
-可以看到 视图信息 多数为空 (**NULL**)
-
-```sql
-show table status like '名称'\G;
-```
-
-![image](./Pictures/mysql/view.avif)
-![image](./Pictures/mysql/view1.avif)
-
-## Stored Procedure and Function (自定义存储过程 和 函数)
-
-- [Difference between stored procedure and function in MySQL](https://medium.com/@singh.umesh30/difference-between-stored-procedure-and-function-in-mysql-52f845d70b05)
-
-**区别:**
-
-| Procedure                | Function                  |
-| ------------------------ | ------------------------- |
-| 可以执行函数             | 不能执行存储过程          |
-| 不能在 select 语句下执行 | 只能在 select 语句下执行  |
-| 支持 Transactions(事务)  | 不支持 Transactions(事务) |
-| 可以不有返回值           | 必须要有返回值            |
-| 能返回多个值             | 只能返回一个值            |
-
-**Procedure:**
-
-注意:procedure 是和数据库相关链接的,如果数据库被删除,procedure 也会被删除
-
-delimiter 是分隔符 默认是: `;`
-
-```sql
-delimiter #
-
-CREATE PROCEDURE hello (IN s VARCHAR(50))
-BEGIN
-   SELECT CONCAT('Hello, ', s, '!');
-END #
-
-delimiter ;
-
-# 执行
-call hello('World');
-
-# 查看所有存储过程
-show procedure status;
-
-# 查看 hello 存储过程
-show create procedure hello\G;
-```
-
-**Function:**
-
-```sql
-CREATE FUNCTION hello (s VARCHAR(50))
-   RETURNS VARCHAR(50) DETERMINISTIC
-   RETURN CONCAT('Hello, ',s,'!');
-
-# 执行
-select hello('world');
-select hello(name) from ca limit 1;
-
-# 查看所有自定义函数
-show function status;
-
-# 查看 hello 函数
-show create function hello\G;
-```
-
-### Stored Procedure (自定义存储过程)
-
-**语法:**
-
-> ```sql
-> delimiter #
-> create procedure 过程名([IN 参数名 数据类型,OUT 参数名 数据类型... ])
->
-> begin
->
-> sql语句;
->
-> end;
-> delimiter ;
-> ```
-
-先创建表:
-
-```sql
-drop table if exists foo;
-create table foo (
-    id int unique auto_increment,
-    val int not null default 0
-);
-
-# 插入一些数据
-insert into foo (val) values (1);
-insert into foo (val) values (2);
-insert into foo (val) values (3);
-insert into foo (val) values (4);
-insert into foo (val) values (5);
-
-# 查看结果
-select * from foo;
-```
-
-![image](./Pictures/mysql/procedure.avif)
-
-循环 5 次, val 字段设置为 0 :
-
-```sql
-# 检测过程是否存在,如存在则删除
-drop procedure if exists zero;
-
-# 过程体要包含在delimiter里
-delimiter #
--- 创建 zero 过程,并设置传递的变量为 int 类型的 v
--- 返回变量为 int 类型的 n
-create procedure zero(IN v INT,OUT n INT)
-begin
-
--- 变量i 代表 id 字段的值
-declare i int default 1;
--- 变量s 代表循环次数
-declare s int default 6;
-
-    while i < s do
-    -- 把 val 字段的值设置为 参数v
-    update foo set val = v where id = i;
-    set i = i + 1;
-    end while;
-    -- 设置返回变量 n 的值为 i
-    set n = i;
-
-end #
-delimiter ;
-
-# 设置 传递参数v 为0
-set @v = 0;
-# 执行 zero 过程
-call zero(@v,@n);
-# 查看 返回参数n 的值
-select @n;
-
-# 查看过程结果
-select * from foo;
-```
-
-![image](./Pictures/mysql/procedure1.avif)
-
-循环 1000 次,val 字段插入随机数:
-
-```sql
-drop procedure if exists foo_rand;
-
-delimiter #
-create procedure foo_rand()
-begin
-
--- 循环次数1000次
-declare v_max int unsigned default 1000;
-declare v_counter int unsigned default 0;
-
--- 删除 foo表 的数据
-  truncate table foo;
-  start transaction;
-  while v_counter < v_max do
-  -- 插入随机数据
-    insert into foo (val) values ( floor(rand() * 65535) );
-    set v_counter=v_counter+1;
-  end while;
-  commit;
-end #
-
-delimiter ;
-
-call foo_rand();
-
-select * from foo order by id;
-```
-
-![image](./Pictures/mysql/procedure2.avif)
-
-创建 10 个表
-
-### ALTER
-
-**语法:**
-
-> ```sql
-> ALTER TABLE table_name
-> 动作 column_name 内容
-> ```
-
-| 动作   | 内容             |
-| ------ | ---------------- |
-| ADD    | 添加列           |
-| DROP   | 删除列           |
-| RENAME | 修改表名         |
-| CHANGE | 修改列名         |
-| MODIFY | 修改列的数据类型 |
-| ENGINE | 修改存储引擎     |
-
-```sql
-# 重命名表
-ALTER TABLE cnarea_2019 RENAME ca;
-
-# 将列 name 改名为 mingzi ,类型改为 char(50)
-ALTER TABLE ca change name mingzi char(50);
-
-# 删除 id 列
-ALTER TABLE ca DROP id;
-
-# 添加 id 列
-ALTER TABLE ca ADD id INT FIRST;
-
-# 重命名 id 列为 number(bigint类型)
-ALTER TABLE ca CHANGE id number BIGINT;
-
-# 修改 city_code 列,为 char(50) 类型
-ALTER TABLE ca MODIFY city_code char(50);
-# 或者
-ALTER TABLE ca CHANGE city_code city_code char(50);
-
-# 修改 ca 表 id 列默认值1000
-ALTER TABLE ca MODIFY id BIGINT NOT NULL DEFAULT 1000;
-# 或者
-ALTER TABLE ca ALTER id SET DEFAULT 1000;
-
-# 添加主键,确保该主键默认不为空(NOT NULL)
-ALTER TABLE ca MODIFY id INT NOT NULL;
-ALTER TABLE ca ADD PRIMARY KEY (id);
-
-# 删除主键
-ALTER TABLE ca DROP PRIMARY KEY;
-
-# 删除唯一性索引(unique)的 id 字段
-ALTER TABLE ca DROP index id;
-
-# 修改 ca 表的存储引擎
-ALTER TABLE ca ENGINE = MYISAM;
-```
-
-#### ALTER优化
-
-- mysql大部分修改表结构的操作是:新建一个空表, 将旧表数据插入新表, 再删除旧表
-
-- 所有`MODIFY COLUMN` 都会导致表的重建
-
-    ```sql
-    ALTER TABLE table_name
-    MODIFY COLUMN col INT DEFAULT 5
-    ```
-
-    - 使用`ALTER COLUMN`代替, 此命令直接修改frm文件, 而不是重建表
-
-    ```sql
-    ALTER TABLE table_name
-    ALTER COLUMN col SET DEFAULT 5
-    ```
-
-<span id="alter_frm"></span>
-- 手动修改frm文件, 避免重建表
-
-    - **注意:此方法不受官方支持, 要自己承担风险, 执行前请先备份好数据**
-
-    - 此方法适用于:
-
-        - 移除(不是添加) `AUTO_INCREMENT`
-
-        - 增加, 移除, 修改EMUM, SET类型
-
-    ![image](./Pictures/mysql/alter_frm.avif)
-    ```sql
-    -- 创建新表
-    CREATE TABLE emum_test_new LIKE emum_test;
-
-    -- 修改表结构
-    ALTER TABLE emum_test_new
-    MODIFY COLUMN emum_col ENUM('xiaomi','huawei','meizu','oppo', 'vivo') DEFAULT 'meizu';
-
-    -- 关闭所有正在使用的表
+    # 进入数据库后给数据库加上一把锁,阻止对数据库进行任何的写操作
     flush tables with read lock;
+
+    # 导出tz数据库
+    mysqldump -uroot -pYouPassward tz > /root/tz.sql
+
+    # 对数据库解锁,恢复对主数据库的操作
+    unlock tables;
     ```
 
     ```sh
-    # 进入表所在的数据库目录
-    cd /var/lib/mysql/database_name
-
-    # 交换新表和旧表
-    mv emum_test.frm emum_test_tmp.frm
-    mv emum_test_new.frm emum_test.frm
-    mv emum_test_tmp.frm emum_test_new.frm
+    # 复制主服务器的tz.sql备份文件
+    scp -r "root@192.168.100.208:/root/tz.sql" /tmp/
+    # 创建tz数据库
+    mysql -uroot -p
     ```
+
+- 在slave服务器上：恢复 tz 数据库
 
     ```sql
-    -- 释放锁
-    UNLOCK TABLES;
-
-    -- 查看表结构是否更改
-    DESC emum_test
-
-    -- 查看数据
-    SELECT * FROM emum_test
-    ```
-    ![image](./Pictures/mysql/alter_frm1.avif)
-
-## INDEX(索引)
-
-**索引:** 列(字段)相当于一本书,创建 **索引** 就相当于建立 **书目录**,可提高查询速度
-
-- [Clusered Index](https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html)(聚簇索引):按顺序保存所有数据文件
-
-    - 如果表定义了主键InnoDB将其作为**Clusered Index**
-
-    - 每一个叶结点上包含主键值, 事务ID, MVCC的回滚指针, 剩余列(col2...)
-
-    - InnoDB每个表都有一个聚簇索引:
-
-        - 如果表没有主键:
-
-            - InnoDB会使用第一个UNIQUE not NULL作为Clusered Index
-
-        - 如果表没有 Primary key 和 Unique not NULL:
-
-            - InnoDB 会生成一个名为GEN_CLUST_INDEX 包含id值的隐藏列(隐藏聚簇索引)
-
-        - 如果聚簇索引的值是非顺序的. 如`UUID`, 则会导致索引的插入完全随机:
-
-            - 顺序的主键:每一条记录都存储在上一条记录的后面
-
-                - 顺序写入会造成锁的竞争, 可通过variable [`innodb autoinc_lock_mode`](https://dev.mysql.com/doc/refman/8.0/en/innodb-auto-increment-handling.html)设置锁的并发度
-
-                    - 只能在auto-increment的索引上使用
-
-                    - 如果没有relication复制, 设置2
-
-                        - 最大并发度, 但副本的auto-increment值未必不一致
-
-                        - mysql 8.0:默认为2
-
-                    - 如果有relication复制, 设置0, 1
-
-                        - mariadb 10.5.11-1:默认为1
-
-            - 非顺序的主键:
-
-                - 乱序写入, 有可能会在中间的页写入:
-
-                    - 写入的页可能已被移除缓存, 这需要从磁盘加载到内存, 会导致大量的随机io
-
-                    - 页分裂(page split):如果写入的页已满, 就会分裂成两个页
-
-                - 可以使用以下命令优化表数据和索引数据, 避免随机io
-                    ```sql
-                    OPTIMIZE TABLE table_name
-                    ```
-
-- [Secondary Indexes](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_secondary_index)(二级索引 或 辅助索引):不按顺序保存索引数据文件
-
-- innodb 会在二级索引上使用共享锁, 而在聚簇索引上使用排他锁
-
-- [Fast Index Creation](https://docs.huihoo.com/mysql/innodb-plugin-1.0-en/innodb-create-index.html):
-
-    - `CREATE INDEX`会扫描并排序主键的聚簇索引:
-
-        ```sql
-        -- 扫描排序两次主键
-        CREATE INDEX B ON T1 (B);
-        CREATE UNIQUE INDEX C ON T1 (C);
-        ```
-
-    - `ALTER TABLE`只扫描排序1次主键的聚簇索引:
-
-        1.创建表时指定聚簇索引A
-
-        2.插入数据后
-
-        3.再使用`ALTER TABLE`创建创建索引B和C
-
-        ```sql
-        CREATE TABLE T1(
-           A INT PRIMARY KEY,
-           B INT,
-           C CHAR(1)
-        );
-
-        INSERT INTO T1 VALUES
-        (1,2,'a'), (2,3,'b'), (3,2,'c'), (4,3,'d'), (5,2,'e');
-
-        COMMIT;
-
-        -- 只扫描一次主键
-        ALTER TABLE T1 ADD INDEX (B),
-                       ADD UNIQUE INDEX (C);
-        ```
-
-- 对于非常小的表全表扫描, 比索引更有效
-
-- 限制每张表上的索引数量,建议单张表索引不超过 5 个
-
-    - 禁止给表中的每一列都建立单独的索引
-
-- 建立索引的意义:索引查询,可以减少随机 IO,索引能过滤出越少的数据,则从磁盘中读入的数据也就越少
-
-- 把使用最频繁的列, 放到联合索引的左侧
-
-- 尽可能把范围查询, 放在索引最右边
-
-- 把字段长度小的列, 放在联合索引的最左侧
-
-    - 列的字段越大,建立索引时所需要的空间也就越大,一页中所能存储的索引节点也就越少,在遍历时IO 次数也就越多
-
-- 无法使用索引的语句
-
-    - `WHERE age + 1 = 25`
-        ```sql
-        SELECT * FROM table_name
-        WHERE age + 1 = 25
-        ```
-
-### [EXPLAIN](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html#explain-join-types)
-
-- [全网最全 | MySQL EXPLAIN 完全解读](https://mp.weixin.qq.com/s?src=11&timestamp=1621488329&ver=3079&signature=ce2PbaAILLUHmAka2fam5y4WUCX0tluEl*UJDpwnLsXFeoNumM9EUWThCCqEGNXQS8Sjer-ghHhvyajC8tO7jw8doi0ZlK0kdtqj3iQcbUgk1L3iyuAjNS-zusjAbJP0&new=1)
-
-### B+树匹配原则
-
-```sql
-CREATE table index_test (
-    last_name varchar(50),
-    first_name varchar(50),
-    date DATE
-);
-
-INSERT INTO index_test VALUES
-('Jobs', 'Steve', '1955-2-24'),
-('王', '小二', '2021-7-10');
-
--- 创建二级索引
-ALTER TABLE index_test
-ADD KEY(last_name, first_name, date);
-```
-
-- 重复索引:如果有索引(A, B), 就没有必要再创建(A)索引, 如发现重复索引可以立即删除
-
-- 最左匹配:
-
-    - 1.只匹配第一列`(last_name)`
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name='Jobs'
-        ```
-
-    - 2.只匹配last_name前缀以'J'开头的
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name LIKE 'J%'
-        ```
-
-    - 3.按顺序从左到右匹配如:`(last_name, first_name)`, `(last_name, first_name, date)`
-
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name='Jobs'
-        AND first_name = 'Steve'
-        AND date = '1955-2-24'
-        ```
-
-        - 不能跨过中间的列进行匹配如:`(last_name, date)`
-        ??不按顺序, 跨过中间的列也可以
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE date = '1955-2-24'
-        AND last_name='Jobs'
-        ```
-
-- 范围匹配:
-
-    - 某列使用范围匹配, 那么后面的列则无法使用索引
-
-        - 尽可能使用`IN()` 代替范围查询, `IN()` 是多个等值查询依然可以使用索引
-
-        ??可以
-
-        - 以下只能匹配last_name, first_name
-            ```sql
-            EXPLAIN SELECT * FROM index_test
-            WHERE last_name='Jobs'
-            AND first_name LIKE 'S%'
-            AND date = '1955-2-24'
-            ```
-- 排序匹配:
-
-    - 1.和上面例子一样适用于最左匹配和范围匹配原则:
-
-        ```sql
-        EXPLAIN SELECT last_name FROM index_test
-        ORDER BY last_name, first_name, date\G;
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index_test
-        type          | index
-        possible_keys | <null>
-        key           | last_name
-        key_len       | 410
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ```
-
-        - 列的顺序可以从where子句开始:
-            ```sql
-            EXPLAIN SELECT last_name FROM index_test
-            WHERE last_name = 'Jobs'
-            ORDER BY first_name, date\G;
-
-            ***************************[ 1. row ]***************************
-            id            | 1
-            select_type   | SIMPLE
-            table         | index_test
-            type          | ref
-            possible_keys | last_name
-            key           | last_name
-            key_len       | 203
-            ref           | const
-            rows          | 1
-            Extra         | Using where; Using index
-            ```
-
-    - 2.降序`desc`, 依然能使用索引:
-        ```sql
-        EXPLAIN SELECT last_name from index_test
-        ORDER BY last_name DESC, first_name DESC, date DESC\G;
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index_test
-        type          | index
-        possible_keys | <null>
-        key           | last_name
-        key_len       | 410
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ```
-
-        - 但如果有两种不同排序方向, 则不能使用索引:
-
-            - Extra字段为`Using filesort`:表示不能使用索引, 需要自己排序, 数据量小则会在内存, 大则会在磁盘
-                - 排序是成本很高的操作, 尽量避免对大量数据排序
-
-            ```sql
-            EXPLAIN SELECT last_name FROM index_test
-            ORDER BY last_name ASC, first_name ASC, date DESC\G;
-            -- 两条语句一样
-            EXPLAIN SELECT last_name FROM index_test
-            ORDER BY last_name, first_name, date DESC\G;
-
-            ***************************[ 1. row ]***************************
-            id            | 1
-            select_type   | SIMPLE
-            table         | index_test
-            type          | index
-            possible_keys | <null>
-            key           | last_name
-            key_len       | 410
-            ref           | <null>
-            rows          | 2
-            Extra         | Using index; Using filesort
-            ```
-
-#### 前缀索引
-
-- 对于过长的值, 可以建立前缀索引
-
-    - 一个数据表的 x_name 值都是类似 23213223.434323.4543.4543.34324.可以只取前7位`alter table table1 add key (x_name(7))`
-
-- 无法使用`ORDER BY`, `GROUP BY`, 以及覆盖查询
-
-- 后缀索引(suffix index):像电子邮件这类值比较有效. 但mysql不支持后缀, 可以把字符串反转后, 再建立前缀索引
-
-- 索引选择性:不重复的索引值,和表总数的比例. 唯一性索引的选择性是1, 性能最好
-
-- 假设要建立cnarea_2019表的name列索引:
-
-    - 查看选择性:
-    ```sql
-    SELECT COUNT(DISTINCT name) / COUNT(*) FROM cnarea_2019;
-
-    +---------------------------------+
-    | COUNT(DISTINCT name) / COUNT(*) |
-    +---------------------------------+
-    | 0.6138 |
-    +---------------------------------+
+    # 先创建 tz 数据库
+    create database tz;
+
+    # 导入
+    mysql -uroot -p tz < /tmp/tz.sql
+
+    # 如果出现以下核对错误
+    ERROR 1273 (HY000) at line 47: Unknown collation: 'utf8mb4_0900_ai_ci'
+    # 通过修改编码修复
+    sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /tmp/tz.sql
+    # 再次运行
+    mysql -uroot -p tz < /tmp/tz.sql
     ```
 
-    - 查看不同前缀长度的选择性
-    ```sql
-    SELECT
-    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel3,
-    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel4,
-    COUNT(DISTINCT LEFT(name, 5)) / COUNT(*) AS sel5,
-    COUNT(DISTINCT LEFT(name, 6)) / COUNT(*) AS sel6,
-    COUNT(DISTINCT LEFT(name, 7)) / COUNT(*) AS sel7,
-    COUNT(DISTINCT LEFT(name, 8)) / COUNT(*) AS sel8,
-    COUNT(DISTINCT LEFT(name, 9)) / COUNT(*) AS sel9,
-    COUNT(DISTINCT LEFT(name, 10)) / COUNT(*) AS sel10,
-    COUNT(DISTINCT LEFT(name, 11)) / COUNT(*) AS sel11,
-    COUNT(DISTINCT LEFT(name, 12)) / COUNT(*) AS sel12
-    FROM cnarea_2019;
-
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    | sel3 | sel4 | sel5 | sel6 | sel7 | sel8 | sel9 | sel10 | sel11 | sel12 |
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    | 0.5271 | 0.5271 | 0.5662 | 0.5866 | 0.5981 | 0.6057 | 0.6095 | 0.6119 | 0.6128 | 0.6133 |
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    ```
-
-    - 查看当前缀为8时, 最频繁出现的次数
-    ```sql
-    SELECT COUNT(*) AS cnt, LEFT(name, 8) FROM cnarea_2019
-    GROUP BY name
-    ORDER BY cnt DESC
-    LIMIT 10;
-
-    +-----+---------------+
-    | cnt | LEFT(name, 8) |
-    +-----+---------------+
-    | 358 | 和平村委会 |
-    | 333 | 张庄村委会 |
-    | 328 | 团结村委会 |
-    | 321 | 王庄村委会 |
-    | 305 | 太平村委会 |
-    | 281 | 市辖区     |
-    | 274 | 胜利村委会 |
-    | 265 | 新民村委会 |
-    | 264 | 新庄村委会 |
-    | 261 | 红星村委会 |
-    +-----+---------------+
-    ```
-
-    - 到达8后选择性的提升已经很小了, 因此建立长度为8的索引
-
-        ```sql
-        ALTER TABLE cnarea_2019 ADD KEY (name(8));
-        ```
-
-### HASH INDEX
-
-- 只有所有列全匹配才有效:
-
-  - 假设索引为`key(last_name, first_name, date)`, 那么查询时如果只有last_name, 则无法使用索引
-
-- 支持比较查询`=, IN(), <=>`.注意<>和<=>是不同操作
-
-  - 不支持范围查询`where price > 100`
-
-- hash index只包含哈希值, 行指针, 不存储字段值
-
-- hash冲突很多的话, 需要遍历链表, 更高的操作代价
-
-- 假设索引为`key(last_name)`. hash函数f(), 返回以下值:
-
-    ```
-    f('Jobs') = 2333
-    f('王') = 6666
-    ```
-
-    | slot(桶) | value(值)     |
-    |----------|---------------|
-    | 2333     | 指向第1行指针 |
-    | 6666     | 指向第2行指针 |
-
-    - 假设查询last_name为'Jobs':
-        ```sql
-        SELECT * FROM index_test
-        WHERE last_name = 'Jobs'
-        ```
-
-        - 1.先计算Jobs的hash
-
-        - 2.查找hash对应的桶2333, 找到指向第1行指针
-
-        - 3.判断第1行指针是否为Jobs, 防止hash冲突
-
-#### 自适应哈希(adaptive hash index)
-
-- innodb的一个特殊功能, 但某些索引值操作比较频繁时, 会在内存中基于B+树之上创建hash索引
-
-- 如果存储引擎不支持自适应哈希, 也可以自己模拟:
-
-    - 创建一个在B+树上的伪哈希索引. 依然是在B+树上查询, 但使用hash代替值查询:
-        ```sql
-        CREATE table hash_test (
-            id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            url varchar(255) NOT NULL,
-            url_crc INT UNSIGNED NOT NULL DEFAULT 0, --哈希为int类型
-            PRIMARY KEY(id)
-        );
-        ```
-    - 创建INSERT, UPDATE的触发器, 使用`CRC32()`函数:
-
-        - 注意:不要使用SHA1(), MD5(), 这类hash是强加密函数, 生成非常长字符串, 会浪费大量空间, 比较时也慢
-
-        ```sql
-        DELIMITER //
-
-        CREATE TRIGGER hash_test_crc_in BEFORE INSERT ON hash_test FOR EACH ROW BEGIN SET NEW.url_crc=crc32(NEW.url);
-        END;
-        //
-
-        CREATE TRIGGER hash_test_crc_up BEFORE UPDATE ON hash_test FOR EACH ROW BEGIN SET NEW.url_crc=crc32(NEW.url);
-        END;
-        //
-
-        DELIMITER ;
-        ```
-
-    - 测试:
-        ```sql
-        INSERT INTO hash_test(url) VALUES
-        ('http://www.mysql.com');
-
-        INSERT INTO hash_test(url) VALUES
-        ('http://www.mariadb.com');
-
-        SELECT * FROM hash_test
-        ```
-        ![image](./Pictures/mysql/hash_test.avif)
-
-    - 防止hash值冲突, 需要加上`AND url = `:
-        ```sql
-        SELECT * FROM hash_test
-        WHERE url_crc = CRC32('http://www.mysql.com')
-        AND url = 'http://www.mysql.com'
-        ```
-
-    - `CRC32()`是32位的, 可以自定义一个64位hash函数:
-        ```sql
-        SELECT CONV(RIGHT(MD5('http://www.mysql.com/'), 16), 16, 10) AS HASH64
-        ```
-### 覆盖索引
-
-- 覆盖索引:索引包含查询所需的字段值
-
-    - 能提升性能, 无需回表
-
-        - 如果索引不能覆盖查询所有列, 需要每扫描一条索引记录后, 回表查询对应的行, 基本是随机io
-
-    - 因此必须存储字段值, 想hash, 空间, 全文索引都不能存储字段值
-
-- 通过`EXPLAIN`命令Extra字段为`Using index` 就是覆盖索引:
-
-    - 注意:type字段的`index` , 说明使用了索引扫描排序.[跳转至type字段说明](#explain-type)
-
-    ```sql
-    CREATE table index1_test (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(10)
-    );
-
-    INSERT INTO index1_test(name) VALUES ('one'), ('two');
-
-    EXPLAIN SELECT id FROM index1_test\G;
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | index1_test
-    type          | index
-    possible_keys | <null>
-    key           | PRIMARY
-    key_len       | 4
-    ref           | <null>
-    rows          | 2
-    Extra         | Using index
-    ```
-
-- 通过`EXPLAIN`命令Extra字段为`Using where`表示没有使用索引:
-
-    ```sql
-    EXPLAIN SELECT name FROM index1_test
-    WHERE name = 'one'\G;
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | index1_test
-    type          | ALL
-    possible_keys | <null>
-    key           | <null>
-    key_len       | <null>
-    ref           | <null>
-    rows          | 2
-    Extra         | Using where
-    ```
-
-    - 通过子查询查找id, 即第一阶段使用覆盖索引.这叫作延迟关联(deferred join)
-        ```sql
-        SELECT * FROM index1_test
-        JOIN (SELECT id FROM index1_test) as id
-        ON (index1_test.id = id.id);
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | index
-        possible_keys | PRIMARY
-        key           | PRIMARY
-        key_len       | 4
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ***************************[ 2. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | ALL
-        possible_keys | PRIMARY
-        key           | <null>
-        key_len       | <null>
-        ref           | <null>
-        rows          | 2
-        Extra         | Using where; Using join buffer (flat, BNL join)
-        ```
-
-    - 创建二级索引后在查询:
-        ```sql
-        ALTER TABLE index1_test ADD INDEX name(name);
-
-        EXPLAIN SELECT name FROM index1_test
-        WHERE name = 'one'\G;
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | ref
-        possible_keys | name
-        key           | name
-        key_len       | 43
-        ref           | const
-        rows          | 1
-        Extra         | Using where; Using index
-        ```
-        ```sql
-MariaDB root@(none):china> explain select id from index1_test order by name,id
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-| id | select_type | table       | type  | possible_keys | key  | key_len | ref    | rows | Extra       |
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-| 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index |
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-
-1 row in set
-Time: 0.005s
-MariaDB root@(none):china> explain select id from index1_test order by id,name
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-| id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra
-              |
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-| 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index; Using filesort |
-+----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-
-        ```
-
-### [Multiple-Column Indexes (多列索引)](https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html)
-
-- Multiple-Column Indexes 最多可以**16**个列
-
-- 如果 col1 和 col2 上有单独的索引时,那么优化器将尝试使用[索引合并优化](https://dev.mysql.com/doc/refman/8.0/en/index-merge-optimization.html)
-
-```sql
-explain select * from index_test
-where last_name = 'Jobs'
-or date = '2021-07-10'
-
-explain select * from index_test
-where date = '2021-07-10'
-or last_name = 'Jobs'
-
-+----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
-| id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra
-             |
-+----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
-| 1 | SIMPLE | index_test | ref | last_name | last_name | 203 | const | 1 | Using where; Using index |
-+----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
-
-create index last_name on index_test(last_name)
-
-create index date on index_test(date)
-
-explain select date, last_name from index_test
-where date = '2021-07-10'
-union
-select date, last_name from index_test
-where last_name = 'Jobs'
-```
-
-| 存储引擎   | B+树   | hash哈希   | full-text(全文索引)   | 分形树索引(fractal tree)  | LSM树 |
-| ---------- | ------ | ---------- | --------------------- | ------------------------- | ----- |
-| Innodb     | 支持   | 支持       |                       |                           |
-| MyISAM     | 支持   | 支持       |                       |                           |
-| Memory     | 支持   | 支持       |                       |                           |
-| TokuDB     |        |            |                       | 支持                      |
-| InfiniDB   |        |            |                       |                           | 支持  |
-| RocksDB    |
-
-### SQL语法索引
-
-> ```sql
-> CREATE INDEX 索引名
-> ON 表名 (列1, 列2,...)
-> # 降序
-> CREATE INDEX 索引名
-> ON 表名 (列1, 列2,... DESC)
->
-> ALTER table 表名
-> ADD INDEX 索引名(列1, 列2);
-> ```
-
-```sql
-# 显示索引
-SHOW INDEX FROM ca;
-
-# 添加索引id
-CREATE INDEX name ON ca (id);
-
-# 添加索引id,name
-CREATE INDEX name ON ca (id,name);
-
-# 添加索引降序id,name
-CREATE INDEX name ON ca (id,name desc);
-
-# 删除索引
-DROP INDEX name ON ca;
-
-# 添加索引id
-ALTER table ca ADD INDEX name(id);
-# 删除索引
-ALTER table ca DROP INDEX name;
-
-# 优化表数据和索引数据
-OPTIMIZE TABLE ca
-```
-
-#### 索引状态
-
-[handler_read:](https://dev.mysql.com/doc/refman/8.0/en/server-status-variables.html#statvar_Handler_read_next)
-
-```sql
-# 清空缓存和状态
-flush tables;
-flush status;
-# 清空后全是0
-SHOW STATUS LIKE 'handler_read%';
-```
-
-![image](./Pictures/mysql/handler_read.avif)
-
-此时 name 字段,还没有索引:
-
-```sql
-select name from cnarea_2019_innodb;
-SHOW STATUS LIKE 'handler_read%';
-```
-
-![image](./Pictures/mysql/handler_read1.avif)
-建立索引后在查询:
-
-```sql
-create index idx_name on cnarea_2019_innodb(name);
-flush tables;
-flush status;
-
-select name from cnarea_2019_innodb;
-SHOW STATUS LIKE 'handler_read%';
-```
-
-![image](./Pictures/mysql/handler_read2.avif)
-
-## DCL
-
-DCL (语句主要是管理数据库权限的时候使用)
-
-### 帮助文档
-
-```sql
-# 按照层次查询
-? contents;
-? Account Management
-# 数据类型
-? Data Types
-? VARCHAR
-? SHOW
-```
-
-### 用户权限设置
-
-> ```sql
-> # 创建用户
-> CREATE USER 'username'@'host' IDENTIFIED BY 'password';
->
-> # 授权
-> GRANT privileges ON databasename.tablename TO 'username'@'host'
->
-> # 撤销权限
-> REVOKE privileges ON databasename.tablename FROM 'username'@'host'
-> ```
-
-[更多用户权限详情](https://blog.csdn.net/lu1171901273/article/details/91635417?utm_medium=distribute.pc_aggpage_search_result.none-task-blog-2~all~sobaiduend~default-1-91635417.nonecase&utm_term=mysql%20%E7%BB%99%E7%94%A8%E6%88%B7%E5%88%86%E9%85%8D%E8%A7%86%E5%9B%BE%E6%9D%83%E9%99%90&spm=1000.2123.3001.4430)
-
-create and grant (创建和授权):
-
-```sql
-# 查看所有用户
-SELECT user,host FROM mysql.user;
-
-# 详细查看所有用户
-SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';')
-AS query FROM mysql.user;
-
-# 创建用户名为tz的用户，并设置密码
-create user 'tz'@'127.0.0.1'
-identified by 'YouPassword';
-# 创建用户名为tz的用户，密码为空
-create user 'tz'@'127.0.0.1'
-identified by '';
-
-# 当前用户修改密码的命令
-SET PASSWORD = PASSWORD("NewPassword");
-
-# 修改密码
-SET PASSWORD FOR 'tz'@'127.0.0.1' = PASSWORD('NewPassword');
-
-# grant (授权)
-# 只能 select china.cnarea_2019
-grant select on china.cnarea_2019 to 'tz'@'127.0.0.1' identified by "YouPassword";
-
-# 添加 insert 和 china所有表的权限
-grant select,insert on china.* to 'tz'@'127.0.0.1' identified by "YouPassword";
-
-# 添加所有数据库和表的权限
-grant all PRIVILEGES on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
-grant all on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
-
-# 允许tz 用户授权于别的用户
-grant all on *.* to 'tz'@'127.0.0.1' with grant option identified by "YouPassword";
-
-# 刷新权限
-flush privileges;
-
-# 查看用户权限
-show grants for 'tz'@'127.0.0.1';
-
-+-------------------------------------------------------------------+
-| Grants for tz@127.0.0.1                                           |
-+-------------------------------------------------------------------+
-| GRANT ALL PRIVILEGES ON *.* TO `tz`@`127.0.0.1` WITH GRANT OPTION   |
-| GRANT SELECT, INSERT ON `china`.* TO `tz`@`127.0.0.1`              |
-| GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1`         |
-+-------------------------------------------------------------------+
-```
-
-#### revoke (撤销):
-
-```sql
-revoke all privileges on *.* from 'tz'@'127.0.0.1';
-revoke grant option on *.* from 'tz'@'127.0.0.1';
-
-+-----------------------------------------------------------+
-| Grants for tz@127.0.0.1                                   |
-+-----------------------------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
-| GRANT SELECT, INSERT ON `china`.* TO `tz`@`127.0.0.1`     |
-| GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
-+-----------------------------------------------------------+
-
-revoke select, insert on china.* from 'tz'@'127.0.0.1';
-
-+-----------------------------------------------------------+
-| Grants for tz@127.0.0.1                                   |
-+-----------------------------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
-| GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
-+-----------------------------------------------------------+
-
-revoke select on china.cnarea_2019 from 'tz'@'127.0.0.1';
-
-+----------------------------------------+
-| Grants for tz@127.0.0.1                |
-+----------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1` |
-+----------------------------------------+
-
-# 刷新权限
-FLUSH PRIVILEGES;
-
-# 删除用户
-drop user 'tz'@'127.0.0.1';
-```
-
-<span id="user"></span>
-
-#### 授予权限,远程登陆
-
-**语法:**
-
-> ```sql
-> GRANT PRIVILEGES ON 数据库名.表名 TO '用户名'@'IP地址' IDENTIFIED BY 'YouPassword' WITH GRANT OPTION;
-> ```
-
-```sql
-
-# 允许root从'192.168.100.208'主机china库下的所有表(WITH GRANT OPTION表示有修改权限的权限)
-grant all PRIVILEGES on china.* to
-'root'@'192.168.100.208'
-identified by 'YouPassword'
-WITH GRANT OPTION;
-
-# 允许root从'192.168.100.208'主机china库下的cnarea_2019表
-grant all PRIVILEGES on china.cnarea_2019 to
-'root'@'%'
-identified by 'YouPassword'
-WITH GRANT OPTION;
-
-# 允许所有用户连接所有库下的所有表(%:表示通配符)
-grant all PRIVILEGES on *.* to
-'root'@'%' identified by 'YouPassword'
-WITH GRANT OPTION;
-
-# 刷新权限
-FLUSH PRIVILEGES;
-```
-
-```sh
-# 记得在服务器里关闭防火墙
-iptables -F
-
-# 连接远程数据库(我这里是192.168.100.208)
-mysql -u root -p 'YouPassword' -h 192.168.100.208
-```
-
-### 配置(varibles)操作
-
-- 注意`variables` 的修改,永久保存要写入`/etc/my.cnf`
-  [详细配置说明](https://github.com/jaywcjlove/mysql-tutorial/blob/master/chapter2/2.6.md#%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9)
-
-```sql
-# 查看配置(变量)
-show variables;
-# 查看字段前面包含max_connect的配置(通配符%)
-show variables like 'max_connect%';
-
-show variables like 'max_connect%';
-+--------------------+-------+
-| Variable_name      | Value |
-+--------------------+-------+
-| max_connect_errors | 100   |
-| max_connections    | 151   |
-+--------------------+-------+
-2 rows in set (0.01 sec)
-
-# 设置自定义变量(重启后失效)
-set @val = 1;
-# 查看刚才的变量
-select @val;
-
-# 修改会话变量,该值将在会话内保持有效(重启后失效)
-set session sql_mode = 'TRADITIONAL';
-
-# 通过 select 查看
-select @@session.sql_mode;
-# 或者
-show variables like 'sql_mode';
-
-# 修改全局变量, 仅影响更改后连接的客户端的相应会话值.(重启后失效)
-set global max_connect_errors=1000;
-
-# 通过 select 查看
-select @@global.max_connect_errors;
-# 或者
-show variables like 'max_connect_errors';
-
-# 永久保存,要写入/etc/my.cnf
-echo "max_connect_errors=1000" >> /etc/my.cnf
-```
-
-[mysql 的 sql_mode 合理设置](http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html)
-
-## 表损坏
-
-- INNODB一般不会损坏, 不存在什么查询会导致表损坏
-
-    - 1.硬件问题(内存, 硬盘)
-
-    - 2.使用 `rsync` 命令备份
-
-```sql
--- 检测表是否损坏.注意并不是所有存储引擎都支持该命令
-CHECK TABLE table_name;
-
--- 修复表
-REPAIR TABLE table_name;
-
--- 也可以使用ALTER TABLE重建表
-ALTER TABLE table_name ENGINE=INNODB;
-```
-
-## mysqldump 备份和恢复
-
-> [建议使用更快更强大的 mydumper](#mydumper)
-
-- 先创建一个数据表
-
-```sql
-use china;
-create table tz (
-    id   int (8),
-    name varchar(50),
-    date DATE
-);
-
-insert into tz (id,name,date) values
-(1,'tz','2020-10-24');
-```
-
-- 1.使用 `mysqlimport` 导入(不推荐)
-
-  > 因为 `mysqlimport` 是把数据**导入新增**进去表里,而非恢复
-
-```sql
-# 导出tz表. 注意:路径要加''
-SELECT * FROM tz INTO OUTFILE '/tmp/tz.txt';
-
-# 删除表和表的数据
-drop table tz;
-
-# 导入前要创建一个新的表
-create table tz (
-    id int (8),
-    name varchar(50),
-    date DATE
-);
-```
-
-回到终端使用 `mysqlimport` 进行数据导入:
-
-```sh
-mysqlimport china /tmp/tz.txt
-```
-
-- 2.使用 `mysqldump` 备份
-
-```sql
-# 备份 china 数据库
-
-mysqldump -uroot -pYouPassward china > china.sql
-
-# 备份 china 数据库里的 tz 表
-
-mysqldump -uroot -pYouPassward china tz > tz-tables.sql
-
-# 备份所有数据库
-
-mysqldump -uroot -pYouPassward --all-databases > all.sql
-
-# -d 只备份所有数据库表结构(不包含表数据)
-
-mysqldump -uroot -pYouPassward -d --all-databases > mysqlbak-structure.sql
-
-# 恢复到 china 数据库
-
-mysql -uroot -pYouPassward china < china.sql
-
-# 恢复所有数据库
-
-mysql -uroot -pYouPassward < all.sql
-```
-
-### 主从同步 (Master Slave Replication )
-
-#### 主服务器配置
+### 主服务器配置
 
 - `/etc/my.cnf` 文件配置
 
-```sh
-[mysqld]
-server-id=129            # 默认是 1 ,这个数字必须是唯一的
-log_bin=centos7
+    ```sh
+    [mysqld]
+    server-id=129            # 默认是 1 ,这个数字必须是唯一的
+    log_bin=centos7
 
-binlog-do-db=tz          # 同步指定库tz
-binlog-ignore-db=tzblock # 忽略指定库tzblock
-```
+    binlog-do-db=tz          # 同步指定库tz
+    binlog-ignore-db=tzblock # 忽略指定库tzblock
 
-```sh
-# 备份
+    # 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
+    binlog_format=row
 
-# 进入数据库后给数据库加上一把锁,阻止对数据库进行任何的写操作
-flush tables with read lock;
+    # 设置一个 binlog 文件的最大字节。设置最大 100MB
+    max_binlog_size=100M
 
-# 备份tz数据库
-mysqldump -uroot -pYouPassward tz > /root/tz.sql
+    # 设置了 binlog 文件的有效期（单位：天）
+    expire_logs_days = 7
 
-# 对数据库解锁,恢复对主数据库的操作
-unlock tables;
-```
+    # 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
+    # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
+    # 执行n 次事务提交后，才fsync到磁盘
+    sync_binlog=1
+    ```
 
-```sql
-# 启用slave权限
-grant PRIVILEGES SLAVE on *.* to  'root'@'%';
+- 设置远程登陆的权限
+    ```sql
+    # 启用slave权限
+    grant PRIVILEGES SLAVE on *.* to  'root'@'%';
+    # 或者启用所有权限
+    grant all on *.* to  'root'@'%';
 
-# 或者启用所有权限
-grant all on *.* to  'root'@'%';
-```
+    # 刷新权限
+    FLUSH PRIVILEGES;
+    ```
 
-查看主服务状态
+- 重启mariadb
+    ```sh
+    systemctl restart mariadb
+    ```
 
-```sql
-# 日志目录 /var/lib/mysql/centos7.000001
+- 查看主服务状态
 
-mysql> show master status;
-ERROR 2006 (HY000): MySQL server has gone away
-No connection. Trying to reconnect...
-Connection id:    7
-Current database: tz
+    ```sql
+    # 日志目录 /var/lib/mysql/centos7.000001
 
-+----------------+----------+--------------+------------------+-------------------+
-| File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
-+----------------+----------+--------------+------------------+-------------------+
-| centos7.000001 |      156 |              |                  |                   |
-+----------------+----------+--------------+------------------+-------------------+
-1 row in set (0.02 sec)
-```
+    mysql> show master status;
+    ERROR 2006 (HY000): MySQL server has gone away
+    No connection. Trying to reconnect...
+    Connection id:    7
+    Current database: tz
 
-#### 从服务器配置
+    +----------------+----------+--------------+------------------+-------------------+
+    | File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
+    +----------------+----------+--------------+------------------+-------------------+
+    | centos7.000001 |      156 |              |                  |                   |
+    +----------------+----------+--------------+------------------+-------------------+
+    1 row in set (0.02 sec)
+    ```
+
+### 从服务器配置
 
 - `/etc/my.cnf` 文件配置
 
-```sh
-[mysqld]
-server-id=128
+    ```sh
+    [mysqld]
+    server-id=128
 
-replicate-do-db = tz     #只同步abc库
-slave-skip-errors = all   #忽略因复制出现的所有错误
-```
+    replicate-do-db = tz     #只同步tz库
+    slave-skip-errors = all   #忽略因复制出现的所有错误
+    ```
 
-```sh
-# 复制主服务器的tz.sql备份文件
-scp -r "root@192.168.100.208:/root/tz.sql" /tmp/
-# 创建tz数据库
-mysql -uroot -p
-```
+- 进入slave服务器后，配置master服务器
+    ```sql
+    -- 关闭同步
+    stop slave;
 
-恢复 tz 数据库
+    # 开启同步功能
+    CHANGE MASTER TO
+    MASTER_HOST = '192.168.100.208',
+    MASTER_USER = 'root',
+    MASTER_PASSWORD = 'YouPassword',
+    -- 在master上执行show master status;查看MASTER_LOG_FILE、MASTER_LOG_POS
+    MASTER_LOG_FILE='centos7.000001',
+    MASTER_LOG_POS=156;
 
-```sql
-# 先创建 tz 数据库
-create database tz;
+    -- 开启同步
+    start slave;
+    ```
 
-# 导入
-mysql -uroot -p tz < /tmp/tz.sql
-
-# 如果出现以下核对错误
-ERROR 1273 (HY000) at line 47: Unknown collation: 'utf8mb4_0900_ai_ci'
-# 通过修改编码修复
-sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /tmp/tz.sql
-# 再次运行
-mysql -uroot -p tz < /tmp/tz.sql
-```
-
-```sql
-# 关闭同步
-stop slave;
-
-# 开启同步功能
-CHANGE MASTER TO
-MASTER_HOST = '192.168.100.208',
-MASTER_USER = 'root',
-MASTER_PASSWORD = 'YouPassword',
-MASTER_LOG_FILE='centos7.000001',
-MASTER_LOG_POS=156;
-
-# 开启同步
-start slave;
-```
-
-```sql
-MariaDB [tz]> show slave status\G;
-*************************** 1. row ***************************
-                Slave_IO_State: Connecting to master
-                   Master_Host: 192.168.100.208
-                   Master_User: root
-                   Master_Port: 3306
-                 Connect_Retry: 60
-               Master_Log_File: centos7.000001
-           Read_Master_Log_Pos: 6501
-                Relay_Log_File: tz-pc-relay-bin.000001
-                 Relay_Log_Pos: 4
-         Relay_Master_Log_File: centos7.000001
-              Slave_IO_Running: Connecting
-             Slave_SQL_Running: Yes
-```
-
-```sh
-# 测试能不能连接主服务器
-mysql -uroot -p -h 192.168.100.208 -P3306
-```
+- 查看是否成功
+    ```sql
+    MariaDB [tz]> show slave status\G;
+    *************************** 1. row ***************************
+                    Slave_IO_State: Connecting to master
+                       Master_Host: 192.168.100.208
+                       Master_User: root
+                       Master_Port: 3306
+                     Connect_Retry: 60
+                   Master_Log_File: centos7.000001
+               Read_Master_Log_Pos: 6501
+                    Relay_Log_File: tz-pc-relay-bin.000001
+                     Relay_Log_Pos: 4
+             Relay_Master_Log_File: centos7.000001
+                  Slave_IO_Running: Connecting
+                 Slave_SQL_Running: Yes
+    ```
 
 ### docker 主从复制
 
@@ -3856,9 +311,235 @@ docker 主从复制测试:
 
 ![image](./Pictures/mysql/docker-replication.gif)
 
-## mysqlbinlog
+## 日志
 
-### [--flashback 闪回还原](https://mariadb.com/kb/en/flashback/)
+| 日志类型   | 日志说明                               |
+|------------|----------------------------------------|
+| 错误日志   | Mysql本身的错误日志                    |
+| 查询日志   | 查询语句日志                           |
+| 慢查询日志 | 慢查询语句，查询耗时续配署             |
+| 事务日志   | 记录事物执行过程，用于故障恢复         |
+| binlog二进制日志 | 记录所有语句执行记录，用于数据同步等   |
+| 中继日志   | 线程读取别人的二进制日志存到本地的日志 |
+
+![image](./Pictures/mysql/logs.avif)
+
+### 普通日志
+
+- 默认情况下，MYSQL 中不启用日志文件。所有错误都会显示在 `syslog (/var/log/syslog)` 中。
+
+| 日志类型          | 记录内容                                                       |
+|-------------------|----------------------------------------------------------------|
+| error log         | 它包含有关服务器运行时发生的错误的信息(也包括服务器启动和停止) |
+| general query log | 记录(连接、断开连接、查询)                                     |
+| Slow Query log    | 慢查询日志                                                     |
+
+- 查看日志大小, 保存路径
+
+```sql
+show variables like '%log%file%';
+```
+
+修改`/etc/mysql/my.cnf` 配置文件下启用日志
+
+- 开启 error log:
+
+    ```sh
+    [mysqld_safe]
+    log_error=/var/log/mysql/mysql_error.log
+
+    [mysqld]
+    log_error=/var/log/mysql/mysql_error.log
+    ```
+
+- 开启 general query log:
+
+    ```sh
+    general_log_file = /var/log/mysql/mysql_general.log
+    general_log = 1
+    ```
+
+- 开启 Slow Query log:
+
+    ```sh
+    slow_query_log_file = /var/log/mysql/mysql_slow.log
+    slow_query_log = 1
+
+    # 超过两秒, 可以设置0秒捕捉所有查询
+    long_query_time = 2
+    log-queries-not-using_indexes
+    ```
+
+    ```sh
+    # 创建文件
+    mkdir /var/log/mysql
+
+    touch /var/log/mysql/mysql_error.log
+    touch /var/log/mysql/mysql_general.log
+    touch /var/log/mysql/mysql_slow.log
+
+    # 授予权限
+    chown mysql:mysql /var/log/mysql/mysql_error.log
+    chown mysql:mysql /var/log/mysql/mysql_general.log
+    chown mysql:mysql /var/log/mysql/mysql_slow.log
+
+    # 重启 mysql
+    systemctl restart mysqld
+    ```
+
+- 在运行时启用日志:
+
+    ```sh
+    SET GLOBAL general_log = 'ON';
+    SET GLOBAL slow_query_log = 'ON';
+    ```
+
+### binlog (二进制日志)
+
+MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
+
+- binlog是逻辑日志，记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
+
+    - 不管用什么存储引擎，只要发生了表数据更新，都会产生binlog日志。
+
+    - 只记录对数据库更改的所有操作，不包括 `select`，`show` 等这类操作不修改数据的语句
+
+- redo log它是物理日志，记录内容是“在某个数据页上做了什么修改”，属于InnoDB存储引擎。
+
+    ![image](./Pictures/mysql/binlog_and_redolog.avif)
+
+- binlog的作用：MySQL数据库的数据备份、主备、主主、主从都离不开binlog，需要依靠binlog来同步数据，保证数据一致性。
+    ![image](./Pictures/mysql/binlog作用.avif)
+
+- 启用了binlog的服务器会使性能稍微降低
+
+- 写入机制：
+
+    - 事务执行过程中，先把日志写到binlog cache，事务提交的时候，再把binlog cache写到binlog文件中。
+
+    - 因为一个事务的binlog不能被拆开，无论这个事务多大，也要确保一次性写入，所以系统会给每个线程分配一个块内存作为binlog cache
+
+    - 我们可以通过binlog_cache_size参数控制单个线程 binlog cache 大小，如果存储内容超过了这个参数，就要暂存到磁盘（Swap）。
+
+        ![image](./Pictures/mysql/binlog写入机制.avif)
+
+        - 上图的 `write`，是指把日志写入到文件系统的 page cache，并没有把数据持久化到磁盘，所以速度比较快
+
+        - 上图的 `fsync`，才是将数据持久化到磁盘的操作
+
+        - 由参数`sync_binlog`控制，默认是0。
+            - 为0的时候，表示每次提交事务都只write，由系统自行判断什么时候执行fsync。
+            - 为了安全起见，可以设置为1，表示每次提交事务都会执行fsync，就如同binlog 日志刷盘流程一样。
+
+- binlog日志有3种格式，可以通过`binlog_format`参数指定。
+
+    - statement：记录的内容是SQL语句原文`update T set update_time=now() where id=1`
+        ![image](./Pictures/mysql/binlog-statement.avif)
+
+        - 问题：同步数据时，会执行记录的SQL语句，update_time=now()这里会获取当前系统时间，直接执行会导致与原库的数据不一致。
+
+        - 解决方法：我们需要指定为row：
+
+    - row（通常会设置此值）：记录的内容不再是简单的SQL语句了，还包含操作的具体数据
+        - 记录的内容看不到详细信息，要通过mysqlbinlog工具解析出来。
+        ![image](./Pictures/mysql/binlog-row.avif)
+
+        - update_time=now()变成了具体的时间update_time=1627112756247，条件后面的@1、@2、@3 都是该行数据第 1 个~3 个字段的原始值（假设这张表只有 3 个字段）。
+
+            - 缺点：需要更大的容量来记录，比较占用空间，恢复与同步时会更消耗IO资源，影响执行速度。
+
+    - mixed：前两者的混合。判断这条SQL语句是否可能引起数据不一致，如果是，就用row格式，否则就用statement格式。
+
+#### 配置
+
+开启 `binary` 日志:
+
+```ini
+[mysqld]
+datadir = /var/lib/mysql/
+
+##### binlog #####
+# 可以通过show master status;查看
+log-bin=arch
+log-bin-index=arch.index
+
+# 主从复制要设置的复制的数据库
+# binlog-do-db=test          # 同步指定库tz
+# binlog-ignore-db=tzblock   # 忽略指定库tzblock
+
+# 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
+binlog_format=row
+
+# 设置一个 binlog 文件的最大字节。设置最大 100MB
+max_binlog_size=100M
+
+# 设置了 binlog 文件的有效期（单位：天）
+expire_logs_days = 7
+
+# 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
+# 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
+# 执行n 次事务提交后，才fsync到磁盘
+sync_binlog=1
+```
+
+![image](./Pictures/mysql/binlog.avif)
+
+```sql
+# 我这里是 row 格式
+show variables like 'binlog_format';
++---------------+-------+
+| Variable_name | Value |
++---------------+-------+
+| binlog_format | ROW   |
++---------------+-------+
+```
+
+随着时间的推移日志文件会越来越多，可以设置日志有效期，自动清理
+
+```sql
+# 我这里是 0 (表示永不会清理)
+show variables like 'expire_logs_days';
++------------------+-------+
+| Variable_name    | Value |
++------------------+-------+
+| expire_logs_days | 0     |
++------------------+-------+
+```
+
+#### 基本命令
+```sql
+# 查看二进制日志
+show binary logs;
+
+# 创建新的二进制文件
+flush logs;
+
+# 查看第一个日志(缺点:没有时间显示)
+show binlog events;
+
+# 查看指定日志
+show binlog events in 'LogName';
+
+# 删除所有二进制日志
+reset master;
+
+# 删除日志centos7.000022前的日志
+pugre master logs to 'centos7.000022';
+
+# 删除某一天前的日志
+pugre master logs before '2020-10-25 00:00:00'
+
+# 删除10天前的日志
+pugre master logs before current_date - interval 1 day;
+```
+
+#### mysqlbinlog 日志分析
+
+```sh
+mysqlbinlog /var/lib/mysql/bin.000001
+```
+
+##### [--flashback 还原被添加、删除、修改的数据](https://mariadb.com/kb/en/flashback/)
 
 日志格式必须设置为:
 
@@ -3919,7 +600,7 @@ select current_timestamp();
 +---------------------+
 ```
 
-删除,修改,添加数据:
+- 先删除,修改,添加数据。方便后面还原
 
 ```sql
 delete from test
@@ -3959,72 +640,1636 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
 
 ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
-## XtraBackup 热备份
+#### [canal](https://github.com/alibaba/canal)
 
-- XtraBackup：能对innodb和xtradb存储引擎进行热备份。也能对MyISAM存储引擎进行备份，只不过对于MyISAM的备份需要加表锁，会阻塞写操作。
+- canal 模拟 slave 的方式，获取 binlog 日志数据. binlog 设置为 row 模式以后，不仅能获取到执行的每一个增删改的脚本，同时还能获取到修改前和修改后的数据.
 
-- 有2个工具
-    - `xtrabackup`：只能备份innodb和xtradb存储引擎数据表
-    - `innobackupex`：是通过perl脚本对xtrabackup进行封装和功能扩展，除了能备份innodb和xtradb存储引擎的数据表外，还可以备份MyISAM数据表和frm文件。
-        - 由于MyISAM不支持事务，在对MyISAM表备份之前，需要对全库进行加读锁，阻塞写操作。如果在从库进行的话，还会影响主从同步，从而造成延迟。
-        - 备份时是根据配置文件`my.cnf`获取备份文件的信息
+- 支持高性能,实时数据同步
 
-### 安装
+- 支持 docker
 
-```sh
-rpm -ivh
-yum install -y percona-xtrabackup
-```
+[canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
 
-## 导出不同文件格式
+[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
 
-```sh
-# \G格式导出数据
-mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+### redo log (重做日志)
 
-# html
-mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+- redo log是InnoDB存储引擎独有的
 
-# xml
-mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
-```
+    - 先将事务的变更写入redo log，并且保证redo log持久化到磁盘上，才能认为事务提交成功。这样即使在数据库发生故障时，也能够根据redo log来恢复未写入数据文件的数据，确保已经提交的事务不会丢失。
+
+- 为什么不直接把修改后的数据页刷盘，还有redo log什么事？
+
+    - 问题：
+        - 数据页大小是16KB，刷盘比较耗时，可能就修改了数据页里的几Byte数据，有必要把完整的数据页刷盘吗？
+        - 而且数据页刷盘是随机写，因为一个数据页对应的位置可能在硬盘文件的随机位置，所以性能是很差。
+
+    - 如果是写redo log，一行记录可能就占几十Byte，只包含表空间号、数据页号、磁盘文件偏移 量、更新值，再加上是顺序写，所以刷盘速度很快。
+
+- 写入机制：
+
+    ![image](./Pictures/mysql/redo-log.avif)
+
+    - MySQL中数据是以页为单位，你查询一条记录，会从硬盘把一页的数据加载出来，加载出来的数据叫数据页，会放入到Buffer Pool中。
+    - 后续的查询都是先从Buffer Pool中找，没有命中再去硬盘加载，减少硬盘IO开销，提升性能。
+    - 更新表数据的时候，也是如此，发现Buffer Pool里存在要更新的数据，就直接在Buffer Pool里更新。
+    - 然后会把“在某个数据页上做了什么修改”记录到重做日志缓存（redo log buffer）里，接着刷盘到redo log文件里。
+
+        - 每条 redo 记录由“表空间号+数据页号+偏移量+修改数据长度+具体修改的数据”组成
+
+        - 理想情况，事务一提交就会进行刷盘操作，但实际上，刷盘的时机是根据策略来进行的。
+
+        - InnoDB存储引擎有一个后台线程，每隔1秒，就会把redo log buffer中的内容写到文件系统缓存（page cache），然后调用fsync刷盘。
+
+            - 一个没有提交事务的redo log记录，也可能会后台线程刷盘。
+
+            ![image](./Pictures/mysql/redo-log后台线程刷盘.avif)
+
+        - 另外，redo log的刷盘策略提供了`innodb_flush_log_at_trx_commit`参数，它支持三种策略：
+
+            - `0`:表示每次事务提交时不进行刷盘操作
+                - 为0时，如果MySQL挂了或宕机可能会有1秒数据的丢失。
+                ![image](./Pictures/mysql/redo-log刷盘策略值为0.avif)
+
+            - `1`（默认值）:表示每次事务提交时都将进行刷盘操作
+                - 为1时， 只要事务提交成功，redo log记录就一定在硬盘里，不会有任何数据丢失。
+                - 如果事务执行期间MySQL挂了或宕机，这部分日志丢了，但是事务并没有提交，所以日志丢了也不会有损失。
+                ![image](./Pictures/mysql/redo-log刷盘策略值为1.avif)
+
+            - `2`:表示每次事务提交时都只把 redo log buffer 内容写入 page cache
+                - 为2时， 只要事务提交成功，redo log buffer中的内容只写入文件系统缓存（page cache）。
+                - 如果仅仅只是MySQL挂了不会有任何数据丢失，但是宕机可能会有1秒数据的丢失。
+                ![image](./Pictures/mysql/redo-log刷盘策略值为2.avif)
+
+            ```sql
+            show variables like 'innodb_flush_log_at_trx_commit'
+            +--------------------------------+-------+
+            | Variable_name                  | Value |
+            +--------------------------------+-------+
+            | innodb_flush_log_at_trx_commit | 1     |
+            +--------------------------------+-------+
+            ```
+
+- 日志文件组
+
+    - 硬盘上存储的redo log日志文件不只一个，而是以一个日志文件组的形式出现的，每个的redo日志文件大小都是一样的。
+
+        - redo log 以 **块(block)** 为单位进行存储的,每个块的大小为 **512** Bytes
+        - redo log 文件的组合大小 = (`innodb_log_file_size` \* `innodb_log_files_in_group`)
+        - 例子：可以配置为一组4个文件，每个文件的大小是1GB，整个redo log日志文件组可以记录4G的内容。
+
+        ```sql
+        # redo log文件大小
+        show variables like 'innodb_log_file_size';
+        +----------------------+-----------+
+        | Variable_name        | Value     |
+        +----------------------+-----------+
+        | innodb_log_file_size | 100663296 |
+        +----------------------+-----------+
+
+        # redo log文件数量
+        show variables like 'innodb_log_files_in_group';
+        +---------------------------+-------+
+        | Variable_name             | Value |
+        +---------------------------+-------+
+        | innodb_log_files_in_group | 1     |
+        ```
+
+    - 日志文件组采用的是环形数组形式，从头开始写，写到末尾又回到头循环写
+
+        ![image](./Pictures/mysql/redo-log日志文件组.avif)
+
+        - 有两个重要的属性
+            - write pos是当前记录的位置，一边写一边后移
+            - checkpoint（刷脏）是当前要擦除的位置，也是往后推移
+
+        - 每次刷盘redo log记录到日志文件组中，write pos位置就会后移更新。
+        - 每次MySQL加载日志文件组恢复数据时，会清空加载过的redo log记录，并把checkpoint后移更新。
+        - write pos和checkpoint之间的还空着的部分可以用来写入新的redo log记录。
+            ![image](./Pictures/mysql/redo-log日志文件组1.avif)
+
+        - 如果write pos追上checkpoint，表示日志文件组满了，这时候不能再写入新的redo log记录，MySQL得停下来，清空一些记录，把checkpoint推进一下。
+            ![image](./Pictures/mysql/redo-log日志文件组2.avif)
+
+### binlog和redo log
+
+- binlog是逻辑日志，记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
+
+    - 不管用什么存储引擎，只要发生了表数据更新，都会产生binlog日志。
+
+    - 只记录对数据库更改的所有操作，不包括 `select`，`show` 等这类操作不修改数据的语句
+
+- redo log它是物理日志，记录内容是“在某个数据页上做了什么修改”，属于InnoDB存储引擎。
+
+    ![image](./Pictures/mysql/binlog_and_redolog.avif)
+
+- 虽然它们都属于持久化的保证，但是则重点不同。
+
+    - 在执行更新语句过程，会记录redo log与binlog两块日志，以基本的事务为单位，redo log在事务执行过程中可以不断写入，而binlog只有在提交事务时才写入，所以redo log与binlog的写入时机不一样。
+
+    ![image](./Pictures/mysql/binlog_and_redolog1.avif)
+
+- redo log与binlog两份日志之间的逻辑不一致，会出现什么问题？
+
+    - 假设执行过程中写完redo log日志后，binlog日志写期间发生了异常，会出现什么情况呢？
+
+        ![image](./Pictures/mysql/binlog_and_redolog2.avif)
+        ![image](./Pictures/mysql/binlog_and_redolog3.avif)
+
+    - 解决方法：两阶段提交——将redo log的写入拆成了两个步骤prepare和commit，这就是两阶段提交。
+        ![image](./Pictures/mysql/binlog_and_redolog4.avif)
+
+        - 使用两阶段提交后，写入binlog时发生异常也不会有影响，因为MySQL根据redo log日志恢复数据时，发现redo log还处于prepare阶段，并且没有对应binlog日志，就会回滚该事务。
+        ![image](./Pictures/mysql/binlog_and_redolog5.avif)
+
+### undo log回滚日志）
+
+- 保证事务的原子性（ACID的A）：要么全部成功，要么全部失败，不可能出现部分成功的情况。
+
+- undo log 逻辑日志：
+    - 事务未提交的时候,所有事务进行的修改都会先先记录到这个回滚日志中，并持久化到磁盘上。
+    - 系统崩溃时，没 COMMIT 的事务 ，就需要借助 undo log 来进行回滚至事务开始前的状态。
+    - 保存在`ibdata*`
+
+## 性能优化
+
+- 如果无法测量就无法优化, 测量需要分析大量的数据, 大多数系统无法完整的测量, 而且测量的结果也可能是错误的
+
+- 判断是服务器问题还是查询问题:
+
+    - 如果是每一条查询都变慢, 则可能是服务器问题
+
+    - 如果是只有某条查询变慢, 则可能是查询问题
+
+### profile 记录查询响应时间
 
 ```sql
-# csv
-SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
-FIELDS TERMINATED BY ',' ENCLOSED BY '"'
-LINES TERMINATED BY '\r\n';
+# 开启profile
+set profile = 1
+
+# 查看所有查询的响应时间
+show profiles
+
+# 查看上一次查询每个步骤的响应时间
+show profile
 ```
 
-## 第三方 mysql 软件
+### 记录计数器
 
-- [MySQL 常用工具选型和建议](https://zhuanlan.zhihu.com/p/86846532)
+```sh
+# 查看线程状态, 如果注意是否有大量的freeing item
+mysql -e 'show processlist\G' | grep -i "state:" | sort | uniq -c | sort -rn
+```
 
-### [mycli](https://github.com/dbcli/mycli)
+### [pt-query-digest(percona-toolkit)](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
 
-- 更友好的 mysql 命令行
-- 目前发现不能,修改和查看用户权限
+```sh
+pt-query-digest /var/log/mysql/mysql_slow.log
+```
+
+### mysqldumpslow
+
+```sh
+# 取出使用最多的10条慢查询
+mysqldumpslow -s c -t 10 /var/log/mysql/mysql_slow.log
+
+# 取出查询时间最慢的3条慢查询
+mysqldumpslow -s t -t 3 /var/log/mysql/mysql_slow.log
+
+# 得到按照时间排序的前10条里面含有左连接的查询语句
+mysqldumpslow -s t -t 10 -g “left join” /var/log/mysql/mysql_slow.log
+
+# 按照扫描行数最多的
+mysqldumpslow -s r -t 10 -g 'left join' /var/log/mysqld/mysql_slow.log
+```
+
+### [mysqlsla](https://github.com/daniel-nichter/hackmysql.com/tree/master/mysqlsla)
+
+mysqlsla 来自于 hackmysql.com，此网站的软件 2015 就不再维护了
+
+```sh
+# Usege
+
+mysqlsla --log-type slow /var/log/mysql/mysql_slow.log
+mysqlsla --log-type general /var/log/mysql/mysql_general.log
+mysqlsla --log-type error /var/log/mysql/mysql_error.log
+```
+
+### informantion_schema数据库
+
+- row_format(行格式)是 `redundant` ,存储在 `ibdata1`, `ibdata2` 文件
+
+- 记录 `innodb` 核心的对象信息,比如表、索引、字段等
 
 ```sql
-mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';') AS query FROM mysq
-                          -> l.user;
-(1142, "SELECT command denied to user 'root'@'localhost' for table 'user'")
+# 查看innoddb字典
+use information_schema;
+show tables like '%INNODB_SYS%';
++------------------------------+
+| Tables_in_information_schema |
++------------------------------+
+| INNODB_SYS_DATAFILES         |
+| INNODB_SYS_TABLESTATS        |
+| INNODB_SYS_FIELDS            |
+| INNODB_SYS_FOREIGN_COLS      |
+| INNODB_SYS_FOREIGN           |
+| INNODB_SYS_TABLES            |
+| INNODB_SYS_COLUMNS           |
+| INNODB_SYS_TABLESPACES       |
+| INNODB_SYS_VIRTUAL           |
+| INNODB_SYS_INDEXES           |
+| INNODB_SYS_SEMAPHORE_WAITS   |
++------------------------------+
 ```
 
-![image](./Pictures/mysql/mycli.avif)
+- 查看使用 innodb 存储的表:
 
-### [mitzasql](https://github.com/vladbalmos/mitzasql)
+    ```sql
+    select * from INNODB_SYS_TABLES;
+    ```
 
-- 一个使用`vim`快捷键的 `mysql-tui`
+    ![image](./Pictures/mysql/dictionary3.avif)
 
-![image](./Pictures/mysql/mysql-tui.avif)
-![image](./Pictures/mysql/mysql-tui1.avif)
+**InnoDB Buffer Pool** 储数据和索引,减少磁盘 I/O,是一种特殊的 mitpoint LRU 算法
+[查看 INNODB_BUFFER 表](https://mariadb.com/kb/en/information-schema-innodb_buffer_pool_stats-table/)
 
-<span id="mydumper"></span>
+```sql
+select * from INNODB_BUFFER
+# 或者 隔几秒就会有变化
+show global status like '%buffer%';
 
-### [mydumper](https://github.com/maxbube/mydumper)
+# innodb 页是16k
 
-Mydumper 是 MySQL 数据库服务器备份工具,它比 MySQL 自带的 mysqldump 快很多.[详细参数](https://linux.cn/article-5330-1.html)
+# 一共 8057页
+POOL_SIZE: 8057
+
+# 空闲页
+FREE_BUFFERS: 6024
+
+# 已使用页
+DATABASE_PAGES: 2033
+```
+
+![image](./Pictures/mysql/dictionary5.avif)
+
+**innodb_buffer_pool_size** 越大,初始化时间就越长
+
+```sql
+show variables like 'innodb%buffer%';
+```
+
+![image](./Pictures/mysql/dictionary6.avif)
+
+### performance_schema数据库
+
+- [knowclub：使用performance schema来更加容易的监控MySQL](https://mp.weixin.qq.com/s?__biz=Mzk0OTI3MDg5MA==&mid=2247486646&idx=1&sn=82c4cb4bc32a44c6751f8f9241ddf9e0&chksm=c35bacb3f42c25a50c9f0e1fc1c1307cbe5fd0550e1e1c3909b4704a8aeb3120ea57cea3fa8c&scene=178&cur_album_id=2555489356258705411#rd)
+
+- performance_schema通过监视server的事件来实现监视server内部运行情况
+
+    - “事件”就是server内部活动中所做的任何事情以及对应的时间消耗，利用这些信息来判断server中的相关资源消耗在了哪里？可以是函数调用、操作系统的等待、SQL语句执行的阶段（如sql语句执行过程中的parsing 或 sorting阶段）或者整个SQL语句与SQL语句集合。
+
+    - 事件的采集可以方便的提供server中的相关存储引擎对磁盘文件、表I/O、表锁等资源的同步调用信息。
+
+- performance_schema的表中的数据不会持久化存储在磁盘中，而是保存在内存中，一旦服务器重启，这些数据会丢失（包括配置表在内的整个performance_schema下的所有数据）
+
+
+- 使用性能模式诊断问题
+
+    - 以下示例提供了一种可用于分析可重复问题的方法，例如调查性能瓶颈。首先，您应该有一个可重复的用例，其中性能被认为“太慢”并且需要优化，并且您应该启用所有检测（根本没有预过滤）。
+
+    - 1.使用性能模式表，分析性能问题的根本原因。此分析在很大程度上依赖于后过滤。
+
+    - 2.对于排除的问题区域，禁用相应的工具。例如，如果分析表明问题与特定存储引擎中的文件 I/O 无关，则禁用该引擎的文件 I/O 工具。然后截断历史和摘要表以删除以前收集的事件。
+
+    - 3.重复步骤 1 中的过程。
+
+        - 在每次迭代中，Performance Schema 输出，尤其是 events_waits_history_long表格，包含越来越少的由无关紧要的仪器引起的“噪音”，并且鉴于该表格具有固定大小，包含越来越多与手头问题分析相关的数据。
+
+        - 在每次迭代中，随着“信噪比”的提高 ，调查应该越来越接近问题的根本原因 ，从而使分析更加容易。
+
+    - 4.一旦确定了性能瓶颈的根本原因，就采取适当的纠正措施，例如：
+
+        - 调整服务器参数（缓存大小、内存等）。
+        - 通过不同的方式编写查询来调整查询，
+        - 调整数据库架构（表、索引等）。
+        - 调整代码（这仅适用于存储引擎或服务器开发人员）。
+
+    - 5.从第 1 步重新开始，查看更改对性能的影响。
+
+- 对于调查性能瓶颈或死锁极为重要`mutex_instances.LOCKED_BY_THREAD_ID`。 `rwlock_instances.WRITE_LOCKED_BY_THREAD_ID`这是通过 Performance Schema 检测实现的，如下所示：
+
+    - 1.假设线程 1 在等待互斥锁时卡住了。
+
+    - 2.您可以确定线程正在等待什么：
+        ```sql
+        SELECT * FROM performance_schema.events_waits_current
+        WHERE THREAD_ID = thread_1;
+        ```
+
+        - 假设查询结果标识线程正在等待在 中找到的互斥量 events_waits_current.OBJECT_INSTANCE_BEGINA。
+
+    - 3.您可以确定哪个线程持有互斥量 A：
+        ```sql
+        SELECT * FROM performance_schema.mutex_instances
+        WHERE OBJECT_INSTANCE_BEGIN = mutex_A;
+        ```
+
+        - 假设查询结果标识它是持有互斥量 A 的线程 2，如中所见 mutex_instances.LOCKED_BY_THREAD_ID。
+
+    - 4.你可以看到线程 2 在做什么：
+        ```sql
+        SELECT * FROM performance_schema.events_waits_current
+        WHERE THREAD_ID = thread_2;
+        ```
+
+- performance_schema数据库开启
+
+    - `/etc/my.cnf`配置文件，开启performance_schema
+    ```
+    [mysqld]
+    performance_schema=ON
+    ```
+
+    ```sql
+    // 在mysql的5.7版本中默认开启。我是MariaDB默认关闭
+    SHOW VARIABLES LIKE 'performance_schema';
+    +--------------------+-------+
+    | Variable_name | Value |
+    +--------------------+-------+
+    | performance_schema | ON    |
+    +--------------------+-------+
+
+    // 切换数据库
+    use performance_schema;
+
+    // 查看表
+    show tables;
+
+    // 查看表结构
+    show create table setup_consumers;
+    ```
+
+- performance_schema表的分类
+
+    ```sql
+    //语句事件记录表，这些表记录了语句事件信息，当前语句事件表events_statements_current、历史语句事件表events_statements_history和长语句历史事件表events_statements_history_long、以及聚合后的摘要表summary，其中，summary表还可以根据帐号(account)，主机(host)，程序(program)，线程(thread)，用户(user)和全局(global)再进行细分)
+    show tables like '%statement%';
+
+    //等待事件记录表，与语句事件类型的相关记录表类似：
+    show tables like '%wait%';
+
+    //阶段事件记录表，记录语句执行的阶段事件的表
+    show tables like '%stage%';
+
+    //事务事件记录表，记录事务相关的事件的表
+    show tables like '%transaction%';
+
+    //监控文件系统层调用的表
+    show tables like '%file%';
+
+    //监视内存使用的表
+    show tables like '%memory%';
+
+    //动态对performance_schema进行配置的配置表
+    show tables like '%setup%';
+    ```
+
+- 2个概念：
+    - instruments: 生产者，用于采集mysql中各种各样的操作产生的事件信息，对应配置表中的配置项我们可以称为监控采集配置项。
+    - consumers:消费者，对应的消费者表用于存储来自instruments采集的数据，对应配置表中的配置项我们可以称为消费存储配置项。
+    ```sql
+    //默认不会收集所有的事件，可能你需要检测的事件并没有打开，需要进行设置，可以使用如下两个语句打开对应的instruments和consumers（行计数可能会因MySQL版本而异)。
+
+    //打开等待事件的采集器配置项开关，需要修改setup_instruments配置表中对应的采集器配置项
+    UPDATE setup_instruments SET ENABLED = 'YES', TIMED = 'YES'where name like 'wait%';
+
+    //打开等待事件的保存表配置开关，修改setup_consumers配置表中对应的配置项
+    UPDATE setup_consumers SET ENABLED = 'YES'where name like '%wait%';
+
+    //当配置完成之后可以查看当前server正在做什么，可以通过查询events_waits_current表来得知，该表中每个线程只包含一行数据，用于显示每个线程的最新监视事件
+    select * from events_waits_current\G
+    *************************** 1. row ***************************
+                THREAD_ID: 11
+                 EVENT_ID: 570
+             END_EVENT_ID: 570
+               EVENT_NAME: wait/synch/mutex/innodb/buf_dblwr_mutex
+                   SOURCE:
+              TIMER_START: 4508505105239280
+                TIMER_END: 4508505105270160
+               TIMER_WAIT: 30880
+                    SPINS: NULL
+            OBJECT_SCHEMA: NULL
+              OBJECT_NAME: NULL
+               INDEX_NAME: NULL
+              OBJECT_TYPE: NULL
+    OBJECT_INSTANCE_BEGIN: 67918392
+         NESTING_EVENT_ID: NULL
+       NESTING_EVENT_TYPE: NULL
+                OPERATION: lock
+          NUMBER_OF_BYTES: NULL
+                    FLAGS: NULL
+    /*该信息表示线程id为11的线程正在等待buf_dblwr_mutex锁，等待事件为30880
+    属性说明：
+     id:事件来自哪个线程，事件编号是多少
+     event_name:表示检测到的具体的内容
+     source:表示这个检测代码在哪个源文件中以及行号
+     timer_start:表示该事件的开始时间
+     timer_end:表示该事件的结束时间
+     timer_wait:表示该事件总的花费时间
+    注意：_current表中每个线程只保留一条记录，一旦线程完成工作，该表中不会再记录该线程的事件信息
+    */
+    ```
+
+- 一些表
+    ```sql
+    //_history表中记录每个线程应该执行完成的事件信息，但每个线程的事件信息只会记录10条，再多就会被覆盖，*_history_long表中记录所有线程的事件信息，但总记录数量是10000，超过就会被覆盖掉
+    select thread_id,event_id,event_name,timer_wait from events_waits_history order by thread_id limit 21;
+
+    // summary表提供所有事件的汇总信息，该组中的表以不同的方式汇总事件数据（如：按用户，按主机，按线程等等）。例如：要查看哪些instruments占用最多的时间，可以通过对events_waits_summary_global_by_event_name表的COUNT_STAR或SUM_TIMER_WAIT列进行查询（这两列是对事件的记录数执行COUNT（*）、事件记录的TIMER_WAIT列执行SUM（TIMER_WAIT）统计而来）
+    SELECT EVENT_NAME,COUNT_STAR FROM events_waits_summary_global_by_event_name  ORDER BY COUNT_STAR DESC LIMIT 10;
+
+
+    //instance表记录了哪些类型的对象会被检测。这些对象在被server使用时，在该表中将会产生一条事件记录，例如，file_instances表列出了文件I/O操作及其关联文件名
+    select * from file_instances limit 20;
+    ```
+
+- 重要配置表
+    ```sql
+    /*
+    performance_timers表中记录了server中有哪些可用的事件计时器
+    字段解释：
+     timer_name:表示可用计时器名称，CYCLE是基于CPU周期计数器的定时器
+     timer_frequency:表示每秒钟对应的计时器单位的数量,CYCLE计时器的换算值与CPU的频率相关、
+     timer_resolution:计时器精度值，表示在每个计时器被调用时额外增加的值
+     timer_overhead:表示在使用定时器获取事件时开销的最小周期值
+    */
+    select * from performance_timers;
+
+    /*
+    setup_timers表中记录当前使用的事件计时器信息
+    字段解释：
+     name:计时器类型，对应某个事件类别
+     timer_name:计时器类型名称
+    */
+    select * from setup_timers;
+
+    /*
+    setup_consumers表中列出了consumers可配置列表项
+    字段解释：
+     NAME：consumers配置名称
+     ENABLED：consumers是否启用，有效值为YES或NO，此列可以使用UPDATE语句修改。
+    */
+    select * from setup_consumers;
+
+    /*
+    setup_instruments 表列出了instruments 列表配置项，即代表了哪些事件支持被收集：
+    字段解释：
+     NAME：instruments名称，instruments名称可能具有多个部分并形成层次结构
+     ENABLED：instrumetns是否启用，有效值为YES或NO，此列可以使用UPDATE语句修改。如果设置为NO，则这个instruments不会被执行，不会产生任何的事件信息
+     TIMED：instruments是否收集时间信息，有效值为YES或NO，此列可以使用UPDATE语句修改，如果设置为NO，则这个instruments不会收集时间信息
+    */
+    SELECT * FROM setup_instruments;
+
+    /*
+    setup_actors表的初始内容是匹配任何用户和主机，因此对于所有前台线程，默认情况下启用监视和历史事件收集功能
+    字段解释：
+     HOST：与grant语句类似的主机名，一个具体的字符串名字，或使用“％”表示“任何主机”
+     USER：一个具体的字符串名称，或使用“％”表示“任何用户”
+     ROLE：当前未使用，MySQL 8.0中才启用角色功能
+     ENABLED：是否启用与HOST，USER，ROLE匹配的前台线程的监控功能，有效值为：YES或NO
+     HISTORY：是否启用与HOST， USER，ROLE匹配的前台线程的历史事件记录功能，有效值为：YES或NO
+    */
+    SELECT * FROM setup_actors;
+
+    /*
+    setup_objects表控制performance_schema是否监视特定对象。默认情况下，此表的最大行数为100行。
+    字段解释：
+     OBJECT_TYPE：instruments类型，有效值为：“EVENT”（事件调度器事件）、“FUNCTION”（存储函数）、“PROCEDURE”（存储过程）、“TABLE”（基表）、“TRIGGER”（触发器），TABLE对象类型的配置会影响表I/O事件（wait/io/table/sql/handler instrument）和表锁事件（wait/lock/table/sql/handler instrument）的收集
+     OBJECT_SCHEMA：某个监视类型对象涵盖的数据库名称，一个字符串名称，或“％”(表示“任何数据库”)
+     OBJECT_NAME：某个监视类型对象涵盖的表名，一个字符串名称，或“％”(表示“任何数据库内的对象”)
+     ENABLED：是否开启对某个类型对象的监视功能，有效值为：YES或NO。此列可以修改
+     TIMED：是否开启对某个类型对象的时间收集功能，有效值为：YES或NO，此列可以修改
+    */
+    SELECT * FROM setup_objects;
+
+    /*
+    threads表对于每个server线程生成一行包含线程相关的信息，
+    字段解释：
+     THREAD_ID：线程的唯一标识符（ID）
+     NAME：与server中的线程检测代码相关联的名称(注意，这里不是instruments名称)
+     TYPE：线程类型，有效值为：FOREGROUND、BACKGROUND。分别表示前台线程和后台线程
+     PROCESSLIST_ID：对应INFORMATION_SCHEMA.PROCESSLIST表中的ID列。
+     PROCESSLIST_USER：与前台线程相关联的用户名，对于后台线程为NULL。
+     PROCESSLIST_HOST：与前台线程关联的客户端的主机名，对于后台线程为NULL。
+     PROCESSLIST_DB：线程的默认数据库，如果没有，则为NULL。
+     PROCESSLIST_COMMAND：对于前台线程，该值代表着当前客户端正在执行的command类型，如果是sleep则表示当前会话处于空闲状态
+     PROCESSLIST_TIME：当前线程已处于当前线程状态的持续时间（秒）
+     PROCESSLIST_STATE：表示线程正在做什么事情。
+     PROCESSLIST_INFO：线程正在执行的语句，如果没有执行任何语句，则为NULL。
+     PARENT_THREAD_ID：如果这个线程是一个子线程（由另一个线程生成），那么该字段显示其父线程ID
+     ROLE：暂未使用
+     INSTRUMENTED：线程执行的事件是否被检测。有效值：YES、NO 
+     HISTORY：是否记录线程的历史事件。有效值：YES、NO * 
+     THREAD_OS_ID：由操作系统层定义的线程或任务标识符（ID）：
+    */
+    select * from threads
+    ```
+
+- performance_schema实践操作
+    ```sql
+    //1、哪类的SQL执行最多？
+    SELECT DIGEST_TEXT,COUNT_STAR,FIRST_SEEN,LAST_SEEN FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //2、哪类SQL的平均响应时间最多？
+    SELECT DIGEST_TEXT,AVG_TIMER_WAIT FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //3、哪类SQL排序记录数最多？
+    SELECT DIGEST_TEXT,SUM_SORT_ROWS FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //4、哪类SQL扫描记录数最多？
+    SELECT DIGEST_TEXT,SUM_ROWS_EXAMINED FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //5、哪类SQL使用临时表最多？
+    SELECT DIGEST_TEXT,SUM_CREATED_TMP_TABLES,SUM_CREATED_TMP_DISK_TABLES FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //6、哪类SQL返回结果集最多？
+    SELECT DIGEST_TEXT,SUM_ROWS_SENT FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
+    //7、哪个表物理IO最多？
+    SELECT file_name,event_name,SUM_NUMBER_OF_BYTES_READ,SUM_NUMBER_OF_BYTES_WRITE FROM file_summary_by_instance ORDER BY SUM_NUMBER_OF_BYTES_READ + SUM_NUMBER_OF_BYTES_WRITE DESC
+    //8、哪个表逻辑IO最多？
+    SELECT object_name,COUNT_READ,COUNT_WRITE,COUNT_FETCH,SUM_TIMER_WAIT FROM table_io_waits_summary_by_table ORDER BY sum_timer_wait DESC
+    //9、哪个索引访问最多？
+    SELECT OBJECT_NAME,INDEX_NAME,COUNT_FETCH,COUNT_INSERT,COUNT_UPDATE,COUNT_DELETE FROM table_io_waits_summary_by_index_usage ORDER BY SUM_TIMER_WAIT DESC
+    //10、哪个索引从来没有用过？
+    SELECT OBJECT_SCHEMA,OBJECT_NAME,INDEX_NAME FROM table_io_waits_summary_by_index_usage WHERE INDEX_NAME IS NOT NULL AND COUNT_STAR = 0 AND OBJECT_SCHEMA <> 'mysql' ORDER BY OBJECT_SCHEMA,OBJECT_NAME;
+    //11、哪个等待事件消耗时间最多？
+    SELECT EVENT_NAME,COUNT_STAR,SUM_TIMER_WAIT,AVG_TIMER_WAIT FROM events_waits_summary_global_by_event_name WHERE event_name != 'idle' ORDER BY SUM_TIMER_WAIT DESC
+    //12-1、剖析某条SQL的执行情况，包括statement信息，stege信息，wait信息
+    SELECT EVENT_ID,sql_text FROM events_statements_history WHERE sql_text LIKE '%count(*)%';
+    //12-2、查看每个阶段的时间消耗
+    SELECT event_id,EVENT_NAME,SOURCE,TIMER_END - TIMER_START FROM events_stages_history_long WHERE NESTING_EVENT_ID = 1553;
+    //12-3、查看每个阶段的锁等待情况
+    SELECT event_id,event_name,source,timer_wait,object_name,index_name,operation,nesting_event_id FROM events_waits_history_longWHERE nesting_event_id = 1553;
+    ```
+
+## Storage Engine (存储引擎)
+
+- [『浅入浅出』MySQL 和 InnoDB](https://draveness.me/mysql-innodb/)
+
+- mysql的存储引擎架构是分离的, 类似插件式的架构
+
+修改默认存储引擎 `engine`:
+
+> ```sh
+> [mysqld]
+> default_storage_engine=INNODB
+> ```
+
+- MyIsam: 速度更快,因为 MyISAM 内部维护了一个计数器,可以直接调取,使用 b+树索引
+
+  > 表锁(对表的锁)
+  >
+  > 不支持事务
+  >
+  > 缓冲池只缓存索引文件,不缓冲数据文件
+  >
+  > 由 MYD 和 MYI 文件组成,MYD 用来存放数据文件,MYI 用来存放索引文件
+
+- InnoDB: 事务更好,使用 b+树索引
+
+  > 行锁(对行的锁),表锁(对表的锁)
+  >
+  > 支持事务
+  >
+  > 自动灾难恢复
+
+```sql
+# 查看支持的存储引擎
+show engines;
+
+# 查看目前使用的存储引擎
+show variables like 'storage_engine';
+
+# 查看 cnarea_2019表 的存储引擎
+show create table cnarea_2019\G;
+
+# 修改ca表的存储引擎为MYISAM
+ALTER TABLE cnarea_2019 ENGINE = MYISAM;
+```
+
+### 表空间
+
+- [爱可生开源社区：第10期：选择合适的表空间](https://mp.weixin.qq.com/s/D-pc8yYD9AJVkk8t9_mXzA)
+
+- MySQL 表空间可分为
+    - 共享表空间
+        - 系统表空间
+        - 通用表空间
+    - 单表空间
+
+
+- 三种表空间如何销毁：
+    - 系统表空间无法销毁，除非把里面的内容全部剥离出来；
+    - 单表空间如果表被删掉了，表空间也就自动销毁；或者是表被移植到其他表空间，单表空间也自动销毁。
+    - 通用表空间需要引用他的表全部删掉或者移植到其他表空间，才可以被成功删除。
+        ```sql
+        # 删除表空间 ts2 失败
+        mysql> drop tablespace ts2;
+        ERROR 3120 (HY000): Tablespace `ts2` is not empty.
+        mysql> show errors;
+        +-------+------+--------------------------------+
+        | Level | Code | Message |
+        +-------+------+--------------------------------+
+        | Error | 3120 | Tablespace `ts2` is not empty. |
+        +-------+------+--------------------------------+
+        1 row in set (0.00 sec)
+
+        # 查看数据字典表来进一步查看表空间 ts2 被哪些表引用了
+
+        mysql> select regexp_replace(a.name,'/.+','') dbname,regexp_replace(a.name,'.+/','') tablename from innodb_tables a, innodb_tablespaces b where a.space = b.space and b.name= 'ts2';
+        +--------+-----------+
+        | dbname | tablename |
+        +--------+-----------+
+        | ytt | t4 |
+        +--------+-----------+
+        1 row in set (0.00 sec)
+
+        # 删除对应的表或者转到其他的表空间。
+        mysql> alter table t4 tablespace innodb_file_per_table;
+        Query OK, 0 rows affected (0.10 sec)
+        Records: 0 Duplicates: 0 Warnings: 0
+
+        # 删除表空间 ts2。
+        mysql> drop tablespace ts2;
+        Query OK, 0 rows affected (0.02 sec)
+        ```
+
+#### 系统表空间：mysql目录下的ibdata1的文件，可以保存一张或者多张表。
+
+- 有些啥内容？double writer buffer、 change buffer、数据字典（MySQL 8.0 之前）、表数据、表索引。
+
+- my.cnf配置文件修改：默认为 1 个，可以有多个
+    ```
+    innodb_data_file_path=ibdata1:200M;ibdata2:200M:autoextend:max:800M
+
+    # 系统表空间不仅可以是文件系统组成的文件，也可以是非文件系统组成的磁盘块，比如裸设备，定义也很简单
+    innodb_data_file_path=/dev/nvme0n1p1:3Gnewraw;/dev/nvme0n1p2:2Gnewraw
+    ```
+
+- 那 MySQL 为什么现在主流版本默认都不是系统表空间？
+
+    - 系统表空间有三个最大的缺点：
+
+    - 1.即使它包含的表都被删掉，这部分空间也不会自动释放。
+
+        ```sql
+        # 表 t1
+        mysql> create table t1(id int, r1 char(36)) tablespace innodb_system;
+        Query OK, 0 rows affected (0.03 sec)
+
+        # ibdata1 初始大小为 12M
+        mysql> \! ls -sihl ibdata1
+        923275 12M -rw-r----- 1 mysql mysql 12M 3月  18 15:32 ibdata1
+
+        # ... 插入一部分数据
+        # ...
+        mysql> select count(*) from t1;
+        +----------+
+        | count(*) |
+        +----------+
+        |   262144 |
+        +----------+
+        1 row in set (0.10 sec)
+
+        # ibdata1 增长到 76M
+        mysql> \! ls -sihl ibdata1
+        923275 76M -rw-r----- 1 mysql mysql 76M 3月  18 15:34 ibdata1
+
+        # 删除这张表
+        mysql> drop table t1;
+        Query OK, 0 rows affected (0.02 sec)
+
+        # 空间并没有释放
+        mysql> \! ls -sihl ibdata1
+        923275 76M -rw-r----- 1 mysql mysql 76M 3月  18 15:39 ibdata1
+        ```
+
+    - 如何才能释放 ibdata1 呢?这个比较麻烦，而且严重影响服务可用性，大致几个步骤：
+        - 1. 用 mysqldump 导出所有表数据；
+        - 2. 关闭 MySQL 服务；
+        - 3. 设置 ibdata1 为默认大小；
+        - 4. source 重新导入数据。
+
+    - 2：扩容时，单表分离速度慢。
+
+        - 系统表空间在无限制增大导致磁盘满需要扩容时，无法快速的把表从系统表空间里分离出来，必须得经过停服务；改配置；扩容；重新导入数据；启服务等步骤方才可行。
+
+    - 3：多张表的数据写入顺序写。
+
+        - 对多张表的写入数据依然是顺序写，这就致使 MySQL 发布了单表空间来解决这两个问题。
+
+#### 单表空间：innodb的ibd文件
+
+- 单表空间不同于系统表空间，每个表空间和表是一一对应的关系，每张表都有自己的表空间。具体在磁盘上表现为后缀为 .ibd 的文件。
+
+- 单表空间除了解决之前说的系统表空间的几个缺点外，还有其他的优点
+    - 1.truncate table 操作比其他的任何表空间都快；
+    - 2.可以把不同的表按照使用场景指定在不同的磁盘目录；
+        ```sql
+        // 比如日志表放在慢点的磁盘，把需要经常随机读的表放在 SSD 上等。
+        mysql> create table ytt_dedicated (id int) data directory = '/var/lib/mysql-files';
+        ```
+
+    - 3.可以用 optimize table 来收缩或者重建经常增删改查的表。
+
+        - `optimize table`命令过程：建立和原来表一样的表结构和数据文件，把真实数据复制到临时文件，再删掉原始表定义和数据文件，最后把临时文件的名字改为和原始表一样的。
+
+        ```
+        # 表 t1 optimize table之前的大小 324M
+        ls -sihl
+        总用量 325M
+        934068 4.0K -rw-r----- 1 mysql mysql   67 3月   6 23:01 db.opt
+        917593  12K -rw-r----- 1 mysql mysql 8.5K 3月  18 16:35 t1.frm
+        918181 325M -rw-r----- 1 mysql mysql 324M 3月  18 16:38 t1.ibd
+
+        # 重建表
+        mysql> optimize table t1;
+
+        # 重建期间抓取到的结果：如愿以偿看到 # 开头的临时表定义和数据文件。
+        ls -sihl
+        总用量 409M
+        934068 4.0K -rw-r----- 1 mysql mysql 67 3月 6 23:01 db.opt
+        917100 12K -rw-r----- 1 mysql mysql 8.5K 3月 18 16:38 '#sql-1791_7.frm'
+        917107 85M -rw-r----- 1 mysql mysql 84M 3月 18 16:39 '#sql-ib51-975102565.ibd'
+        917593 12K -rw-r----- 1 mysql mysql 8.5K 3月 18 16:35 t1.frm
+        918181 325M -rw-r----- 1 mysql mysql 324M 3月 18 16:38 t1.ibd
+
+        # 重建完成，表 t1 实际占用空间 84M
+        ls -sihl
+        总用量 85M
+        934068 4.0K -rw-r----- 1 mysql mysql   67 3月   6 23:01 db.opt
+        917100  12K -rw-r----- 1 mysql mysql 8.5K 3月  18 16:38 t1.frm
+        917107  85M -rw-r----- 1 mysql mysql  84M 3月  18 16:39 t1.ibd
+        ```
+
+    - 4.可以自由移植单表
+        - 并不需要移植整个数据库，可以把单独的表在各个实例之间灵活移植。
+        - 例子：把 ytt.t1 的数据移植到 ytt2.t1 里。
+        ```sql
+        create database ytt2;
+        use ytt2
+        create table t1 like ytt.t1;
+
+        // 进行表数据移植。
+        alter table t1 discard tablespace;
+
+        root@ytt-pc:/data/ytt/mysql/data/ytt# cp -rfp /tmp/t1.ibd ../ytt2/
+
+        alter table t1 import tablespace;
+
+        // 确认下数据是否一致。
+        select (select count(*) from ytt.t1) 'ytt.t1',(select count(*) from ytt2.t1) 'ytt2.t1';
+        +---------+---------+
+        | ytt.t1 | ytt2.t1 |
+        +---------+---------+
+        | 2097152 | 2097152 |
+        +---------+---------+
+        1 row in set (1.69 sec)
+        ```
+
+    - 5.单表空间的表可以使用 MySQL 的新特性：比如表压缩，大对象更优化的磁盘存储等。
+    - 6.可以更好的管理和监控单个表的状态：比如在 OS 层可以看到表的大小。
+    - 7.可以解除 InnoDB 系统表空间的大小限制：InnoDB 一个表空间最大支持 64TB 数据（针对 16KB 的页大小）。如果是系统表空间，整个实例都被这个限制，单表空间则是针对单个表有 64TB 大小限制。
+
+- 单表空间的缺点
+    - 1.当多张表被大量的增删改后，表空间会有一定的膨胀
+    - 2.相比系统表空间，打开表需要的文件描述符增多，浪费更多的内存。
+
+##### ibd文件内部
+
+- ibd文件：
+
+    - segment (包括段)
+    - extent (区)
+    - page (页)
+
+    ![image](./Pictures/mysql/innodb3.avif)
+
+
+    - 这个数据文件被划分成很多的数据页（页号来标识），每个数据页大小是16K。
+        ![image](./Pictures/mysql/innodb-ibd.avif)
+
+    - ibd文件内部结构
+        ![image](./Pictures/mysql/innodb-ibd1.avif)
+
+    - 数据页需要读写，写入到一半的过程中可能会发生了意外断电等情况，所以为了保证数据页的准确性，还引入了校验码；
+    - 同时为了在数据页搜索数据提高效率，数据页内部还生成了页目录；
+    - 除了上述所说的，数据页内剩下的空间就用来存放实际的数据；
+
+- 数据页和数据页之间是以B+树的形式进行关联
+
+    ![image](./Pictures/mysql/innodb-ibd2.avif)
+
+    - 叶子节点的数据页存放的是实际存储的数据，非叶子节点存放的是索引内容。
+
+    - B+树的每一层代表一次磁盘 IO。
+        - 例子：寻找 ID=5 的记录，从顶部非叶子节点开始查找，由于 ID=5 大于1并且小于7，故应该往左边寻找，来到页号为6的数据页，由于5大于4，故应该往右边寻找，来到页号为105的数据页，找到 ID=5 的记录，完成查询。这个过程中查询了三个数据页，如果这三个数据页都没有加载到内存，那么就需要经历三次磁盘 IO 查询。
+
+    - MySQL 一棵 B+ 树可以存放多少行数据？
+
+        - 假设：
+            - 非叶子节点内指向其他数据页的指针数量为 X（即非叶子节点的最大子节点数为 X）
+            - 每个叶子节点可以存储的行记录数为 Y
+            - B+树的高度为 N（即  B+树的层数）
+
+        - 公式：
+
+            - 对于一个高度为 N 的 B+树，顶层（根节点）有一个非叶子节点，那么第二层就有X个节点，第三层就有 X 的2次方个节点，第四层就有 X 的三次方个节点，以此类推，第 N 层（即叶子节点所在的第 N 层）就有 X 的 N-1 次方个节点；
+            - 在 B+ 树中，所有的记录都存储在叶子节点中，假设每个叶子节点都可以存储的行记录数为 Y；
+            - 那么 B+ 树可以存储的数据总量为叶子节点总数乘以每个叶子节点存储的记录数
+                - 即：M=（X 的 N-1 次方）乘以 Y；
+
+        - 代入计算：
+
+            - 一个数据页大小16K，扣除页号、前后指针、页目录，校验码等信息，实际可以存储数据的大约为15K，假设主键ID为bigint型，那么主键 ID 占用8个 byte，页号占用4个 byte，则 X=15*1024/(8 + 4) 等于1280；
+            - 一个数据页实际可以存储数据的空间大小，大约为15K，假设一条行记录占用的空间大小为1K，那么一个数据页就可以存储15条行记录，即 Y=15；
+            - 假设 B+树是两层的：则 N=2，即 M=1280的（2-1）次方 * 15 ≈ 2w ；
+            - 假设 B+树是三层的：则 N=3，即 M=1280的2次方 * 15 ≈ 2.5 kw；
+                - 这个2.5kw，就是我们常说的单表建议最大行数2kw的由来。毕竟再加一层，数据就大得有点离谱了。三层数据页对应最多3次磁盘IO，也比较合理。
+            - 假设 B+树是四层的：则 N=4，即 M=1280的3次方 * 15 ≈ 300亿
+
+        - 综上所述，我们建议单表数据量大小在两千万。当然这个数据是根据每条行记录的大小为 1K 的时候估算而来的，而实际情况中可能并不是这个值，所以这个建议值两千万只是一个建议，而非一个标准。
+
+#### 通用表空间
+
+- 通用表空间先是出现在 MySQL Cluster 里，也就是 NDB 引擎。从 MySQL 5.7 引入到 InnoDB 引擎。
+
+- 通用表空间和系统表空间一样，也是共享表空间。每个表空间可以包含一张或者多张表，也就是说通用表空间和表之间是一对多的关系。
+
+- 通用表空间其实是介于系统表空间和单表空间之间的一种折中的方案。
+
+    - 和系统表空间类似，不会自动收缩磁盘空间；
+    - 和系统表空间类似，可以重命名表空间名字；
+    - 和单表空间类似，可以很方便把表空间文件定义在 MySQL 数据目录之外；
+    - 比单表空间占用更少的文件描述符，但是又不能像单表空间那样移植表空间。
+
+```sql
+create tablespace ts1 add datafile '/var/lib/mysql-files/ts1.ibd' engine innodb;
+create table t1(id int,r1 datetime) tablespace ts1;
+create table t2(id int,r1 datetime) tablespace ts1;
+create table t3(id int,r1 datetime) tablespace ts1;
+```
+
+#### 切换各种表空间
+
+- 要注意切换时间点，毕竟切换涉及到数据的迁移，类似 copy 文件对系统的影响。
+
+```sql
+// 表 t1 随时切换各种表空间
+alter table t1 tablespace innodb_file_per_table;
+alter table t1 tablespace innodb_system;
+alter table t1 tablespace ts1;
+```
+
+### MyISAM
+
+- MyISAM引擎是5.1版本之前的默认引擎
+
+- 在 Mysql 保存目录下:
+
+    | 文件拓展名 | 说明                     |
+    |------------|--------------------------|
+    | frm        | 表格式(innodb也有此文件) |
+    | MYD        | 数据文件                 |
+    | MYI        | 索引文件                 |
+
+    ![image](./Pictures/mysql/myisam.avif)
+
+- 不支持事务
+- 不支持外键
+- 不支持行锁：在执行查询语句(SELECT、UPDATE、DELETE、INSERT 等)前,会自动给涉及的表加读锁,这个过程并不需要用户干预
+
+- 默认情况下,写锁比读锁具有更高的优先级:当一个锁释放时,这个锁会优先给写锁队列中等候的获取锁请求,然后再给读锁队列中等候的获取锁请求.
+
+    - 这也正是 MyISAM 表不太适合于有大量更新操作和查询操作应用的原因,因为,大量的更新操作会造成查询操作很难获得读锁,从而可能永远阻塞.
+
+- 测试在循环 50 次 select 的过程中,MYISAM 的表的写入情况
+
+    ```sql
+    # 创建存储过程,循环50次select
+
+    delimiter #
+    create procedure scn()
+    begin
+    declare i int default 1;
+    declare s int default 50;
+
+    while  i < s do
+        select * from cnarea_2019;
+        set i = i + 1;
+    end while;
+
+    end #
+    delimiter ;
+
+    # 执行scn
+    call scn();
+    ```
+
+    打开另一个客户端,对 MyISAM 表修改数据:
+
+    ```sql
+    show processlist;
+
+    update cnarea_2019
+    set name='test-lock'
+    where id <11;
+
+    select name from cnarea_2019
+    where id < 11;
+    ```
+
+    - 左边:修改数据的客户端
+    - 右边:执行 call scn();
+
+    左边在等待右边的锁,可以看到我停止 **scn()**后,立马修改成功
+
+    ![image](./Pictures/mysql/myisam_lock.gif)
+
+
+- 测试在循环 50 次 select 的过程中,innodb 的表的写入情况
+
+    ```sql
+    # 把 cnarea_2019表 改为innodb 引擎
+    alter table cnarea_2019 rename cnarea_2019_innodb;
+    alter table cnarea_2019_innodb engine = innodb;
+    ```
+
+    ```sql
+    `u`# 创建存储过程,循环50次select
+    delimiter #
+    create procedure scn2()
+    begin
+    declare i int default 1;
+    declare s int default 50;
+
+    while  i < s do
+        select * from cnarea_2019_innodb;
+        set i = i + 1;
+    end while;
+
+    end #
+    delimiter ;
+
+    # 执行scn2
+    call scn2();
+    ```
+
+    打开另一个客户端,对 innodb 表修改数据:
+
+    ```sql
+    update cnarea_2019_innodb
+    set name='test-lock'
+    where id < 11;
+
+    select name from cnarea_2019_innodb
+    where id < 11;
+    ```
+
+    - 左边:修改数据的客户端
+    - 右边:执行 call scn2();
+
+    修改数据后左边**commit**,右边也**commit**后,数据同步
+
+    ![image](./Pictures/mysql/innodb_lock.gif)
+
+### [InnoDB](https://dev.mysql.com/doc/refman/8.0/en/innodb-storage-engine.html)
+
+注意:在 MariaDB 10.3.7 以上的版本,InnoDB 版本不再与 MySQL 发布版本相关联
+[InnoDB and XtraDB](https://mariadb.com/kb/en/innodb/)
+
+- 每一张表，在 Mysql 保存目录下保存2个文件：
+
+    - frm：表格式
+    - ibd：（innodb 数据文件，又叫表空间文件）: 索引和数据文件
+
+    ![image](./Pictures/mysql/innodb1.avif)
+    ![image](./Pictures/mysql/innodb.avif)
+
+- 行格式:
+
+    - Compact
+
+    - Redundant
+
+    ![image](./Pictures/mysql/innodb2.avif)
+
+#### TRANSACTION (事务)
+
+| 事务sql语句   | 操作           |
+| ------------- | -------------- |
+| BEGIN         | 开始一个事务   |
+| ROLLBACK      | 事务回滚       |
+| COMMIT        | 事务确认       |
+
+```sql
+# 创建表tz
+create table tz (
+    id int (8),
+    name varchar(50),
+    date DATE
+);
+
+# 开始事务
+begin;
+
+# 插入数据
+insert into tz (id,name,date) values
+(1,'tz','2020-10-24');
+
+# 回滚到开始事务之前(rollback 和 commit 只能选一个)
+rollback;
+# 如果出现waring,表示该表的存储引擎不支持事务(不是innodb)
+Query OK, 0 rows affected, 1 warning (0.00 sec)
+
+# 如果不回滚,使用commit确认这次事务的修改
+commit;
+```
+
+如果有两个会话,一个开启了事务,修改了数据.另一个会话同步数据要执行 `flush table 表名`
+
+```sql
+# 把 clone表 存放在缓冲区里的修改操作写入磁盘
+flush table clone
+```
+
+![image](./Pictures/mysql/flush.avif)
+
+`flush table clone`后, `select` 数据同步
+![image](./Pictures/mysql/flush1.avif)
+
+---
+
+- `SAVEPOINT savepoint_name;` 声明一个事务保存点
+- `ROLLBACK TO savepoint_name;` 回滚到事务保存点,但不会终止该事务
+- `RELEASE SAVEPOINT savepoint_name;` // 删除指定保留点
+
+```sql
+# 创建数据库
+create table tz (
+    id int (8),
+    name varchar(50),
+    date DATE
+);
+
+# 声明一个名叫 abc 的事务保存点
+savepoint abc;
+
+# 插入数据
+insert into tz (id,name,date) values
+(1,'tz','2020-10-24');
+
+# 回滚到 abc 事务保存点
+rollback to abc;
+```
+
+##### autocommit（自动提交）
+
+`autocommit = 1` 对表的所有修改将立即生效
+
+`autocommit = 0` 则必须使用 COMMIT 来提交事务,或使用 ROLLBACK 来回滚撤销事务
+
+- 1.如果 InnoDB 表有大量的修改操作,应设置 `autocommit = 0` 因为 `ROLLBACK` 操作会浪费大量的 I/O
+
+    ```ini
+    [mysqld]
+    autocommit = 0
+    ```
+
+    - **注意:**
+
+        - 不要长时间打开事务会话,适当的时候要执行 COMMIT(完成更改)或 ROLLBACK(回滚撤消更改)
+        - ROLLBACK 这是一个相对昂贵的操作 请避免对大量行进行更改,然后回滚这些更改.
+
+- 2.如果只是查询表,没有大量的修改,应设置 `autocommit = 1`
+
+##### [事务隔离性](https://mariadb.com/kb/en/set-transaction/)
+
+- mysql默认隔离性为REPEATABLE READ（可重复读）
+
+- 基本命令
+
+    ```sql
+    -- 查看当前会话的隔离级别
+    SHOW VARIABLES LIKE 'transaction_isolation';
+    -- 查看全局的隔离级别
+    SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
+    -- 查看当前会话和全局的隔离级别
+    SELECT @@GLOBAL.tx_isolation, @@tx_isolation;
+
+    -- 设置当前会话的隔离级别。设置为READ COMMITTED（已提交读）
+    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    -- 设置全局的隔离级别。设置为REPEATABLE READ（可重复读）
+    SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+    ```
+
+- 创建测试表，并插入数据:
+
+    ```sql
+    drop table if exists test;
+
+    CREATE TABLE test(
+        id int (8),
+        name varchar(50),
+        date DATE
+    );
+
+    insert into test (id,name,date) values
+    (1,'tz1','2020-10-24'),
+    (10,'tz2','2020-10-24'),
+    (100,'tz3','2020-10-24');
+
+    commit;
+    ```
+
+###### read uncommitted(未提交读)，也叫dirty read (脏读)
+
+> 事务A能读到事务B修改了但未提交的数据
+
+- 开启事务 a:
+
+    ```sql
+    # 设置事务a read uncommitted
+    set session transaction isolation level read uncommitted;
+    begin;
+    select * from test;
+    ```
+
+- 开启事务 b,并修改数据,不需要提交:
+
+    ```sql
+    begin;
+    select *from test;
+
+    update test
+    set id = 20
+    where id = 10;
+    ```
+
+- 事务 a 就能读取到b未提交修改的数据:
+
+    ```sql
+    select * from test;
+    ```
+
+    - 右边为事务 a
+    - 左边为事务 b
+    ![image](./Pictures/mysql/uncommitted.gif)
+
+- 注意:如果事务 b,没有 `commit` 就退出.那么事务 b 的修改将失效
+
+    ![image](./Pictures/mysql/uncommitted1.gif)
+
+###### read committed(已提交读) , phantom read (幻读):
+
+> 事务A只能读到事务B修改并提交的数据
+
+- 开启事务 a:
+
+    ```sql
+    # 设置事务a read committed
+    set session transaction isolation level read committed;
+
+    # 开启事务
+    begin;
+    select * from test;
+    ```
+
+- 开启事务 b,并修改数据后,提交:
+
+    ```sql
+    begin;
+    select *from test;
+
+    update test
+    set id = 20
+    where id = 10;
+
+    # 区别于 read uncommitted
+    commit;
+    ```
+
+- 事务 a 就能读取:
+
+    ```sql
+    select * from test;
+    ```
+
+    - 右边为事务 a
+    - 左边为事务 b
+    ![image](./Pictures/mysql/committed.gif)
+
+###### MVCC(多版本并发控制)：解决幻读问题
+
+- MVCC并非乐观锁，但是InnoDB存储引擎所实现的MVCC是乐观的，它和之前所提到的用户行为的“乐观锁”都采用的是乐观机制，属于不同的“乐观锁”手段，它们都是“乐观家族”的成员。
+
+- InnoDB 中的 RC 和 RR 隔离事务是基于多版本并发控制（MVVC）实现高性能事务。
+
+- InnoDB的MVCC，是通过在每行记录后保存两个隐藏的列来实现的（用户不可见）。
+    - 一个列保存行创建的时间
+    - 一个列保存行过期（删除）的时间，这里所说的时间并不是传统意义上的时间，而是系统版本号
+
+- mvcc在不同sql语句的操作：
+
+    - SELECT：InnoDB会根据以下两个条件检查每行记录：
+
+        - 1.InnoDB只查找版本早于当前事务版本的数据行（行的系统版本号小于或者等于事务的系统版本号），这样可以确保事务读取到的行，要么是在事务开始之前已经存在的，要么是事务自身插入或者修改过的（结合以下INSERT、UPDATE操作理解）。
+
+        - 2.行的删除版本要么未定义，要么大于当前事务版本号。可以确保事务读取到的行，在事务开启之前未被删除（结合以下DELETE操作理解）。
+
+    - INSERT：InnoDB为新插入的每一行保存当前系统版本号作为行版本号。
+    - DELETE：InnoDB为删除的每一行保存当前系统版本号作为行删除标识（第二个隐藏列的作用来了）。
+    - UPDATE：InnoDB将更新后的列作为新的行插入数据库（并不是覆盖），并保存当前系统版本号作为该行的行版本号，同时保存当前系统版本号到原来的行作为行删除标识。
+
+##### 结合业务场景，使用不同的事务隔离
+
+- 隔离级别越高，并发性能就越低。
+
+- 其实 MySQL 的并发事务调优和 Java 的多线程编程调优非常类似，都是可以通过减小锁粒度和减少锁的持有时间进行调优。在 MySQL 的并发事务调优中，我们尽量在可以使用低事务隔离级别的业务场景中，避免使用高事务隔离级别。
+
+    - 在功能业务开发时，开发人员往往会为了追求开发速度，习惯使用默认的参数设置来实现业务功能。例如，在 service 方法中，你可能习惯默认使用 transaction，很少再手动变更事务隔离级别。但要知道，transaction 默认是 RR 事务隔离级别，在某些业务场景下，可能并不合适。因此，我们还是要结合具体的业务场景，进行考虑。
+
+- 那换到业务场景中，我们如何判断用哪种隔离级别更合适呢？我们可以通过两个简单的业务来说下其中的选择方法。
+
+    - 1.我们在修改用户最后登录时间的业务场景中，这里对查询用户的登录时间没有特别严格的准确性要求，而修改用户登录信息只有用户自己登录时才会修改，不存在一个事务提交的信息被覆盖的可能。所以我们允许该业务使用最低隔离级别。
+
+    - 2.而如果是账户中的余额或积分的消费，就存在多个客户端同时消费一个账户的情况，此时我们应该选择 RR 级别来保证一旦有一个客户端在对账户进行消费，其他客户端就不可能对该账户同时进行消费了。
+
+- 是否遇到过以下 SQL 异常呢？在抢购系统的日志中，在活动区间，我们经常可以看到这种异常日志：`MySQLQueryInterruptedException: Query execution was interrupted`
+
+    - 由于在抢购提交订单中开启了事务，在高并发时对一条记录进行更新的情况下，当多个事务同时对一条记录进行更新时，极端情况下，一个更新操作进去排队系统后，可能会一直拿不到锁，最后因超时被系统打断踢出。
+
+    - 在两种不同的执行顺序下，其结果都是一样的，但在事务性能方面却不一样：
+
+        | 执行顺序1                    | 执行顺序2                    |
+        |------------------------------|------------------------------|
+        | 1.开启事务                   | 1.开启事务                   |
+        | 2.查询库存、判断库存是否满足 | 2.查询库存、判断库存是否满足 |
+        | 3.新建订单                   | 3.扣除库存                   |
+        | 4.扣除库存                   | 4.新建订单                   |
+        | 5.提交或回滚                 | 5.提交或回滚                 |
+
+        - 这是因为，虽然这些操作在同一个事务，但锁的申请在不同时间，只有当其他操作都执行完，才会释放所有锁。因为扣除库存是更新操作，属于行锁，这将会影响到其他操作该数据的事务，所以我们应该尽量避免长时间地持有该锁，尽快释放该锁。
+
+        - 又因为先新建订单和先扣除库存都不会影响业务，所以我们可以将扣除库存操作放到最后，也就是使用执行顺序 1，以此尽量减小锁的持有时间。
+
+#### 锁
+
+- Mysql 锁分为**共享锁**和**排他锁**,也叫做 **读锁** 和 **写锁**:
+
+    - 写锁: 是排他的,它会阻塞其他的写锁和读锁.从颗粒度来区分,可以分为 **表锁** 和 **行锁** 两种.
+
+    - 表锁: 会锁定整张表并且阻塞其他用户对该表的所有读写操作,比如 alter 修改表结构的时候会锁表.
+
+> Innodb 默认使用的是行锁.而行锁是基于索引的,因此要想加上行锁,在加锁时必须命中索引,否则将使用表锁.
+
+- **行锁分为:**
+
+    - Pessimistic Locking(悲观锁): 具有**排他性**,数据处理过程中,数据处于锁定状态
+
+    - Optimistic Locking(乐观锁): 记录 commit 的版本号(version),对数据修改会改变 version,通过对比 **修改前后 的 version 是否一致**来确定是哪个事务的 commit
+
+- 行锁的具体实现算法有三种：
+    - 1.record lock：专门对索引项加锁
+    - 2.gap lock：是对索引项之间的间隙加锁
+    - 3.next-key lock：则是前面两种的组合，对索引项以其之间的间隙加锁。
+
+    - 只在可重复读或以上隔离级别下的特定操作才会取得 gap lock 或 next-key lock，在 Select 、Update 和 Delete 时，除了基于唯一索引的查询之外，其他索引查询时都会获取 gap lock 或 next-key lock，即锁住其扫描的范围。
+
+[详情](https://zhuanlan.zhihu.com/p/222958908)
+
+> ```sql
+> # 加锁
+> LOCK TABLES 表1 WRITE, 表2 READ, ...;
+>
+> # 排他锁(写锁)
+> LOCK TABLES 表1 WRITE;
+>
+> # 共享锁(读锁)
+> LOCK TABLES 表1 READ;
+> ```
+
+> ```sql
+> # 解锁
+> UNLOCK TABLES;
+> ```
+
+> ```sql
+> # 通过队列查看是否有 lock
+> show processlist;
+> ```
+
+- 创建一个表进行实验:
+
+    ```sql
+    CREATE TABLE locking(
+        id int (8) NOT NULL UNIQUE,
+        name varchar(50),
+        date DATE
+    );
+
+    insert into locking (id,name,date) values
+    (1,'tz1','2020-10-24'),
+    (10,'tz2','2020-10-24'),
+    (100,'tz3','2020-10-24');
+    ```
+
+##### 共享锁（表锁）：只能加入读取锁
+
+- 事务 a 对表 locking 加入共享锁:
+
+    ```sql
+    begin;
+    select * from locking
+    lock in share mode;
+    ```
+
+- 事务 b 也能对表 locking 加入共享锁:
+
+    ```sql
+    begin;
+    select * from locking
+    lock in share mode;
+
+    update locking set id = 20 where id = 10;
+
+    # 加入非读取锁(悲观锁) 或者 使用update语句,会阻塞
+    select * from locking
+    for update;
+    ```
+
+    ![image](./Pictures/mysql/innodb_lock6.gif)
+
+##### 排他锁（表锁）和悲观锁（行锁）：不能加入其他锁
+
+- 实验1：排他锁（表锁）
+
+    ```sql
+    # 事务a 在select 最后 加入 for update 排他锁,锁整个表
+    begin;
+    select * from locking
+    for update;
+
+    # 事务b 执行update时 或者 加入其他锁,会阻塞
+    begin;
+    update locking
+    set id = 1
+    where id = 2;
+
+    # 事务a commit后,事务b update id = 1 执行成功
+    commit;
+    ```
+
+    ![image](./Pictures/mysql/innodb_lock1.gif)
+
+- 实验2：悲观锁（行锁）
+
+    ```sql
+    # 事务a 加入where 从句,只锁对应的行(我这里是id = 1)
+    select * from locking
+    where id = 1
+    for update;
+
+    # 事务b 对 update 不同的行 成功执行
+    update locking
+    set id = 10
+    where id = 20;
+
+    # 事务b update id = 1时,会阻塞
+    update locking
+    set id = 2
+    where id = 1;
+
+    # 事务a commit后,事务b update id = 1 执行成功
+    commit;
+    ```
+
+    ![image](./Pictures/mysql/innodb_lock2.gif)
+
+##### 乐观锁（行锁）：版本号
+
+修改包含:update,delete
+
+- 事务 a: 修改数据为 2
+
+    ```sql
+    begin;
+    select * from locking;
+
+    update locking
+    set id = 2
+    where id = 1;
+
+    commit;
+    select * from locking;
+    ```
+
+- 事务 b: 修改数据为 3
+
+    ```sql
+    begin
+    select * from locking;
+
+    update locking
+    set id = 3
+    where id = 1;
+
+    commit;
+    ```
+
+最后结果 **2**.
+
+因为事务 a 比事务 b 先 commit,此时版本号改变,所以当事务 b 要 commit 时的版本号 与 事务 b 开始时的版本号不一致,提交失败.
+
+![image](./Pictures/mysql/innodb_lock5.gif)
+
+##### 事务a 和 事务b 插入相同的数据
+
+- **事务 a** 先于 **事务 b** 插入.那么**事务 b** 会被阻塞,当**事务 a** `commit` 后：
+
+    - 如果有唯一性索引或者主健那么 **事务 b** 会插入失败(幻读)
+
+    - 如果没有,那么将会出现相同的两条数据
+
+- 实验1：**有唯一性索引或者主健:**
+
+    ```sql
+    # 事务a 和 事务 b 插入同样的数据
+    insert into locking (id,name,date) value
+    (1000,'tz4','2020-10-24');
+    ```
+
+    ![image](./Pictures/mysql/innodb_lock3.gif)
+
+- 实验2：**没有索引:**
+
+    ```sql
+    # 删除唯一性索引
+    alter table locking
+    drop index id;
+
+    # 事务a 和 事务 b 插入同样的数据
+    insert into locking (id,name,date) value
+    (1000,'tz4','2020-10-24');
+    ```
+
+    ![image](./Pictures/mysql/innodb_lock4.gif)
+
+##### 死锁
+
+- 死锁
+
+    ![image](./Pictures/mysql/innodb_lock.avif)
+
+    事务 A 在等待事务 B 释放 id=2 的行锁
+
+    事务 B 在等待事务 A 释放 id=1 的行锁
+
+    互相等待对方的资源释放,就进入了死锁状态
+
+- 当出现死锁以后,有两种策略:
+
+    - 1:进入等待,直到超时.超时时间参数 `innodb_lock_wait_timeout`
+
+    - 2:发起死锁检测,发现死锁后,主动回滚死锁链条中的某一个事务,让其他事务得以继续执行.将参数 `innodb_deadlock_detect` 设置为 `on`.但是它有额外负担的.每当一个事务被锁的时候,就要看看它所依赖的线程有没有被别人锁住,如此循环,最后判断是否出现了循环等待,也就是死锁
+
+### frm文件解析利器mysqlfrm
+
+- 可以解析innodb和Myisam的.frm文件，转换为CREATE TABLE语句
+
+- 安装
+```sh
+yum install -y mysql-utilities
+```
+
+- 使用
+```sh
+# 将.frm文件转换为CREATE TABLE语句
+mysqlfrm --diagnostic /var/lib/mysql/mysql/columns_priv.frm
+
+# --server 连接远程mysql
+mysqlfrm --diagnostic --server=root:123456@192.168.77.128:3306 /var/lib/mysql/trail/trail_tab.frm
+
+# 分析一个目录下的全部.frm文件生成建表语句
+mysqlfrm --diagnostic /var/lib/mysql/my_db/bk/ >createtb.sql
+# 可以看到一共生成了 124 个建表语句。
+grep "^CREATE TABLE" createtb.sql |wc -l
+124
+```
+
+## my.cnf配置文件
+
+- 调整 InnoDB 配置，提高 Mysql 服务器
+    ```
+    # 将缓冲池大小设置为服务器上可用 RAM 的 80%（例如，在 16G RAM 服务器上）：
+    # 当您重新启动具有大型缓冲池和数据库本身大量数据的 Mysql 服务器时，请准备好稍等片刻。
+    innodb_buffer_pool_size = 12G
+
+    # 当 InnoDB 表中的数据发生变化时，Mysql 会先将变化写入缓冲池。之后，它将更改操作（以低级格式）记录到日志文件（所谓的“重做日志”）
+    # 如果这些日志文件很小，Mysql 必须直接对数据文件进行大量写入磁盘。因此，将日志文件设置为大（如果可能，与缓冲池一样大）
+    # 警告。当您更改innodb_log_file_size选项时，您必须在重新启动服务器时删除旧的日志文件：rm /var/lib/mysql/ib_logfile*
+    innodb_log_file_size = 12G
+
+    # 大型事务将迫使 Mysql 将大量数据写入日志文件。为了节省资源，Mysql 会先将数据写入日志缓冲区：
+    # 如果日志缓冲区小于事务影响，Mysql 将不得不等到它将所有内容写入磁盘。如果您有一次插入/更新/删除多行的查询，请增加日志缓冲区：
+    innodb_log_buffer_size = 128M
+
+    # 数据刷新到磁盘的频率
+    # 默认值1：将在每次事务后将数据刷新到磁盘。
+    # 设置值0：将要求 Mysql 每秒将数据刷新到磁盘。这将显着提高写入性能。但要小心。这可能导致系统崩溃时丢失最多 1 秒的事务。因此，在更改此选项之前，请绝对复制您的 Mysql 服务器以获得可靠性：
+    innodb_flush_log_at_trx_commit = 0
+
+    # 不仅是刷新周期，刷新的方法也会影响Mysql的性能。
+    # O_DSYNC在将数据写入磁盘时，使用选项将跳过双重缓存：
+    innodb_flush_method = O_DSYNC
+    ```
+
+## 备份与恢复
+
+- 备份工具可以分为：
+
+    - 1.物理备份：直接包含了数据库的数据文件，适用于大数据量，需要快速恢复的数据库。
+
+    - 2.逻辑备份：包含的是一系列文本文件，其中是代表数据库中数据结构和内容的SQL语句，适用于较小数据量或是跨版本的数据库备份恢复。
+
+### mysqldump 备份和恢复
+
+- 先创建一个数据表
+
+```sql
+use china;
+create table tz (
+    id   int (8),
+    name varchar(50),
+    date DATE
+);
+
+insert into tz (id,name,date) values
+(1,'tz','2020-10-24');
+```
+
+- 1.使用 `mysqlimport` 导入(不推荐)
+
+  > 因为 `mysqlimport` 是把数据**导入新增**进去表里,而非恢复
+
+```sql
+# 导出tz表. 注意:路径要加''
+SELECT * FROM tz INTO OUTFILE '/tmp/tz.txt';
+
+# 删除表和表的数据
+drop table tz;
+
+# 导入前要创建一个新的表
+create table tz (
+    id int (8),
+    name varchar(50),
+    date DATE
+);
+```
+
+回到终端使用 `mysqlimport` 进行数据导入:
+
+```sh
+mysqlimport china /tmp/tz.txt
+```
+
+- 2.使用 `mysqldump` 备份
+
+```sql
+# 备份 china 数据库
+
+mysqldump -uroot -pYouPassward china > china.sql
+
+# 备份 china 数据库里的 tz 表
+
+mysqldump -uroot -pYouPassward china tz > tz-tables.sql
+
+# 备份所有数据库
+
+mysqldump -uroot -pYouPassward --all-databases > all.sql
+
+# -d 只备份所有数据库表结构(不包含表数据)
+
+mysqldump -uroot -pYouPassward -d --all-databases > mysqlbak-structure.sql
+
+# 恢复到 china 数据库
+
+mysql -uroot -pYouPassward china < china.sql
+
+# 恢复所有数据库
+
+mysql -uroot -pYouPassward < all.sql
+```
+
+### [mydumper：比 MySQL 自带的 mysqldump 快很多](https://github.com/maxbube/mydumper)
+
+- [详细参数](https://linux.cn/article-5330-1.html)
 
 ```sh
 # 带压缩备份--compress(gz)
@@ -4068,11 +2313,410 @@ myloader \
 --verbose=3
 ```
 
-### [XtraBackup]()
+
+### XtraBackup 热备份
+
+- [爱可生开源社区：图解MySQL | [原理解析] XtraBackup全量备份还原](https://zhuanlan.zhihu.com/p/73632725)
+- [爱可生开源社区：图解MySQL | [原理解析] XtraBackup增量备份还原](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247484425&idx=1&sn=a3c70d67676af1c8290b089887d8e4d3&chksm=fc96e696cbe16f80120fbebd0749362fa5501e7a33dbb34ab71c4a5947c57c28dd8496850c6b&scene=21#wechat_redirect)
+- [爱可生开源社区：图解MySQL|[原理解析]XtraBackup备份恢复时为什么要加apply-log-only参数](https://zhuanlan.zhihu.com/p/84716636)
+
+- XtraBackup：属于物理备份
+    - 在备份时复制所有MySQL的数据文件以及一些事务日志信息
+    - 在还原时将复制的数据文件放回至MySQL数据目录，并应用日志保证数据一致。
+
+- Xtrabackup的优点：
+    - 1.备份速度快，物理备份可靠
+    - 2.备份过程不会打断正在执行的事务
+    - 3.能够基于压缩等功能节约磁盘空间和流量
+    - 4.自动备份校验
+    - 5.还原速度快
+    - 6.可以流传将备份传输到另外一台机器上
+    - 7.在不增加服务器负载的情况备份数据
+
+- XtraBackup备份原理：
+
+    - 全量备份的过程：
+
+        ![image](./Pictures/mysql/XtraBackup全量备份.avif)
+
+        - 1.首先开启一个后台检测进程，复制已有的redo log，然后监听redo log变化，一旦发现redo中有新的日志写入，立刻将日志记入后台日志文件xtrabackup_log中。
+
+        - 2.之后复制innodb的数据文件和系统表空间文件ibdata1
+
+            - 为什么要先复制redo log，而不是直接开始复制数据文件？因为XtraBackup是基于InnoDB的crash recovery机制进行工作的。由于是热备操作，在备份过程中可能有持续的数据写入，直接复制出来的数据文件可能有缺失或被修改的页，而redo log记录了InnoDB引擎的所有事务日志
+
+        - 3.执行flush tables with read lock操作（加锁：全局读锁）
+            - 非事务引擎数据文件较多时，全局读锁的时间会较长。
+            - 加锁：全局读锁的作用？在加锁期间，没有新数据写入，XtraBackup会复制此时的binlog位置信息，frm表结构，MyISAM等非事务表。
+
+        - 4.复制.frm，MYI，MYD，等文件
+        - 5.获取binlog点位信息等元数据
+        - 6.最后会发出unlock tables
+        - 7.停止xtrabackup_log。
+
+    - 恢复的过程：
+        - 1.模拟MySQL进行recover，将redo log回放到数据文件中
+        - 2.等到recover完成
+        - 3.重建redo log，为启动数据库做准备
+        - 4.将数据文件复制回MySQL数据目录
+        - 5.恢复完成
+
+    - 增量备份：只针对增量备份过程中的”增量”进行处理，主要是相对innodb而言，对myisam和其他存储引擎而言，它仍然是全量备份。
+
+        - 如何识别InnoDB的哪些数据是增量的？
+            - 数据文件中的数据页都有LSN号，LSN可以看做是数据页的变更时间戳。那么通过这个时间戳，就可以识别数据页在全量备份后是否修改过
+
+        - 如果一个数据页原本不是增量范围内的，在增量备份的过程中，数据页更新了，那么增量备份是否会涵盖这个数据页？ 与全量备份中的解决方案相同：通过恢复时回放redo log，解决数据新旧不一致的问题。
+
+    - 增量恢复：
+
+        ![image](./Pictures/mysql/XtraBackup增量恢复.avif)
+
+        - 1.先还原一个全量备份到临时目录
+        - 2.开始还原增量备份，将增量备份中的增量的数据文件，覆盖到临时目录中。
+        - 3.将增量备份中的redo log，回放到临时目录中。
+        - 4.将其他文件覆盖到临时目录中。
+        - 5.增备还原完成。
+        - 6.重建redo log，为启动数据库做准备。
+        - 7.将临时目录中的文件，拷贝到MySQL的数据目录中。
+
+- XtraBackup：能对innodb和xtradb存储引擎进行热备份。也能对MyISAM存储引擎进行备份，只不过对于MyISAM的备份需要加表锁，会阻塞写操作。
+
+- 有2个工具
+    - `xtrabackup`：只能备份innodb和xtradb存储引擎数据表
+    - `innobackupex`：是通过perl脚本对xtrabackup进行封装和功能扩展，除了能备份innodb和xtradb存储引擎的数据表外，还可以备份MyISAM数据表和frm文件。
+        - 由于MyISAM不支持事务，在对MyISAM表备份之前，需要对全库进行加读锁，阻塞写操作。如果在从库进行的话，还会影响主从同步，从而造成延迟。
+        - 备份时是根据配置文件`my.cnf`获取备份文件的信息
+
+#### 安装
 
 ```sh
-xtrabackup --backup --target-dir=/var/lib/mysql/backups
+rpm -ivh
+yum install -y percona-xtrabackup
 ```
+
+### 导出不同文件格式
+
+```sh
+# \G格式导出数据
+mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+# html
+mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+# xml
+mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+```
+
+```sql
+# csv
+SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
+FIELDS TERMINATED BY ',' ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n';
+```
+
+## 常见错误
+
+- 日志目录`/var/lib/mysql`
+
+### 登录错误
+#### ERROR 1046 (28000)
+
+```sh
+mysql -uroot -p
+ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)
+```
+
+- 修复
+
+```sh
+# 在[mysqld]后添加skip-grant-tables(登录时跳过权限检查)
+echo "skip-grant-tables" >> /etc/my.cnf
+```
+
+```sql
+# 连接数据库
+mysql -uroot -p
+use mysql;
+
+# 刷新权限
+flush privileges;
+
+# 修改密码(8以下的版本)
+update mysql.user set password=PASSWORD('newpassword') where User='root';
+# 修改密码(8以上的版本)
+alter user 'root'@'localhost' identified by 'newpassword';
+```
+
+- 修改密码成功后
+
+```sh
+# 删除刚才添加skip-grant-tables
+sed -i '/skip-grant-tables/d' /etc/my.cnf
+
+# 重新连接
+mysql -uroot -p
+```
+
+#### ERROR 1819 (HY000)： 密码不满足策略安全
+
+```sql
+mysql> alter user 'root'@'localhost' identified by 'newpassword';
+ERROR 1819 (HY000): Your password does not satisfy the current policy requirements
+```
+
+- 修复
+
+```sql
+# 查看密码策略
+SHOW VARIABLES LIKE 'validate_password%';
+
+mysql> SHOW VARIABLES LIKE 'validate_password%';
++--------------------------------------+--------+
+| Variable_name                        | Value  |
++--------------------------------------+--------+
+| validate_password.check_user_name    | ON     |
+| validate_password.dictionary_file    |        |
+| validate_password.length             | 8      |
+| validate_password.mixed_case_count   | 1      |
+| validate_password.number_count       | 1      |
+| validate_password.policy             | MEDIUM |
+| validate_password.special_char_count | 1      |
++--------------------------------------+--------+
+
+# 设置策略为LOW
+set global validate_password.policy='LOW';
+
+# 密码修改成功
+mysql> alter user 'root'@'localhost' identified by 'newpassword';
+Query OK, 0 rows affected (0.52 sec)
+```
+
+### ERROR 2013 (HY000): Lost connection to MySQL server during query(导致无法 stop slave;)
+
+**修复:**
+
+```sql
+[mysqld]
+skip-name-resolve
+```
+
+### ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (111)(连接不了数据库)
+
+- `systemctl restart mysql` 重启配置没问题
+- `ps aux | grep mysql` 进程存在
+- 内存不足
+
+### ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined
+
+```sql
+# 要先删除 auto_incrment 属性,才能删除主健(我这里的主健是 id 字段)
+alter table test modify id int(10);
+alter table test drop primary key;
+```
+
+### 启动错误
+
+```sh
+● mariadb.service - MariaDB 10.5.8 database server
+     Loaded: loaded (/usr/lib/systemd/system/mariadb.service; enabled; vendor preset: disabled)
+     Active: failed (Result: exit-code) since Sun 2020-11-29 10:05:15 CST; 10min ago
+       Docs: man:mariadbd(8)
+             https://mariadb.com/kb/en/library/systemd/
+    Process: 11236 ExecStartPre=/bin/sh -c systemctl unset-environment _WSREP_START_POSITION (code=exited, status=0/SUCCESS)
+    Process: 11237 ExecStartPre=/bin/sh -c [ ! -e /usr/bin/galera_recovery ] && VAR= ||   VAR=`cd /usr/bin/..; /usr/bin/galera_recovery`; [ $? -eq 0 ]   && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1 (code=exited, status=0/SUCCESS)
+    Process: 11246 ExecStart=/usr/bin/mariadbd $MYSQLD_OPTS $_WSREP_NEW_CLUSTER $_WSREP_START_POSITION (code=exited, status=1/FAILURE)
+   Main PID: 11246 (code=exited, status=1/FAILURE)
+     Status: "MariaDB server is down"
+```
+
+解决:
+
+```sh
+# 先删除目录
+mv /var/lib/mysql /tmp
+# 初始化
+mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+```
+
+### 表损坏
+
+- INNODB一般不会损坏, 不存在什么查询会导致表损坏
+
+    - 1.硬件问题(内存, 硬盘)
+
+    - 2.使用 `rsync` 命令备份
+
+```sql
+-- 检测表是否损坏.注意并不是所有存储引擎都支持该命令
+CHECK TABLE table_name;
+
+-- 修复表
+REPAIR TABLE table_name;
+
+-- 也可以使用ALTER TABLE重建表
+ALTER TABLE table_name ENGINE=INNODB;
+```
+
+### [knowclub：在MySQL集群中，如何从几百万个抓包中找到一个异常的包？](https://mp.weixin.qq.com/s/C04qADbcfZP9e7RQDbz-Kg)
+
+## 极限值测试
+
+看看一个表最多是不是 1017 列:
+
+```sh
+# 通过脚本快速生成1017.sql
+echo 'drop table if exists test_1017;' > /tmp/1017.sql
+
+echo 'CREATE TABLE test_1017(' >> /tmp/1017.sql
+
+for i in $(seq 1 1016);do
+    echo "id_$i int," >> /tmp/1017.sql
+done
+echo "id_1017 int" >> /tmp/1017.sql
+
+echo ");" >> /tmp/1017.sql
+
+# 执行
+sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1017.sql
+```
+
+![image](./Pictures/mysql/1017.avif)
+
+改为 1018:
+
+```sh
+# 通过脚本快速生成1018.sql
+echo 'drop table if exists test_1018;' > /tmp/1018.sql
+
+echo 'CREATE TABLE test_1018(' >> /tmp/1018.sql
+
+for i in $(seq 1 1017);do
+    echo "id_$i int," >> /tmp/1018.sql
+done
+echo "id_1018 int" >> /tmp/1018.sql
+
+echo ");" >> /tmp/1018.sql
+
+# 执行
+sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
+```
+
+![image](./Pictures/mysql/1018.avif)
+
+## benchmark(基准测试)
+
+- 测试原则:
+
+    - 基准测试应该运行足够长的时间(8 - 12小时), 因为系统可能需要3, 4个小时的io预热, 如果没有时间去完成, 那么已经花费的时间都是浪费
+
+    - 测试结果保证可重复:每次测试都重启系统, 以及对测试的磁盘分区进行格式化, 数据的碎片度会导致测试结果不能重复
+
+    - 不能用cpu密集性的标准去测试io密集性的应用
+
+- 测试指标:
+
+    - 并发度:是一个测试属性, 而不是一个测试结果. 在并发度增加时需要观察**吞吐量**, **响应时间**
+
+        - 注意:web站点有50000个用户同时访问时, mysql可能只有10 - 15个访问
+
+- 通过md5(), sha1()函数快速测试(不能用作基准测试):
+
+    ```sql
+    set @input := 'hello world';
+    select benchmark(10000, MD5(@input));
+    select benchmark(10000, SHA1(@input));
+    ```
+
+- 在性能下跌时可以使用以下命令:
+
+    ```sql
+    show engine innodb status\G;
+
+    # 查看线程状态
+    show full processlist;
+    ```
+
+### [sysbench](https://github.com/akopytov/sysbench)
+
+- 优点:
+
+    - sysbench的io测试与innodb的io非常相识
+
+    - 支持lua语言
+
+- cpu测试:
+
+    ```sql
+    sysbench --test=cpu --cpu-max-prime=20000 run
+    ```
+
+- io测试:
+
+    | mode(测试模式) | 测试内容 |
+    |----------------|----------|
+    | seqwr          | 顺序写入 |
+    | seqrewr        | 顺序重写 |
+    | seqrd          | 顺序读取 |
+    | rndrd          | 随机写入 |
+    | rndwr          | 随机读取 |
+    | rndrw          | 随机读写 |
+
+    ```sql
+    # 生成数据文件, 注意文件必须比内存大
+    sysbench --test=fileio --file-total-size=100G prepare
+
+    # rndrw:随机读写io测试
+    sysbench --test=fileio --file-total-size=100G prepare --file-test-mode=rndrw/ --init-rng=on --max-time=300 --max-requests=0
+
+    # 删除数据文件
+    sysbench --test=fileio --file-total-size=100G cleanup
+    ```
+
+## 高效强大的 mysql 软件
+
+- [awesome-mysql](http://shlomi-noach.github.io/awesome-mysql/)
+
+    - [中文版](https://github.com/jobbole/awesome-mysql-cn)
+
+
+- [MySQL 常用工具选型和建议](https://zhuanlan.zhihu.com/p/86846532)
+
+### gui管理工具
+
+- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
+
+- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
+
+- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
+
+- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
+
+- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
+
+- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
+
+- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
+
+### [mycli](https://github.com/dbcli/mycli)
+
+- 更友好的 mysql 命令行
+- 目前发现不能,修改和查看用户权限
+
+```sql
+mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';') AS query FROM mysq
+                          -> l.user;
+(1142, "SELECT command denied to user 'root'@'localhost' for table 'user'")
+```
+
+![image](./Pictures/mysql/mycli.avif)
+
+### [mitzasql](https://github.com/vladbalmos/mitzasql)
+
+- 一个使用`vim`快捷键的 `mysql-tui`
+
+![image](./Pictures/mysql/mysql-tui.avif)
+![image](./Pictures/mysql/mysql-tui1.avif)
 
 ### [binlog2sql](https://github.com/danfengcao/binlog2sql)
 
@@ -4214,336 +2858,3 @@ sudo ./sys_parser -uroot -p -d dictionary sakila/actor
 ### [mytop](https://github.com/jzawodn/mytop)
 
 ### [MyRocks:lsm存储引擎](http://myrocks.io/docs/getting-started/)
-
-# 安装 MySql
-
-## Centos 7 安装 MySQL
-
-从 CentOS 7 开始,`yum` 安装 `MySQL` 默认安装的会是 `MariaDB`
-
-- 整个过程需要科学上网
-
-```sh
-# 下载
-wget https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm
-
-# 安装源
-rpm -Uvh mysql80-community-release-el7-3.noarch.rpm
-
-# 查看安装是否成功
-yum repolist enabled | grep "mysql.*-community.*"
-
-# 查看当前MySQL Yum Repository中所有MySQL版本(每个版本在不同的子仓库中)
-yum repolist all | grep mysql
-
-# 切换版本
-yum-config-manager --disable mysql80-community
-yum-config-manager --enable mysql57-community
-
-# 安装
-yum install mysql-community-server
-```
-
-<span id="docker"></span>
-
-## [docker 安装](https://www.runoob.com/docker/docker-install-mysql.html)
-
-```sh
-# 下载镜像
-docker pull mysql:latest
-
-# 查看本地镜像
-docker images
-
-# -p端口映射
-docker run -itd --name mysql-tz -p 3306:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
-
-# 查看运行镜像
-docker ps
-
-#进入容器
-docker exec -it mysql-tz bash
-
-#登录 mysql
-mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
-```
-
-## 常见错误
-
-- 日志目录`/var/lib/mysql`
-
-### 登录错误
-
-```sh
-mysql -uroot -p
-ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)
-```
-
-#### 修复
-
-```sh
-# 在[mysqld]后添加skip-grant-tables(登录时跳过权限检查)
-echo "skip-grant-tables" >> /etc/my.cnf
-```
-
-```sql
-# 连接数据库
-mysql -uroot -p
-use mysql;
-
-# 刷新权限
-flush privileges;
-
-# 修改密码(8以下的版本)
-update mysql.user set password=PASSWORD('newpassword') where User='root';
-# 修改密码(8以上的版本)
-alter user 'root'@'localhost' identified by 'newpassword';
-```
-
-##### 修改密码成功后
-
-```sh
-# 删除刚才添加skip-grant-tables
-sed -i '/skip-grant-tables/d' /etc/my.cnf
-
-# 重新连接
-mysql -uroot -p
-```
-
-##### 如果出现以下报错(密码不满足策略安全)
-
-```sql
-mysql> alter user 'root'@'localhost' identified by 'newpassword';
-ERROR 1819 (HY000): Your password does not satisfy the current policy requirements
-```
-
-###### 修复
-
-```sql
-# 查看密码策略
-SHOW VARIABLES LIKE 'validate_password%';
-
-mysql> SHOW VARIABLES LIKE 'validate_password%';
-+--------------------------------------+--------+
-| Variable_name                        | Value  |
-+--------------------------------------+--------+
-| validate_password.check_user_name    | ON     |
-| validate_password.dictionary_file    |        |
-| validate_password.length             | 8      |
-| validate_password.mixed_case_count   | 1      |
-| validate_password.number_count       | 1      |
-| validate_password.policy             | MEDIUM |
-| validate_password.special_char_count | 1      |
-+--------------------------------------+--------+
-
-# 设置策略为LOW
-set global validate_password.policy='LOW';
-
-# 密码修改成功
-mysql> alter user 'root'@'localhost' identified by 'newpassword';
-Query OK, 0 rows affected (0.52 sec)
-```
-
-### ERROR 2013 (HY000): Lost connection to MySQL server during query(导致无法 stop slave;)
-
-**修复:**
-
-```sql
-[mysqld]
-skip-name-resolve
-```
-
-### ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (111)(连接不了数据库)
-
-- `systemctl restart mysql` 重启配置没问题
-- `ps aux | grep mysql` 进程存在
-- 内存不足
-
-### ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined
-
-```sql
-# 要先删除 auto_incrment 属性,才能删除主健(我这里的主健是 id 字段)
-alter table test modify id int(10);
-alter table test drop primary key;
-```
-
-### 启动错误
-
-```sh
-● mariadb.service - MariaDB 10.5.8 database server
-     Loaded: loaded (/usr/lib/systemd/system/mariadb.service; enabled; vendor preset: disabled)
-     Active: failed (Result: exit-code) since Sun 2020-11-29 10:05:15 CST; 10min ago
-       Docs: man:mariadbd(8)
-             https://mariadb.com/kb/en/library/systemd/
-    Process: 11236 ExecStartPre=/bin/sh -c systemctl unset-environment _WSREP_START_POSITION (code=exited, status=0/SUCCESS)
-    Process: 11237 ExecStartPre=/bin/sh -c [ ! -e /usr/bin/galera_recovery ] && VAR= ||   VAR=`cd /usr/bin/..; /usr/bin/galera_recovery`; [ $? -eq 0 ]   && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1 (code=exited, status=0/SUCCESS)
-    Process: 11246 ExecStart=/usr/bin/mariadbd $MYSQLD_OPTS $_WSREP_NEW_CLUSTER $_WSREP_START_POSITION (code=exited, status=1/FAILURE)
-   Main PID: 11246 (code=exited, status=1/FAILURE)
-     Status: "MariaDB server is down"
-```
-
-解决:
-
-```sh
-# 先删除目录
-mv /var/lib/mysql /tmp
-# 初始化
-mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
-```
-
-## 极限值测试
-
-看看一个表最多是不是 1017 列:
-
-```sh
-# 通过脚本快速生成1017.sql
-echo 'drop table if exists test_1017;' > /tmp/1017.sql
-
-echo 'CREATE TABLE test_1017(' >> /tmp/1017.sql
-
-for i in $(seq 1 1016);do
-    echo "id_$i int," >> /tmp/1017.sql
-done
-echo "id_1017 int" >> /tmp/1017.sql
-
-echo ");" >> /tmp/1017.sql
-
-# 执行
-sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1017.sql
-```
-
-![image](./Pictures/mysql/1017.avif)
-
-改为 1018:
-
-```sh
-# 通过脚本快速生成1018.sql
-echo 'drop table if exists test_1018;' > /tmp/1018.sql
-
-echo 'CREATE TABLE test_1018(' >> /tmp/1018.sql
-
-for i in $(seq 1 1017);do
-    echo "id_$i int," >> /tmp/1018.sql
-done
-echo "id_1018 int" >> /tmp/1018.sql
-
-echo ");" >> /tmp/1018.sql
-
-# 执行
-sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
-```
-
-![image](./Pictures/mysql/1018.avif)
-
-## benchmark(基准测试)
-
-- 测试原则:
-
-    - 基准测试应该运行足够长的时间(8 - 12小时), 因为系统可能需要3, 4个小时的io预热, 如果没有时间去完成, 那么已经花费的时间都是浪费
-
-    - 测试结果保证可重复:每次测试都重启系统, 以及对测试的磁盘分区进行格式化, 数据的碎片度会导致测试结果不能重复
-
-    - 不能用cpu密集性的标准去测试io密集性的应用
-
-- 测试指标:
-
-    - 并发度:是一个测试属性, 而不是一个测试结果. 在并发度增加时需要观察**吞吐量**, **响应时间**
-
-        - 注意:web站点有50000个用户同时访问时, mysql可能只有10 - 15个访问
-
-- 通过md5(), sha1()函数快速测试(不能用作基准测试):
-
-    ```sql
-    set @input := 'hello world';
-    select benchmark(10000, MD5(@input));
-    select benchmark(10000, SHA1(@input));
-    ```
-
-- 在性能下跌时可以使用以下命令:
-
-    ```sql
-    show engine innodb status\G;
-
-    # 查看线程状态
-    show full processlist;
-    ```
-
-### [sysbench](https://github.com/akopytov/sysbench)
-
-- 优点:
-
-    - sysbench的io测试与innodb的io非常相识
-
-    - 支持lua语言
-
-- cpu测试:
-
-    ```sql
-    sysbench --test=cpu --cpu-max-prime=20000 run
-    ```
-
-- io测试:
-
-    | mode(测试模式) | 测试内容 |
-    |----------------|----------|
-    | seqwr          | 顺序写入 |
-    | seqrewr        | 顺序重写 |
-    | seqrd          | 顺序读取 |
-    | rndrd          | 随机写入 |
-    | rndwr          | 随机读取 |
-    | rndrw          | 随机读写 |
-
-    ```sql
-    # 生成数据文件, 注意文件必须比内存大
-    sysbench --test=fileio --file-total-size=100G prepare
-
-    # rndrw:随机读写io测试
-    sysbench --test=fileio --file-total-size=100G prepare --file-test-mode=rndrw/ --init-rng=on --max-time=300 --max-requests=0
-
-    # 删除数据文件
-    sysbench --test=fileio --file-total-size=100G cleanup
-    ```
-## [日志](/mysql-log.md)
-
-## [存储引擎](/mysql-storage-engine.md)
-
-## 设计规范
-
-- [CTO 要我把这份 MySQL 规范贴在工位上！](https://mp.weixin.qq.com/s?src=11&timestamp=1605361738&ver=2706&signature=wzhghhJTTx1Hy9Nn90P35u9hfG3eaeMGOvIoDoBGTECHdDQAmUuxFCVHAbuUqaN4*UYga9bGdXxX3f1G8kiYZ1yoA4tnocgi8GZoRe2TNQFkbbh1T2eSqyC6DcA9bTqF&new=1)
-
-### 基本规范
-
-- 禁止在数据库中存储图片,文件等大的二进制数据
-
-    - 文件过大,在短时间内会造成数据量快速增长
-
-    - 读取时, 会造成大量的随机 IO 操作
-
-- 禁止对线上数据库做压力测试
-
-# reference
-
-- [mysqltutorial](https://www.mysqltutorial.org/)
-- [MySQL 入门教程](https://github.com/jaywcjlove/mysql-tutorial)
-- [sql 语句教程](https://www.1keydata.com/cn/sql/)
-- [W3cSchool SQL 教程](https://www.w3school.com.cn/sql/index.asp)
-- [138 张图带你 MySQL 入门](https://mp.weixin.qq.com/s?src=11&timestamp=1603417035&ver=2661&signature=Z-XNfjtR11GhHg29XAiBZ0RAiMHavvRavxB1ccysnXtAKChrVkXo*zx3DKFPSxDESZ9lwRM7C8-*yu1dEGmXwHgv1qe7V-WvwLUUQe7Nz7RUwEuJmLYqVRnOWtONHeL-&new=1)
-
-- [厉害了,3 万字的 MySQL 精华总结 + 面试 100 问！](https://mp.weixin.qq.com/s?src=11&timestamp=1603207279&ver=2656&signature=PlP1Ta3EiPbja*mclBpkiUWyCM93jx7G0DnE4LwwlzEvW-Fd9hxgIGq1*5ctVid5AZTssRaeDRSKRPlOGOXJfLcS4VUlru*NYhh4BrhZU4k91nsfqzJueeX8kEptSmfc&new=1)
-- [mysql 存储过程详细教程](https://www.jianshu.com/p/7b2d74701ccd)
-
-- [一文彻底读懂 MySQL 事务的四大隔离级别](https://mp.weixin.qq.com/s?src=11&timestamp=1605864322&ver=2718&signature=yj-1WmxuB0tL32v9OCfARl9LKeAqALuoFdmMgiJdyKjkgqeFwvGgJT10hOWiPj0Vn3qalU3-5AEsaoiHI8TTg3GL3s8rPmC7rXZkbu22VZcFcV48aa7sPiqw*Y3yAaC5&new=1)
-
-# 第三方资源
-
-- [awesome-mysql](http://shlomi-noach.github.io/awesome-mysql/)
-
-    - [中文版](https://github.com/jobbole/awesome-mysql-cn)
-
-# 新闻资源
-
-- [MySQL Server Blog](http://mysqlserverteam.com/)
-
-# online tools
-
-- [创建数据库的实体-关系图的工具 dbdiagram](https://dbdiagram.io)

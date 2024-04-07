@@ -1,0 +1,48 @@
+4961:S 20 Aug 2023 22:18:33.344 * FAIL message received from eaf4548fff6106be87d672019ecb600f2481f18d about 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+4961:S 20 Aug 2023 22:18:33.344 # Cluster state changed: fail
+4961:S 20 Aug 2023 22:18:34.375 # Cluster state changed: ok
+4961:S 20 Aug 2023 22:35:33.636 * Clear FAIL state for node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9: master without slots is reachable again.
+4961:signal-handler (1692555103) Received SIGTERM scheduling shutdown...
+4961:S 21 Aug 2023 02:11:44.064 # User requested shutdown...
+4961:S 21 Aug 2023 02:11:44.064 * Saving the final RDB snapshot before exiting.
+4961:S 21 Aug 2023 02:11:44.076 * DB saved on disk
+4961:S 21 Aug 2023 02:11:44.076 * Removing the pid file.
+4961:S 21 Aug 2023 02:11:44.076 # Redis is now ready to exit, bye bye...
+23189:C 06 Feb 2024 17:49:42.101 # WARNING: Changing databases number from 16 to 1 since we are in cluster mode
+23195:C 06 Feb 2024 17:49:42.102 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+23195:C 06 Feb 2024 17:49:42.102 * Redis version=7.2.4, bits=64, commit=00000000, modified=0, pid=23195, just started
+23195:C 06 Feb 2024 17:49:42.102 * Configuration loaded
+23195:M 06 Feb 2024 17:49:42.103 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+23195:M 06 Feb 2024 17:49:42.103 * monotonic clock: POSIX clock_gettime
+23195:M 06 Feb 2024 17:49:42.104 # Failed to write PID file: Permission denied
+23195:M 06 Feb 2024 17:49:42.104 * Running mode=cluster, port=6383.
+23195:M 06 Feb 2024 17:49:42.104 * Node configuration loaded, I'm 4d36091538f0cfb2c73d18dd1d43dc37f4d198d2
+23195:M 06 Feb 2024 17:49:42.105 * Server initialized
+23195:M 06 Feb 2024 17:49:42.106 * Loading RDB produced by version 7.2.4
+23195:M 06 Feb 2024 17:49:42.106 * RDB age 5 seconds
+23195:M 06 Feb 2024 17:49:42.106 * RDB memory usage when created 1.56 Mb
+23195:M 06 Feb 2024 17:49:42.106 * Done loading RDB, keys loaded: 3, keys expired: 0.
+23195:M 06 Feb 2024 17:49:42.106 * DB loaded from disk: 0.001 seconds
+23195:M 06 Feb 2024 17:49:42.106 * Before turning into a replica, using my own master parameters to synthesize a cached master: I may be able to synchronize with the new master with just a partial transfer.
+23195:M 06 Feb 2024 17:49:42.106 * Ready to accept connections tcp
+23195:S 06 Feb 2024 17:49:42.106 * Discarding previously cached master state.
+23195:S 06 Feb 2024 17:49:42.106 * Before turning into a replica, using my own master parameters to synthesize a cached master: I may be able to synchronize with the new master with just a partial transfer.
+23195:S 06 Feb 2024 17:49:42.106 * Connecting to MASTER 127.0.0.1:6380
+23195:S 06 Feb 2024 17:49:42.106 * MASTER <-> REPLICA sync started
+23195:S 06 Feb 2024 17:49:42.106 * Cluster state changed: ok
+23195:S 06 Feb 2024 17:49:42.106 * Non blocking connect for SYNC fired the event.
+23195:S 06 Feb 2024 17:49:42.116 * Master replied to PING, replication can continue...
+23195:S 06 Feb 2024 17:49:42.122 * Trying a partial resynchronization (request 1cda1650a038e29b77adc93f490f83eb0b2484bb:36538).
+23195:S 06 Feb 2024 17:49:42.123 * Successful partial resynchronization with master.
+23195:S 06 Feb 2024 17:49:42.123 * Master replication ID changed to f64cab55d618d07076a12f5d0aac59a9a5374cb7
+23195:S 06 Feb 2024 17:49:42.123 * MASTER <-> REPLICA sync: Master accepted a Partial Resynchronization.
+23195:signal-handler (1707214591) Received SIGTERM scheduling shutdown...
+23195:S 06 Feb 2024 18:16:31.643 * Connection with master lost.
+23195:S 06 Feb 2024 18:16:31.643 * Caching the disconnected master state.
+23195:S 06 Feb 2024 18:16:31.643 * Reconnecting to MASTER 127.0.0.1:6380
+23195:S 06 Feb 2024 18:16:31.643 * MASTER <-> REPLICA sync started
+23195:S 06 Feb 2024 18:16:31.643 * User requested shutdown...
+23195:S 06 Feb 2024 18:16:31.643 * Saving the final RDB snapshot before exiting.
+23195:S 06 Feb 2024 18:16:31.658 * DB saved on disk
+23195:S 06 Feb 2024 18:16:31.658 * Removing the pid file.
+23195:S 06 Feb 2024 18:16:31.658 # Redis is now ready to exit, bye bye...

@@ -136,6 +136,7 @@
         * [OPPO百万级高并发MongoDB集群性能数十倍提升优化实践](#oppo百万级高并发mongodb集群性能数十倍提升优化实践)
 * [第三方mongodb 软件](#第三方mongodb-软件)
 * [第三方mongodb](#第三方mongodb)
+    * [FerretDB：真正的mongodb开源代替品](#ferretdb真正的mongodb开源代替品)
     * [mongodb atlas](#mongodb-atlas)
     * [TencentDB for MongoDB](#tencentdb-for-mongodb)
     * [阿里云数据库 MongoDB](#阿里云数据库-mongodb)
@@ -315,12 +316,12 @@
 
 - 开启mongodb实例
     ```sh
-    mongod --port 27017 --dbpath ~/mongodb
+    mongod --port 27017 --dbpath ~/config/mongodb/data &
     ```
 
 - 配置文件开启mongodb实例
 
-    - `~/mongodb/mongodb.conf`配置文件
+    - `~/config/mongodb/mongodb.conf`配置文件
 
         ```
         port=27017
@@ -332,13 +333,13 @@
 
     - 创建data和log的目录
         ```sh
-        cd ~/mongodb
+        cd ~/config/mongodb
         mkdir data log
         ```
 
     - 通过配置文件，开启实例
         ```sh
-        mongod --config ~/mongodb/mongodb.conf &
+        mongod --config ~/config/mongodb/mongodb.conf &
         ```
 
 - 连接数据库
@@ -464,7 +465,7 @@ var connectTo = function(port, dbname) {
 ```
 ```mongodb
 // 加载js脚本
-load("~/mongodb/defineConnectTo.js")
+load("~/config/mongodb/defineConnectTo.js")
 // 查看是否存在connectTo函数
 typeof connectTo
 ```
@@ -3460,20 +3461,20 @@ session.endSession();
 
 - 1.为每个节点单独创建数据目录
     ```sh
-    mkdir -p ~/mongodb/rs{1,2,3}
+    mkdir -p ~/config/mongodb/rs{1,2,3}
     ```
 
 - 2.启动mongod
     ```sh
     # 启动3个mongod
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &> /dev/null &
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &> /dev/null &
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &> /dev/null &
+    mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 &> /dev/null &
+    mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs2 --port 27018 --oplogSize 200 &> /dev/null &
+    mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs3 --port 27019 --oplogSize 200 &> /dev/null &
 
     # 默认情况下绑定到localhost(127.0.0.1)。--bind_ip参数可以指定ip，也可以在配置文件使用bind_ip
     # 在192.51.100.1服务器上运行mongod
     # 在绑定到非localhost的ip。应该启用授权控制，并指定身份验证机制
-    mongod --bind_ip localhost,192.51.100.1 --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+    mongod --bind_ip localhost,192.51.100.1 --replSet mdDefGuide --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 &
     ```
 
     - 设置key可以实现节点内部通信加密
@@ -3483,9 +3484,9 @@ session.endSession();
         chmod 400 mongodb-replset.key
 
         # 启动副本集--keyFile设置密钥
-        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &> /dev/null &
-        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 &> /dev/null &
-        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 &> /dev/null &
+        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 &> /dev/null &
+        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/config/mongodb/rs2 --port 27018 --oplogSize 200 &> /dev/null &
+        mongod --replSet mdDefGuide --keyFile mongodb-replset.key --dbpath ~/config/mongodb/rs3 --port 27019 --oplogSize 200 &> /dev/null &
         ```
 
         ```mongodb
@@ -3551,7 +3552,7 @@ session.endSession();
 
         ```sh
         # 重新启动27017
-        mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+        mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 &
         # 连接27017
         mongosh --port 27017
 
@@ -3844,10 +3845,10 @@ session.endSession();
     db.shutdownServer()
 
     # 以单机模式运行。从另一个端口启动该服务器
-    mongod --port 30000 --dbpath ~/mongodb &
+    mongod --port 30000 --dbpath ~/config/mongodb &
 
     // 完成维护后。以命令的原始选项重启，会自动连接副本集成为从节点，并从新的主节点复制维护期间的操作，如果该节点的priority优先级最高，会重新选举为主节点
-    mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 &
+    mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 &
     ```
 
 - 强制重新配置命令：`rs.reconfig(config, {"force": true})`
@@ -4024,7 +4025,7 @@ session.endSession();
 
 - 启动mongod时，可以指定oplog大小
     ```sh
-    mongod --config ~/mongodb/mongodb.conf --oplogSize 200 &
+    mongod --config ~/config/mongodb/mongodb.conf --oplogSize 200 &
     ```
 
 - oplog（日志）：包含主节点的每一次写操作。存在于主节点local数据库的`db.oplog.rs`是一个固定集合（类似于环形队列）。
@@ -4543,9 +4544,9 @@ session.endSession();
 - 1.启动config配置服务器：37017、37018、37019
     ```sh
     # 启动config配置服务器
-    mongod --config ~/mongodb/shard/config-primary/start.conf &
-    mongod --config ~/mongodb/shard/config-secondary1/start.conf &
-    mongod --config ~/mongodb/shard/config-secondary2/start.conf &
+    mongod --config ~/config/mongodb/shard/config-primary/start.conf &
+    mongod --config ~/config/mongodb/shard/config-secondary1/start.conf &
+    mongod --config ~/config/mongodb/shard/config-secondary2/start.conf &
 
     # 连接
     mongosh --port 37017
@@ -4575,9 +4576,9 @@ session.endSession();
 
     ```sh
     # 启动分片1
-    mongod --config ~/mongodb/shard/shard1-primary/start.conf &
-    mongod --config ~/mongodb/shard/shard1-secondary1/start.conf &
-    mongod --config ~/mongodb/shard/shard1-secondary2/start.conf &
+    mongod --config ~/config/mongodb/shard/shard1-primary/start.conf &
+    mongod --config ~/config/mongodb/shard/shard1-secondary1/start.conf &
+    mongod --config ~/config/mongodb/shard/shard1-secondary2/start.conf &
 
     # 连接
     mongosh --port 27017
@@ -4607,9 +4608,9 @@ session.endSession();
 
     ```sh
     # 启动分片2
-    mongod --config ~/mongodb/shard/shard2-primary/start.conf &
-    mongod --config ~/mongodb/shard/shard2-secondary1/start.conf &
-    mongod --config ~/mongodb/shard/shard2-secondary2/start.conf &
+    mongod --config ~/config/mongodb/shard/shard2-primary/start.conf &
+    mongod --config ~/config/mongodb/shard/shard2-secondary1/start.conf &
+    mongod --config ~/config/mongodb/shard/shard2-secondary2/start.conf &
 
     # 连接
     mongosh --port 27020
@@ -4638,7 +4639,7 @@ session.endSession();
 - 4.启动mongos路由进程：不需要指定数据目录
     ```sh
     # 启动mongos路由进程。记得是mongos命令，而不是mongod，不然会报错Unrecognized option: sharding.configDB
-    mongos --config ~/mongodb/shard/mongos/start.conf &
+    mongos --config ~/config/mongodb/shard/mongos/start.conf &
 
     # 连接mongos
     mongosh --port 47017
@@ -4876,8 +4877,8 @@ mongosh --port 27019
 db.shutdownServer()
 
 # 加入--shardsvr选项后，重新启动从节点
-mongod --replSet mdDefGuide --dbpath ~/mongodb/rs2 --port 27018 --oplogSize 200 --shardsvr &
-mongod --replSet mdDefGuide --dbpath ~/mongodb/rs3 --port 27019 --oplogSize 200 --shardsvr &
+mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs2 --port 27018 --oplogSize 200 --shardsvr &
+mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs3 --port 27019 --oplogSize 200 --shardsvr &
 
 # 再关闭主节点。我这里是27017
 mongosh --port 27017
@@ -4885,7 +4886,7 @@ rs.stepDown()
 db.shutdownServer()
 
 # 加入--shardsvr选项后，重新启动主节点
-mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 --shardsvr &
+mongod --replSet mdDefGuide --dbpath ~/config/mongodb/rs1 --port 27017 --oplogSize 200 --shardsvr &
 ```
 
 - 启动config配置服务器（我这里使用上一个实验的配置文件。如果像上一个实验那样启动过，则需要删除data目录里的数据）
@@ -4894,9 +4895,9 @@ mongod --replSet mdDefGuide --dbpath ~/mongodb/rs1 --port 27017 --oplogSize 200 
 
 ```sh
 # 启动config配置服务器
-mongod --config ~/mongodb/shard/config-primary/start.conf &
-mongod --config ~/mongodb/shard/config-secondary1/start.conf &
-mongod --config ~/mongodb/shard/config-secondary2/start.conf &
+mongod --config ~/config/mongodb/shard/config-primary/start.conf &
+mongod --config ~/config/mongodb/shard/config-secondary1/start.conf &
+mongod --config ~/config/mongodb/shard/config-secondary2/start.conf &
 
 // 初始化副本集
 mongosh --port 37017
@@ -4916,7 +4917,7 @@ rs.status()
     - 添加分片后，客户端的请求需要发送到mongos而不是副本集
 ```sh
 # 启动mongos路由进程。记得是mongos命令，而不是mongod，不然会报错Unrecognized option: sharding.configDB
-mongos --config ~/mongodb/shard/mongos/start.conf &
+mongos --config ~/config/mongodb/shard/mongos/start.conf &
 
 # 连接mongos
 mongosh --port 47017
@@ -6254,7 +6255,7 @@ db.adminCommand({"connPoolStats": 1})
 
         ```mongodb
         // --journalCommitInterval设置日志刷新间隔。范围1-500毫秒
-        mongod --journalCommitInterval 25 --config ~/mongodb/mongodb.conf &
+        mongod --journalCommitInterval 25 --config ~/config/mongodb/mongodb.conf &
         ```
     - 数据库文件：每60毫秒刷新到磁盘。这个60秒间隔叫检查点（checkpoint）
     - 如果服务器突然停止，重新启动后，可以使用日志重放在关闭前没有刷新到磁盘的所有写操作
@@ -6670,7 +6671,7 @@ db.currentOp()
 
         ```sh
         # numactl --interleave=all关闭numa
-        numactl --interleave=all /bin/mongod --port 27017 --dbpath ~/mongodb
+        numactl --interleave=all /bin/mongod --port 27017 --dbpath ~/config/mongodb
         ```
 
     - 关闭磁盘预读（readahead）
@@ -6804,7 +6805,7 @@ db.currentOp()
     - 2.以numactl启动mongodb实例
         ```sh
         # --interleave=all内存分配是应该尽量均匀地分布在各个节点上，启动mongodb
-        numactl --interleave=all mongod --config ~/mongodb/mongodb.conf
+        numactl --interleave=all mongod --config ~/config/mongodb/mongodb.conf
         ```
 
 - 关闭大内存页（THP）（默认开启）：THP会导致更多的磁盘IO。如果数据不能放在内存，磁盘刷新时需要写入几MB而不是几KB
@@ -8369,6 +8370,12 @@ mlaunch stop shard0002
         ```
 
 # 第三方mongodb
+
+## [FerretDB：真正的mongodb开源代替品](https://github.com/FerretDB/FerretDB)
+
+- 为什么要替换MongoDB？他说因为MongoDB更改了开源协议后，他们的一些商用项目怕受影响，因此需要找到替代方案。正是因为SSPL授权协议的问题，有不少用户都有了替换MongoDB的想法。
+
+- FerretDB的开源协议是Apache 2.0，可以在github上下载，自从2021年开源依赖，目前已经迭代了40多个版本。FerretDB是一个开源代理，它将MongoDB 6.0+线协议查询转换为SQL，并可以在后端使用PostgreSQL/SQL LITE等后端存储作为数据库引擎。
 
 ## mongodb atlas
 

@@ -1,0 +1,110 @@
+4906:S 20 Aug 2023 22:18:16.610 # Connection with master lost.
+4906:S 20 Aug 2023 22:18:16.610 * Caching the disconnected master state.
+4906:S 20 Aug 2023 22:18:16.610 * Reconnecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:16.610 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:16.610 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:17.473 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:17.473 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:17.474 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:18.476 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:18.476 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:18.476 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:19.479 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:19.479 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:19.480 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:20.483 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:20.483 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:20.483 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:21.487 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:21.487 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:21.487 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:22.490 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:22.490 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:22.490 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:23.494 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:23.494 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:23.494 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:24.498 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:24.498 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:24.498 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:25.501 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:25.501 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:25.501 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:26.504 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:26.504 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:26.504 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:27.508 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:27.508 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:27.508 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:28.511 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:28.511 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:28.511 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:29.514 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:29.515 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:29.515 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:30.518 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:30.519 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:30.519 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:31.522 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:31.523 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:31.523 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:32.526 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:32.526 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:32.526 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:33.344 * FAIL message received from eaf4548fff6106be87d672019ecb600f2481f18d about 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9
+4906:S 20 Aug 2023 22:18:33.344 # Cluster state changed: fail
+4906:S 20 Aug 2023 22:18:33.430 # Start of election delayed for 879 milliseconds (rank #0, offset 16993).
+4906:S 20 Aug 2023 22:18:33.530 * Connecting to MASTER 127.0.0.1:6379
+4906:S 20 Aug 2023 22:18:33.530 * MASTER <-> REPLICA sync started
+4906:S 20 Aug 2023 22:18:33.530 # Error condition on socket for SYNC: Connection refused
+4906:S 20 Aug 2023 22:18:34.333 # Starting a failover election for epoch 13.
+4906:S 20 Aug 2023 22:18:34.336 # Failover election won: I'm the new master.
+4906:S 20 Aug 2023 22:18:34.336 # configEpoch set to 13 after successful failover
+4906:M 20 Aug 2023 22:18:34.336 * Discarding previously cached master state.
+4906:M 20 Aug 2023 22:18:34.336 # Setting secondary replication ID to 03e7887e2b6a0c5fc2eef89fe7484950972ccf7f, valid up to offset: 16994. New replication ID is 62fffe8e3936914d0ebd4dcb84417641ef8b7a22
+4906:M 20 Aug 2023 22:18:34.336 # Cluster state changed: ok
+4906:M 20 Aug 2023 22:35:33.620 * Replica 127.0.0.1:6379 asks for synchronization
+4906:M 20 Aug 2023 22:35:33.620 * Partial resynchronization not accepted: Replication ID mismatch (Replica asked for '5cda69a890d650a4755166ff0c924184cf68f9dc', my replication IDs are '62fffe8e3936914d0ebd4dcb84417641ef8b7a22' and '03e7887e2b6a0c5fc2eef89fe7484950972ccf7f')
+4906:M 20 Aug 2023 22:35:33.620 * Delay next BGSAVE for diskless SYNC
+4906:M 20 Aug 2023 22:35:33.702 * Clear FAIL state for node 253e27e0d617bb3c9cdbede1468ecc23e54e4ee9: master without slots is reachable again.
+4906:M 20 Aug 2023 22:35:38.615 * Starting BGSAVE for SYNC with target: replicas sockets
+4906:M 20 Aug 2023 22:35:38.616 * Background RDB transfer started by pid 8220
+8220:C 20 Aug 2023 22:35:38.618 * Fork CoW for RDB: current 0 MB, peak 0 MB, average 0 MB
+4906:M 20 Aug 2023 22:35:38.618 # Diskless rdb transfer, done reading from pipe, 1 replicas still up.
+4906:M 20 Aug 2023 22:35:38.620 * Background RDB transfer terminated with success
+4906:M 20 Aug 2023 22:35:38.620 * Streamed RDB transfer with replica 127.0.0.1:6379 succeeded (socket). Waiting for REPLCONF ACK from slave to enable streaming
+4906:M 20 Aug 2023 22:35:38.620 * Synchronization with replica 127.0.0.1:6379 succeeded
+4906:signal-handler (1692555103) Received SIGTERM scheduling shutdown...
+4906:M 21 Aug 2023 02:11:44.054 # User requested shutdown...
+4906:M 21 Aug 2023 02:11:44.054 * 1 of 1 replicas are in sync when shutting down.
+4906:M 21 Aug 2023 02:11:44.054 * Saving the final RDB snapshot before exiting.
+4906:M 21 Aug 2023 02:11:44.058 * DB saved on disk
+4906:M 21 Aug 2023 02:11:44.058 * Removing the pid file.
+4906:M 21 Aug 2023 02:11:44.059 # Redis is now ready to exit, bye bye...
+23182:C 06 Feb 2024 17:49:42.096 # WARNING: Changing databases number from 16 to 1 since we are in cluster mode
+23188:C 06 Feb 2024 17:49:42.096 * oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+23188:C 06 Feb 2024 17:49:42.096 * Redis version=7.2.4, bits=64, commit=00000000, modified=0, pid=23188, just started
+23188:C 06 Feb 2024 17:49:42.096 * Configuration loaded
+23188:M 06 Feb 2024 17:49:42.096 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+23188:M 06 Feb 2024 17:49:42.096 * monotonic clock: POSIX clock_gettime
+23188:M 06 Feb 2024 17:49:42.097 # Failed to write PID file: Permission denied
+23188:M 06 Feb 2024 17:49:42.097 * Running mode=cluster, port=6382.
+23188:M 06 Feb 2024 17:49:42.097 * Node configuration loaded, I'm a18392ee91e8494d1ab2ddaf2cbaa7c0ca204ff3
+23188:M 06 Feb 2024 17:49:42.098 * Server initialized
+23188:M 06 Feb 2024 17:49:42.098 * Loading RDB produced by version 7.2.4
+23188:M 06 Feb 2024 17:49:42.098 * RDB age 5 seconds
+23188:M 06 Feb 2024 17:49:42.098 * RDB memory usage when created 1.56 Mb
+23188:M 06 Feb 2024 17:49:42.098 * Done loading RDB, keys loaded: 3, keys expired: 0.
+23188:M 06 Feb 2024 17:49:42.098 * DB loaded from disk: 0.000 seconds
+23188:M 06 Feb 2024 17:49:42.098 * I have keys for slot 9842, but the slot is assigned to another node. Setting it to importing state.
+23188:M 06 Feb 2024 17:49:42.102 * Ready to accept connections tcp
+23188:M 06 Feb 2024 17:49:43.087 * Replica 127.0.0.1:6379 asks for synchronization
+23188:M 06 Feb 2024 17:49:43.087 * Partial resynchronization request from 127.0.0.1:6379 accepted. Sending 0 bytes of backlog starting from offset 36538.
+23188:M 06 Feb 2024 17:49:44.109 * Cluster state changed: ok
+23188:signal-handler (1707214591) Received SIGTERM scheduling shutdown...
+23188:M 06 Feb 2024 18:16:31.642 * Connection with replica 127.0.0.1:6379 lost.
+23188:M 06 Feb 2024 18:16:31.643 * User requested shutdown...
+23188:M 06 Feb 2024 18:16:31.643 * Saving the final RDB snapshot before exiting.
+23188:M 06 Feb 2024 18:16:31.654 * DB saved on disk
+23188:M 06 Feb 2024 18:16:31.654 * Removing the pid file.
+23188:M 06 Feb 2024 18:16:31.654 # Redis is now ready to exit, bye bye...

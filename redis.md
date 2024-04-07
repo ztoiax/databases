@@ -1,6 +1,7 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Redis](#redis)
+    * [许可证](#许可证)
     * [根据qps的架构部署](#根据qps的架构部署)
     * [软件架构](#软件架构)
         * [从单线程Reactor到redis6.0多线程架构演进](#从单线程reactor到redis60多线程架构演进)
@@ -220,6 +221,24 @@
 <!-- vim-markdown-toc -->
 
 # Redis
+
+## 许可证
+
+- Redis从 7.4 起从原来的「BSD 3-Clause 开源协议」改成「RSALv2 和 SSPLv1 双重许可证」
+
+    - 新的许可证主要是限制托管 Redis 产品的云服务商，比如 Redis 云数据库等，不能继续免费使用 Redis 最新的源代码。
+
+        - 用 Redis Labs CEO 的话讲就是：“多年来，我们就像个傻子一样，他们拿着我们开发的东西大赚了一笔”。“他们”是谁？—— 公有云。Redis 切换 SSPL 的目的是，试图通过法律工具阻止这些云厂商白嫖吸血开源，成为体面的社区参与者，将软件的管理、监控、托管等方面的代码开源回馈社区。
+
+    - 因为引入了额外的限制与所谓的“歧视”条款，OSI 并没有将 SSPL 认定为开源协议。因此使用 SSPL 的举措被解读为 —— “Redis 不再开源”，而云厂商的各种 Fork 是“开源”的。从法律工具的角度来说，这是成立的。但从朴素道德情感出发，这样的说法对于 Redis 来说是极其不公正的抹黑与羞辱。
+
+    - 当 Redis 宣布更改协议后，马上就有 AWS 员工跳出来 Fork Redis —— “Redis 不开源了，我们的分叉才是真开源！” 然后 AWS CTO 出来叫好，并假惺惺地说：这是我们员工的个人行为 —— 堪称是现实版杀人诛心。
+
+        - 被这样搞过的并非只有 Redis 一家。发明 SSPL 的 MongoDB 也是这个样子 —— 当 2018 年 MongoDB 切换至 SSPL 时，AWS 就搞了一个所谓 “API兼容“ 的 DocumentDB 来恶心它。ElasticSearch 修改协议后，AWS 就推出了 OpenSearch 作为替代。头部 NoSQL 数据库都已经切换到了 SSPL，而 AWS 也都搞出了相应的“开源替代”。
+
+- 微软发布了一个兼容 Redis 的缓存服务器 [Garnet](https://github.com/microsoft/garnet)
+
+- Redis 现在也被分叉了，诞生了两个全新的项目 [Redict](https://redict.io/) 和 [Valkey](https://github.com/valkey-io/valkey)，目标是成为自由软件版本的 Redis。
 
 ## 根据qps的架构部署
 
@@ -576,77 +595,79 @@
     ```
 
 - 常用命令(对单个key)
-```redis
-# 创建一个 key 为字符串对象, 值也为字符串对象的 key 值对
-SET msg "hello world !!!"
 
-# 对同一个 key 设置,会覆盖值以及存活时间
-SET msg "hello world"
+    ```redis
+    # 创建一个 key 为字符串对象, 值也为字符串对象的 key 值对
+    SET msg "hello world !!!"
 
-# 查看msg
-get msg
+    # 对同一个 key 设置,会覆盖值以及存活时间
+    SET msg "hello world"
 
-# 返回原来的值, 并设置新的值
-getset msg "hw"
+    # 查看msg
+    get msg
 
-# EX 设置 key 的存活时间, 单位秒
-SET msg "hello world" EX 100
-# 或者
-expire msg 100
+    # 返回原来的值, 并设置新的值
+    getset msg "hw"
 
-# 输入负数等同于DEL命令
-expire msg -1
+    # EX 设置 key 的存活时间, 单位秒
+    SET msg "hello world" EX 100
+    # 或者
+    expire msg 100
 
-# timestamp(时间戳)后过期
-expireat msg timestamp
+    # 输入负数等同于DEL命令
+    expire msg -1
 
-# 毫秒后过期
-pexpire msg 10000
+    # timestamp(时间戳)后过期
+    expireat msg timestamp
 
-# 毫秒timestamp(时间戳)后过期
-expireat msg timestamp
+    # 毫秒后过期
+    pexpire msg 10000
 
-# persist 可以移除存活时间
-persist msg
+    # 毫秒timestamp(时间戳)后过期
+    expireat msg timestamp
 
-# ttl 查看 key 存活时间, 单位秒. -1表示key没有设置过期时间, -2表示key不存在(已经过期)
-ttl msg
+    # persist 可以移除存活时间
+    persist msg
 
-# pttl 查看 key 存活时间, 单位毫秒
-pttl msg
+    # ttl 查看 key 存活时间, 单位秒. -1表示key没有设置过期时间, -2表示key不存在(已经过期)
+    ttl msg
 
-# strlen 查看 key 长度
-strlen msg
+    # pttl 查看 key 存活时间, 单位毫秒
+    pttl msg
 
-# exists 查看 key 是否存在
-exists msg
+    # strlen 查看 key 长度
+    strlen msg
 
-# type 查看 key 类型. 对应源代码里的RedisObject结构里的type
-type msg
+    # exists 查看 key 是否存在
+    exists msg
 
-# object 查看 key 的编码. 对应源代码里的RedisObject结构里的encoding
-object encoding msg
+    # type 查看 key 类型. 对应源代码里的RedisObject结构里的type
+    type msg
 
-# 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的lru
-object IDLETIME msg
+    # object 查看 key 的编码. 对应源代码里的RedisObject结构里的encoding
+    object encoding msg
 
-# 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的refcount
-object refcount msg
+    # 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的lru
+    object IDLETIME msg
 
-# 随机返回一个key
-randomkey
+    # 查看最后一次访问该key是多少秒之前. 对应源代码里的RedisObject结构里的refcount
+    object refcount msg
 
-# 改名, 会覆盖a
-rename msg a
+    # 随机返回一个key
+    randomkey
 
-# renamenx 改名,如果a存在,那么改名失败
-renamenx msg a
-```
+    # 改名, 会覆盖a
+    rename msg a
+
+    # renamenx 改名,如果a存在,那么改名失败
+    renamenx msg a
+    ```
 
 ### 遍历key命令
 
 - redis采用hashtable数据结构存储键
-![avatar](./Pictures/redis/internal-hashtable.avif)
+
+    ![avatar](./Pictures/redis/internal-hashtable.avif)
 
 - 遍历所有key
 
@@ -1186,16 +1207,16 @@ redis keys video* | xargs redis-cli del
 
 - list相关命令性能对比（quicklist with ziplist -> quicklist with listpack)
 
-    | command    | quicklist listpack(rps) | quicklist ziplist(rps) | percentage(positive: performance enhancement | negative: performance degradation) |
-    |------------|-------------------------|------------------------|----------------------------------------------|------------------------------------|-------|
-    | LPUSH      | 106929 rps              | p50=0.223              | 103535.75 rps                                | p50=0.223                          | 3.2%  |
-    | LRANGE_100 | 65737.58 rps            | p50=0.375              | 67333.27 rps                                 | p50=0.375                          | -2.3% |
-    | LRANGE_300 | 30900.44 rps            | p50=0.839              | 31346.00 rps                                 | p50=0.823                          | -1.4% |
-    | LRANGE_500 | 22126.59 rps            | p50=1.175              | 22689.63 rps                                 | p50=1.159                          | -1.4% |
-    | LRANGE_600 | 19443.90 rps            | p50=1.343              | 19690.08 rps                                 | p50=1.327                          | -1.2% |
-    | RPUSH      | 109075.04 rps           | p50=0.223              | 108283.71 rps                                | p50=0.223                          | 0.7%  |
-    | LPOP       | 108636.61 rps           | p50=0.223              | 110778.77 rps                                | p50=0.223                          | 1.9%  |
-    | RPOP       | 109757.44 rps           | p50=0.223              | 109206.08 rps                                | p50=0.223                          | 0.5%  |
+    | command    | quicklist listpack(rps)  | quicklist ziplist(rps)   | percentage(positive: performance enhancement, negative: performance degradation) |
+    |------------|--------------------------|--------------------------|----------------------------------------------------------------------------------|
+    | LPUSH      | 106929 rps     p50=0.223 | 103535.75 rps  p50=0.223 | 3.2%  |
+    | LRANGE_100 | 65737.58 rps   p50=0.375 | 67333.27 rps   p50=0.375 | -2.3% |
+    | LRANGE_300 | 30900.44 rps   p50=0.839 | 31346.00 rps   p50=0.823 | -1.4% |
+    | LRANGE_500 | 22126.59 rps   p50=1.175 | 22689.63 rps   p50=1.159 | -1.4% |
+    | LRANGE_600 | 19443.90 rps   p50=1.343 | 19690.08 rps   p50=1.327 | -1.2% |
+    | RPUSH      | 109075.04 rps  p50=0.223 | 108283.71 rps  p50=0.223 | 0.7%  |
+    | LPOP       | 108636.61 rps  p50=0.223 | 110778.77 rps  p50=0.223 | 1.9%  |
+    | RPOP       | 109757.44 rps  p50=0.223 | 109206.08 rps  p50=0.223 | 0.5%  |
 
     - lpush/rpush/lpop/rpop性能略有提升，这得益于listpack避免了连锁更新的问题
 
@@ -4213,7 +4234,7 @@ redis-cli -s /var/run/redis/redis.sock
 
     ```sh
     # 服务器启动时，设置密码为testpasswd
-    redis-server ~/redis/redis.conf --requirepass testpasswd
+    redis-server ~/notes/databases/redis/redis.conf --requirepass testpasswd
     ```
 
     ```sh
@@ -5870,7 +5891,7 @@ slaveof no one
 > sentinel monitor <name> 127.0.0.1 6379 <quorum>
 > ```
 
-- **sentinel** 配置文件 `~/redis/sentinel/redis-sentinel-26379.conf`加入以下代码:
+- **sentinel** 配置文件 `~/notes/databases/redis/sentinel/redis-sentinel-26379.conf`加入以下代码:
 
 ```sh
 # 端口
@@ -5929,9 +5950,9 @@ sentinel parallel-syncs YouMasterName 1
 开启 sentiel 服务器（默认端口为26379）
 
 ```sh
-redis-sentinel ~/redis/sentinel/redis-sentinel-26379.conf
+redis-sentinel ~/notes/databases/redis/sentinel/redis-sentinel-26379.conf
 # 或者
-redis-server ~/redis/sentinel/redis-sentinel-26379.conf --sentinel
+redis-server ~/notes/databases/redis/sentinel/redis-sentinel-26379.conf --sentinel
 ```
 
 ```sh
@@ -6215,7 +6236,7 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
     ```sh
     # 通过for循环,开启6个实例
     for (( i=6379; i<=6384; i=i+1 )); do
-        redis-server /var/lib/redis/$i/redis.conf
+        redis-server /home/tz/notes/databases/redis/cluster/redis-$i.conf
     done
     ```
 
@@ -6333,7 +6354,7 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
 ```sh
 # 通过for循环,开启6个实例
 for (( i=6379; i<=6384; i=i+1 )); do
-    redis-server /var/lib/redis/$i/redis.conf
+    redis-server /home/tz/notes/databases/redis/cluster/redis-$i.conf
 done
 
 # 自动建立集群
@@ -6381,7 +6402,7 @@ redis-cli --cluster check 127.0.0.1:6379
     ```sh
     # 通过for循环,开启6个实例
     for (( i=6380; i<=6385; i=i+1 )); do
-        redis-server /var/lib/redis/$i/redis.conf
+        redis-server /home/tz/notes/databases/redis/cluster/redis-$i.conf
     done
     ```
 
@@ -6772,7 +6793,7 @@ redis-cli --cluster rebalance 127.0.0.1:6379
 - 故障节点恢复
     - 1.重新启动6379
     ```sh
-    redis-server ~/redis/cluster/redis-6379.conf
+    redis-server ~/notes/databases/redis/cluster/redis-6379.conf
     ```
     - 2.6379日志：成为了6382的slave
     ```
