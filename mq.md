@@ -575,3 +575,15 @@ delete.topic.enable=true
 host.name=kafka01
 advertised.host.name=192.168.239.128
 ```
+
+## 日志
+
+- [knowclub：Kafka日志索引详解以及生产常见问题分析与总结](https://mp.weixin.qq.com/s/5EHJclMxaI98vjUT7ZNeFA)
+
+## 监控
+
+- [阿里巴巴中间件：问题盘点｜使用 Prometheus 监控 Kafka，我们该关注哪些指标](https://mp.weixin.qq.com/s/0y13nETgeac42an2JlImvA)
+
+## 第三方软件
+
+- [kafka-ui：web ui管理](https://github.com/provectus/kafka-ui)

@@ -266,6 +266,7 @@
 - [Redis开发运维实战：Redis6.0解密-1.Thread/IO多线程]()
 
 ![avatar](./Pictures/redis/redis-version.avif)
+![avatar](./Pictures/redis/redis-version1.avif)
 
 - Redis6之前的Redis并不是单线程程序。通常我们说的Redis的单线程，是指Redis接受链接，接收数据并解析协议，发送结果等命令的执行，都是在主线程中执行的。
 

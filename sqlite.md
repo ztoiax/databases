@@ -1191,6 +1191,11 @@ pragma optimize;
 
 - [rqlite: go语言实现raft, 分布式sqlite](https://github.com/rqlite/rqlite)
 
+- [WCDB 是微信团队开源的一款基于 SQLite 的终端数据库](https://github.com/Tencent/wcdb)
+    - [微信客户端技术团队：五年沉淀，微信全平台终端数据库WCDB迎来重大升级！](https://mp.weixin.qq.com/s/RWCqLD0M_WGCrCcz0oQIcQ)
+
+- [redka：sqlite实现的redis](https://github.com/nalgeon/redka)
+
 # 在线工具
 
 - [在线使用sqlite](https://sqlime.org/)

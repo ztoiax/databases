@@ -2,6 +2,72 @@
 
 ## 安装 MySql
 
+- MySQL主要包含四个部分的程序，分别为：服务器程序、安装程序、实用工具程序，及客户端程序。
+
+- 服务器程序：mysqld
+
+    ```sh
+    # 手动启动
+    mysqld --user=mysql --datadir=/var/lib/mysql --socket=/tmp/mysql.sock
+    ```
+
+- 安装程序：
+
+    - mysql_secure_installation：可以对安全性进行初始化配置
+        - 可以改善MySQL服务器的安全性，包括创建root用户的密码、删除root用户的远程访问权限、删除匿名账户，以及删除“test”数据库。注意，该程序主要针对8.0之前版本的MySQL，8.0的安装包内已经包含了上述功能。
+
+    - mysql_tzinfo_to_sql：则可以创建一个包含主机时区信息的SQL语句。
+
+- 实用工具程序：
+
+    - mysql_config_editor：用于管理登录路径，方便用户通过命令行客户端连接MySQL服务器。
+
+        - 可以创建一个加密的选项文件，文件中包含用户的密码及主机的选项，默认产生的文件名称为`.mylogin.cnf`
+
+            - 可以通过设置`MYSQL_TEST_LOGIN_FILE`环境变量的值更改该文件名称
+            ```ini
+            [adminuser]
+            user=root
+            password = mysqlroot
+            host = 127.0.0.1           
+            ```
+        ```sh
+        # 创建登录路径时，使用如下命令：
+        mysql_config_editor set --login-path=login-path --user=username --password --host=hostname
+
+        # 删除登录路径时，使用如下命令；
+        mysql_config_editor remove --login-path=login-path
+
+        # 客户端连接MySQL服务器时，使用“--login-path”选项，指定用户名即可进行连接。例如，
+        mysql --login-path=adminuser
+        ```
+
+    - mysqlbinlog：用于读取和回放二进制日志中的内容。
+
+    - mysqldumpslow：用于读取和总结慢查询日志的内容。
+
+    - mysql_ssl_rsa_setup：用于创建TLS密钥和证书
+
+    - ibd2sdi：用于从InnoDB表空间文件中抽取SDI（serialized dictionary information）
+
+- 客户端程序：
+
+    - mysql：MySQL命令行客户端
+
+    - mysqladmin：用于监视、管理及关闭MySQL
+
+    - mysqldump/mysqlpump：使用SQL语句执行的逻辑备份工具
+
+    - mysqlimport：用于将文件中的数据导入数据库
+
+    - mysqlslap：加载模拟程序
+
+    - mysqlshow：用于显示数据库对象的元数据
+
+    - mysqlcheck：用于检查和优化数据库的表
+
+    - mysqlsh：MySQL的高级命令行客户端及代码编辑器
+
 ### Centos 7 安装 MySQL
 
 - 从 CentOS 7 开始,`yum` 安装 `MySQL` 默认安装的会是 `MariaDB`
@@ -71,245 +137,47 @@ docker exec -it mysql-tz bash
 mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
 ```
 
-## 主从复制 (Master Slave Replication )
+### 升级
 
-- 原理
-    - master提交完事务后，写入binlog
-    - slave连接到master，获取binlog
-    - master创建dump线程，推送binglog到slave
-    - slave启动一个IO线程读取同步过来的master的binlog，记录到relay log中继日志中
-    - slave再开启一个sql线程读取relay log事件并在slave执行，完成同步
-    - slave记录自己的binglog
+- 2023年10月25日，随着MySQL 5.7.44发布，宣告5.7正式停止开发和维护。而不少企业选择把MySQL 5.7升级到8.0。
 
-    ![image](./Pictures/mysql/主从复制原理.avif)
+#### github升级mysql 8.0过程
 
-- mysql默认的复制方式是异步的：主库把日志发送给从库后不关心从库是否已经处理，这样会产生一个问题就是假设主库挂了，从库处理失败了，这时候从库升为主库后，日志就丢失了。
+- GitHub也在去年把MySQL升级到了8.0。[详细的升级过程](https://github.blog/2023-12-07-upgrading-github-com-to-mysql-8-0/)
 
-- 全同步复制：主库写入binlog后强制同步日志到从库，所有的从库都执行完成后才返回给客户端，但是很显然这个方式的话性能会受到严重影响。
+- 总结一下大致步骤
 
-- 半同步复制：和全同步不同的是，半同步复制的逻辑是这样，从库写入日志成功后返回ACK确认给主库，主库收到至少一个从库的确认就认为写操作完成。
+    - 1.先升级部分副本，然后将部分只读流量切上去，也会保留足够的5.7副本，以方便回滚
 
-### 主从复制不会复制已经存在的数据库数据。因此需要自己导入
+    - 2.如果只读流量经过8.0的验证，没问题，就调整复制拓扑为下图形式 
 
-- 在master服务器上：导出主从复制设置的数据库
+        ![image](./Pictures/mysql/mysql升级-github升级过程.avif)
 
-    ```sh
-    # 导出
+        - 一个8.0的候选，直接接在5.7主库后面
 
-    # 进入数据库后给数据库加上一把锁,阻止对数据库进行任何的写操作
-    flush tables with read lock;
+        - 8.0的从库下游又创建两个复制链
 
-    # 导出tz数据库
-    mysqldump -uroot -pYouPassward tz > /root/tz.sql
+            - 一部分是5.7的从（暂时不提供查询，用来做回滚用的）
 
-    # 对数据库解锁,恢复对主数据库的操作
-    unlock tables;
-    ```
+            - 另外一部分是8.0的从，用来承担只读查询
 
-    ```sh
-    # 复制主服务器的tz.sql备份文件
-    scp -r "root@192.168.100.208:/root/tz.sql" /tmp/
-    # 创建tz数据库
-    mysql -uroot -p
-    ```
+    - 3.通过Orchestrator，执行failover将上图MySQL 8.0的从库提升为主。
 
-- 在slave服务器上：恢复 tz 数据库
+        - 通过Orchestrator，执行failover将上图MySQL 8.0的从库提升为主。
 
-    ```sql
-    # 先创建 tz 数据库
-    create database tz;
+        - 这个时候，拓扑变成了一个8.0的主，它下游附带了两个复制链组：
 
-    # 导入
-    mysql -uroot -p tz < /tmp/tz.sql
+            - 一部分是5.7的从（暂时不提供查询，用来做回滚用的）。
 
-    # 如果出现以下核对错误
-    ERROR 1273 (HY000) at line 47: Unknown collation: 'utf8mb4_0900_ai_ci'
-    # 通过修改编码修复
-    sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /tmp/tz.sql
-    # 再次运行
-    mysql -uroot -p tz < /tmp/tz.sql
-    ```
+            - 另外一部分是8.0的从，用来承担只读查询。
 
-### 主服务器配置
+        - 并且Orchestrator还把5.7的主机列为故障转移的黑名单，防止发生切换的时候，又出现5.7的实例提升为主的情况。
 
-- `/etc/my.cnf` 文件配置
+    - 4.升级其他用于备份或者非生产的实例
 
-    ```sh
-    [mysqld]
-    server-id=129            # 默认是 1 ,这个数字必须是唯一的
-    log_bin=centos7
+    - 5.如果在8.0的版本下运行了足够长的时间（至少24小时），则把集群内5.7版本的MySQL全删除。
 
-    binlog-do-db=tz          # 同步指定库tz
-    binlog-ignore-db=tzblock # 忽略指定库tzblock
-
-    # 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
-    binlog_format=row
-
-    # 设置一个 binlog 文件的最大字节。设置最大 100MB
-    max_binlog_size=100M
-
-    # 设置了 binlog 文件的有效期（单位：天）
-    expire_logs_days = 7
-
-    # 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
-    # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
-    # 执行n 次事务提交后，才fsync到磁盘
-    sync_binlog=1
-    ```
-
-- 设置远程登陆的权限
-    ```sql
-    # 启用slave权限
-    grant PRIVILEGES SLAVE on *.* to  'root'@'%';
-    # 或者启用所有权限
-    grant all on *.* to  'root'@'%';
-
-    # 刷新权限
-    FLUSH PRIVILEGES;
-    ```
-
-- 重启mariadb
-    ```sh
-    systemctl restart mariadb
-    ```
-
-- 查看主服务状态
-
-    ```sql
-    # 日志目录 /var/lib/mysql/centos7.000001
-
-    mysql> show master status;
-    ERROR 2006 (HY000): MySQL server has gone away
-    No connection. Trying to reconnect...
-    Connection id:    7
-    Current database: tz
-
-    +----------------+----------+--------------+------------------+-------------------+
-    | File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
-    +----------------+----------+--------------+------------------+-------------------+
-    | centos7.000001 |      156 |              |                  |                   |
-    +----------------+----------+--------------+------------------+-------------------+
-    1 row in set (0.02 sec)
-    ```
-
-### 从服务器配置
-
-- `/etc/my.cnf` 文件配置
-
-    ```sh
-    [mysqld]
-    server-id=128
-
-    replicate-do-db = tz     #只同步tz库
-    slave-skip-errors = all   #忽略因复制出现的所有错误
-    ```
-
-- 进入slave服务器后，配置master服务器
-    ```sql
-    -- 关闭同步
-    stop slave;
-
-    # 开启同步功能
-    CHANGE MASTER TO
-    MASTER_HOST = '192.168.100.208',
-    MASTER_USER = 'root',
-    MASTER_PASSWORD = 'YouPassword',
-    -- 在master上执行show master status;查看MASTER_LOG_FILE、MASTER_LOG_POS
-    MASTER_LOG_FILE='centos7.000001',
-    MASTER_LOG_POS=156;
-
-    -- 开启同步
-    start slave;
-    ```
-
-- 查看是否成功
-    ```sql
-    MariaDB [tz]> show slave status\G;
-    *************************** 1. row ***************************
-                    Slave_IO_State: Connecting to master
-                       Master_Host: 192.168.100.208
-                       Master_User: root
-                       Master_Port: 3306
-                     Connect_Retry: 60
-                   Master_Log_File: centos7.000001
-               Read_Master_Log_Pos: 6501
-                    Relay_Log_File: tz-pc-relay-bin.000001
-                     Relay_Log_Pos: 4
-             Relay_Master_Log_File: centos7.000001
-                  Slave_IO_Running: Connecting
-                 Slave_SQL_Running: Yes
-    ```
-
-### docker 主从复制
-
-[docker 安装 mysql 教程](#docker)
-
-启动两个 mysql:
-
-```sh
-docker run -itd --name mysql-tz -p 3306:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
-
-docker run -itd --name mysql-slave -p 3307:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
-```
-
-进入 docker 修改 `my.cnf` 配置文件
-
-```sh
-docker exec -it mysql-tz /bin/bash
-echo "server-id=1" >> /etc/mysql/my.cnf
-echo "log-bin=bin.log" >> /etc/mysql/my.cnf
-echo "bind-address=0.0.0.0" >> /etc/mysql/my.cnf
-
-docker exec -it mysql-slave /bin/bash
-echo "server-id=2" >> /etc/mysql/my.cnf
-echo "log-bin=bin.log" >> /etc/mysql/my.cnf
-
-退出docker后,重启mysql
-docker container restart mysql-slave
-docker container restart mysql-tz
-```
-
-进入 master(主服务器) 创建 backup 用户,并添加权限:
-
-```sql
-mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
-
-create user 'backup'@'%' identified by 'YouPassword';
-GRANT replication slave ON *.* TO 'backup'@'%';
-FLUSH PRIVILEGES;
-```
-
-查看 master 的 ip:
-
-```sh
-sudo docker exec -it mysql-tz cat '/etc/hosts'
-```
-
-我这里为 `172.17.0.2`
-
-![image](./Pictures/mysql/docker-replication.avif)
-
-开启 **slave**:
-
-```sql
-# MASTER_HOST 填刚才查询的ip
-
-mysql -uroot -pYouPassword -h 127.0.0.1 -P3307
-CHANGE MASTER TO
-MASTER_HOST = '172.17.0.2',
-MASTER_USER = 'backup',
-MASTER_PASSWORD = 'YouPassword';
-start slave;
-```
-
-docker 主从复制测试:
-
-- 左为 3307 从服务器
-- 右为 3306 主服务器
-
-在主服务器**新建数据库 tz,hello 表**,并插入 1 条数据.可以看到从服务器可以 select hello 表;在主服务器删除 tz 数据库,从服务器也跟着删除.
-
-![image](./Pictures/mysql/docker-replication.gif)
+#### [爱可生开源社区：MySQL 5.7 升级到 8.0 可能踩的一个坑](https://mp.weixin.qq.com/s/DLf98FgoE-FbxmETzGnSZw)
 
 ## 日志
 
@@ -431,7 +299,18 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
             - 为0的时候，表示每次提交事务都只write，由系统自行判断什么时候执行fsync。
             - 为了安全起见，可以设置为1，表示每次提交事务都会执行fsync，就如同binlog 日志刷盘流程一样。
 
+    - [爱可生开源社区：MySQL 核心模块揭秘 | 10 期 | binlog 怎么写入日志文件？](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247514251&idx=1&sn=98cf7b9fc9c0116327a0154809b92c33&chksm=fc955a14cbe2d302e3d9deb93b5919163612d8b26de98f818ad48adb4e994bea6ac85f6504aa&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
 - binlog日志有3种格式，可以通过`binlog_format`参数指定。
+
+    ```sql
+    show variables like 'binlog_format';
+    +---------------+-------+
+    | Variable_name | Value |
+    +---------------+-------+
+    | binlog_format | ROW   |
+    +---------------+-------+
+    ```
 
     - statement：记录的内容是SQL语句原文`update T set update_time=now() where id=1`
         ![image](./Pictures/mysql/binlog-statement.avif)
@@ -449,6 +328,387 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
             - 缺点：需要更大的容量来记录，比较占用空间，恢复与同步时会更消耗IO资源，影响执行速度。
 
     - mixed：前两者的混合。判断这条SQL语句是否可能引起数据不一致，如果是，就用row格式，否则就用statement格式。
+
+#### 解析binlog
+
+- [爱可生开源社区：MySQL 核心模块揭秘 | 06 期 | 事务提交之前，binlog 写到哪里？](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513577&idx=1&sn=793b807b72016cb10b3f903720ebf49e&chksm=fc955776cbe2de60fc8f2af8219a2d282d5ffd7de37ba7c2f6d124139dafb3d57d36ea4a4384&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+- 准备工作
+
+    ```sql
+    -- 创建测试表
+    CREATE TABLE `t_binlog` (
+      `id` int unsigned NOT NULL AUTO_INCREMENT,
+      `i1` int DEFAULT '0',
+      `str1` varchar(32) DEFAULT '',
+      PRIMARY KEY (`id`) USING BTREE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+    -- 开启事务，插入数据
+    BEGIN;
+
+    INSERT INTO `t_binlog` (`i1`, `str1`)
+    VALUES (100, 'MySQL 核心模块揭秘');
+
+    COMMIT;
+
+    -- 查看binlog，我这里为arch.000040
+    show binary logs;
+    +-------------+-----------+
+    | Log_name    | File_size |
+    +-------------+-----------+
+    | arch.000026 | 2536245   |
+    | arch.000027 | 6140778   |
+    | arch.000028 | 2162      |
+    | arch.000029 | 360       |
+    | arch.000030 | 7724      |
+    | arch.000031 | 360       |
+    | arch.000032 | 13971     |
+    | arch.000033 | 1314      |
+    | arch.000034 | 379       |
+    | arch.000035 | 417       |
+    | arch.000036 | 417       |
+    | arch.000037 | 417       |
+    | arch.000038 | 398       |
+    | arch.000039 | 360       |
+    | arch.000040 | 953       |
+    +-------------+-----------+
+    ```
+
+- 解析事务binlog日志
+
+    ```sh
+    # 进入binlog的目录
+    cd /var/lib/mysql/
+
+    # 解析事务产生的 binlog 日志
+    mysqlbinlog  arch.000040 --base64-output=decode-rows -vv
+    ```
+
+- 解析事务 binlog 日志之后，我们可以得到 4 个 binlog event。
+
+    - 示例 SQL 中，只有两条 SQL 会产生 binlog event：
+
+        - BEGIN：不会产生 binlog event。
+        - INSERT：产生三个 binlog event。
+            - Query_log_event。
+            - Table_map_log_event。
+            - Write_rows_log_event。
+        - COMMIT：产生 Xid_log_event。
+
+    - 按照这些 binlog event 在 binlog 日志文件中的顺序，简化之后的内容如下：
+
+    - 1.Query_log_event
+
+        ```sql
+        # at 657
+        START TRANSACTION
+        ```
+
+    - 2.Table_map_log_event
+
+        ```sql
+        # at 800
+        Table_map: `test`.`t_binlog` mapped to number 57
+        ```
+
+    - 3.Write_rows_log_event
+
+        ```sql
+        # at 855
+        Write_rows: table id 57 flags: STMT_END_F
+        ### INSERT INTO `test`.`t_binlog`
+        ### SET
+        ###   @1=1 /* INT meta=0 nullable=0 is_null=0 */
+        ###   @2=100 /* INT meta=0 nullable=1 is_null=0 */
+        ###   @3='MySQL 核心模块揭秘' /* VARSTRING(96) meta=96 nullable=1 is_null=0 */
+        ```
+
+    - 4.Xid_log_event
+
+        ```sql
+        Xid = 31
+        COMMIT/*!*/;
+        ```
+
+##### binlog cache
+
+- 使用 mysqlbinlog 分析 binlog 日志的时候，可以发现这么一个现象：同一个事务产生的 binlog event，在 binlog 日志文件中是连续的。
+
+- 保证同一个事务的 binlog event 在 binlog 日志文件中的连续性，不管是 MySQL 从库回放 binlog，还是作为用户的我们，都可以很方便的定位到一个事务的 binlog 从哪里开始，到哪里结束。
+
+- 问题：一个事务会产生多个 binlog event，很多个事务同时执行，怎么保证同一个事务产生的 binlog event 写入到 binlog 日志文件中是连续的？
+- 解决方法：binlog cache
+
+- 每个事务都有两个 binlog cache：
+
+    - stmt_cache：改变（插入、更新、删除）不支持事务的表，产生的 binlog event，临时存放在这里。
+    - trx_cache：改变（插入、更新、删除）支持事务的表，产生的 binlog event，临时存放在这里。
+
+        - 事务执行过程中，产生的所有 binlog event，都会先写入 trx_cache。trx_cache 分为两级：
+
+            - 第一级：内存，也称为 buffer，它的大小用 buffer_length 表示，由系统变量 binlog_cache_size 控制，默认为 32K。
+            - 第二级：临时文件，位于操作系统的 tmp 目录下，文件名以 ML 开头。
+
+        - buffer_length 加上临时文件中已经写入的 binlog 占用的字节数，也有一个上限，由系统变量 max_binlog_cache_size 控制。
+
+##### 产生 binlog
+
+- 如果一条 SQL 语句改变了（插入、更新、删除）表中的数据，server 层会为这条 SQL 语句产生一个包含表名和表 ID 的 Table_map_log_event。
+
+- 每次调用存储引擎的方法写入一条记录到表中之后，server 层都会为这条记录产生 binlog。
+
+    - 这里没有写成 binlog event，是因为记录中各字段内容都很少的时候，多条记录可以共享同一个 binlog event ，并不需要为每条记录都产生一个新的 binlog event。
+
+        - 这个 binlog event 最多可以存放多少字节的内容，由系统变量 `binlog_row_event_max_size` 控制
+            ```sql
+            -- 默认为 8192 字节。
+            select @@binlog_row_event_max_size
+            +-----------------------------+
+            | @@binlog_row_event_max_size |
+            +-----------------------------+
+            | 8192                        |
+            +-----------------------------+
+            ```
+
+        - 如果一条记录产生的 binlog 超过了 8192 字节，它的 binlog 会独享一个 binlog event，这个 binlog event 的大小就不受系统变量 `binlog_row_event_max_size` 控制了。
+
+
+- 在 binlog 日志文件中
+
+    - 那么，第一步就要为这个事务初始化 binlog cache，包括 stmt_cache 和 trx_cache。初始化完成之后，这两个 cache 都是空的。
+
+        - 事务执行过程中，所有 binlog event 都会先写入 trx_cache 的 buffer，buffer 大小默认为 32K。
+
+    - 1.Query_log_event 为 BEGIN 语句的binlog event。
+    - 2.Table_map_log_event 位于 SQL 语句改变表中数据产生的 binlog event 之前。
+    - 3.Write_rows_log_event 是插入记录对应的 binlog event
+    - 4.Xid_log_event 是 COMMIT 语句时，会产生的binlog event ，并写入 trx_cache。
+
+
+- trx_cache 分为两级：内存（buffer）、临时文件。
+
+
+- 写入一个 binlog event 到 trx_cache 的流程：
+
+    - 判断 buffer 剩余空间是否足够写入这个 binlog event。
+    - 如果足够，直接把 binlog event 写入 buffer，流程结束。
+    - 如果不够，用 binlog event 前面的部分内容填满 buffer，然后，把 buffer 中所有内容写入临时文件，再清空 buffer，以备复用。
+    - 接着判断 binlog event 剩余内容是否大于等于 4096 字节（IO_SIZE）。
+    - 如果剩余内容大于等于 4096 字节，则把剩余内容前面的 N * 4096 字节写入临时文件。
+    - 对于剩余内容字节数不能被 4096 整除的情况，最后还会剩下不足 4096 字节的内容，这部分内容会写入 buffer。
+    - 如果剩余内容小于 4096 字节，直接把 binlog event 中剩余的所有内容都写入 buffer。
+
+#### 二阶段提交
+
+- [爱可生开源社区：MySQL 核心模块揭秘 | 07 期 | 二阶段提交 (1) prepare 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513770&idx=1&sn=d7cf4c9ba5acafbe33fab85219692d0b&chksm=fc955435cbe2dd2374ed1d72c332cff16f1d9c10ff8ed01f450d7fa44c4d1f3df7035f00dcef&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+- 二阶段提交是一种用于保证分布式事务原子性的协议。
+
+- 二阶段提交：
+
+    - prepare 阶段：写binlog、redo log
+    - commit 阶段：把binlog、redo log刷盘
+
+- MySQL 把 binlog 也看作一个存储引擎，开启 binlog，SQL 语句改变（插入、更新、删除）InnoDB 表的数据，这个 SQL 语句执行过程中，就涉及到两个存储引擎。
+
+    - 使用二阶段提交，就是为了保证2个存储引擎的数据一致性。
+
+        - 如果没有开启 binlog，SQL 语句改变表中数据，不产生 binlog，不用保证 binlog 和表中数据的一致性，用户事务也就不需要使用二阶段提交了。
+
+- 用户事务提交分为2种场景，如果开启了 binlog，它们都会使用二阶段提交。
+
+    - 1.通过 BEGIN 或其它开始事务的语句，显式开始一个事务，用户手动执行 COMMIT 语句提交事务。
+
+    - 2.没有显式开始的事务，一条 SQL 语句执行时，InnoDB 会隐式开始一个事务，SQL 语句执行完成之后，自动提交事务。
+
+- prepare 阶段
+    - binlog prepare阶段：什么也不会干
+    - InnoDB prepare阶段：主要做五件事
+
+        - 1.把分配给事务的所有 undo 段的状态从 TRX_UNDO_ACTIVE 修改为 TRX_UNDO_PREPARED
+
+            - 进入二阶段提交的事务，都至少改变过（插入、更新、删除）一个用户表的一条记录，最少会分配 1 个 undo 段，最多会分配 4 个 undo 段。
+
+            - 意义：如果数据库发生崩溃，重新启动后，undo 段的状态是影响事务提交还是回滚的因素之一。
+
+        - 2.把事务 Xid 写入所有 undo 段中当前提交事务的 undo 日志组头信息。
+            - InnoDB 给当前提交事务分配的每个 undo 段中，都会有一组 undo 日志属于这个事务，事务 Xid 就写入 undo 日志组的头信息。
+
+        - 对于第 1、2 件事，如果事务改变了用户普通表的数据，修改 undo 段状态、把事务 Xid 写入 undo 日志组头信息，都会产生 redo 日志。
+
+        - 3.把内存中的事务对象状态从 TRX_STATE_ACTIVE 修改为 TRX_STATE_PREPARED。
+            - 前面修改 undo 状态，是为了事务提交完成之前，MySQL 崩溃了，下次启动时，能够从 undo 段中恢复崩溃之前的事务状态。
+
+            - 这里修改事务对象状态，用于 MySQL 正常运行过程中，标识事务已经进入二阶段提交的 prepare 阶段。
+
+        - 4.如果当前提交事务的隔离级别是读未提交（READ-UNCOMMITTED）或读已提交（READ-COMMITTED)，InnoDB 会释放事务给记录加的共享、排他 GAP 锁。
+            - 虽然读未提交、读已提交隔离级别一般都只加普通记录锁，不加 GAP 锁，但是，外键约束检查、插入记录重复值检查这两个场景下，还是会给相应的记录加 GAP 锁。
+
+        - 5.调用 trx_flush_logs()，处理 事务产生的 redo 日志刷盘的相关逻辑。
+
+- 二阶段提交的 commit 阶段，分为三个子阶段。
+
+    - 1.flush 子阶段，要干两件事：
+
+        - 1.触发操作系统把 prepare 阶段及之前产生的 redo 日志刷盘。
+
+            - 事务执行过程中，改变（插入、更新、删除）表中数据产生的 redo 日志、prepare 阶段修改 undo 段状态产生的 redo 日志，都会由后台线程先写入 page cache，再由操作系统把 page cache 中的 redo 日志刷盘。
+
+            - 等待操作系统把 page cache 中的 redo 日志刷盘，这个时间存在不确定性，InnoDB 会在需要时主动触发操作系统马上把 page cache 中的 redo 日志刷盘。
+
+        - 2.把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
+
+            - 这个写入操作，也是先写入 page cache，至于操作系统什么时候把 page cache 中的 binlog 日志刷盘，flush 子阶段就不管了。
+
+    - 2.sync 子阶段，根据系统变量 sync_binlog 的值决定是否要触发操作系统马上把 page cache 中的 binlog 日志刷盘。
+
+    - 3.commit 子阶段，完成 InnoDB 的事务提交。
+
+- 组提交与重复刷盘
+
+    - 小事务：TP 场景，比较常见的情况是事务只改变（插入、更新、删除）表中少量数据，产生的 redo 日志、binlog 日志也比较少。
+
+    - 以redo 日志为例，binlog 日志也有同样的问题。一个事务产生的 redo 日志少，操作系统的一个页就有可能存放多个事务产生的 redo 日志。
+
+    - 问题：如果每个事务提交时都把自己产生的 redo 日志刷盘，共享操作系统同一个页存放 redo 日志的多个事务，就会触发操作系统把这个页多次刷盘。
+        - 数据库闲的时候，把操作系统的同一个页多次刷盘，也没啥问题，反正磁盘闲着也是闲着。
+        - 数据库忙的时候，假设某个时间点有 1 万个小事务要提交，每 10 个小事务共享操作系统的一个页用于存放 redo 日志，总共需要操作系统的 1000 个页。
+            - 1 万个事务各自提交，就要触发操作系统把这 1000 个数据页刷盘 10000 次。
+
+
+    - 解决方法：组提交。某个时间点提交的多个事务触发操作系统的同一个页重复刷盘。这样一来，1000 个数据页，只刷盘 1000 次就可以了，刷盘次数只有原来的十分之一。
+
+        - 组提交，就是把一组事务攒到一起提交，InnoDB 使用队列把多个事务攒到一起。
+
+        - commit 阶段的 3 个子阶段都有自己的队列，分别为 flush 队列、sync 队列、commit 队列。
+            - 每个队列都会选出一个队长，负责管理这个队列，选队长的规则很简单，先到先得。
+
+            - 对于每个队列，第一个加入该队列的用户线程就是队长，第二个及以后加入该队列的都是队员。
+                - 队长要多干活：每个子阶段的队长，都会把自己和所有队员在对应子阶段要干的事全都干了。队员只需要在旁边当吃瓜群众就好。
+                - 以 flush 子阶段为例
+                    - 1.我们假设 flush 队列的队长为 A 队长，A 队长收编一些队员之后，它会带领这帮队员从 flush 队列挪走，并且开始给自己和所有队员干活，队员们就在一旁当吃瓜群众。
+                    - 2.A 队长带领它的队员挪走之后，flush 队列就变成空队列了。
+                    - 3.接下来第一个进入 flush 队列的用户线程，又成为下一组的队长，我们称它为 B 队长。
+                    - 4.A 队长正在干活，还没干完呢。B 队长收编了一些队员之后，也带领这帮队员从 flush 子阶段的队列挪走，并且也要开始给自己和所有队员干活了。
+
+                    - 如果 A 队长和 B 队长都把自己和各自队员产生的 binlog 日志写入 binlog 日志文件，相互交叉写入，那是会出乱子的。
+
+                        - 为了避免 flush 子阶段出现两个队长同时干活导致出乱子，InnoDB 给 flush 子阶段引入了一个互斥量，名字是 LOCK_log。
+
+                        - sync 子阶段、commit 子阶段也需要避免出现多个队长同时干活的情况，这两个子阶段也有各自的互斥量，分别是 LOCK_sync、LOCK_commit。
+
+- [爱可生开源社区：MySQL 核心模块揭秘 | 08 期 | 二阶段提交 (2) commit 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513864&idx=1&sn=9896ca5bd7cf5d775ee9cb8c65a9ab6c&chksm=fc955597cbe2dc811614bf1d1281831d9e1cb8b04df43127aa43f25bf7f2ef94f341d5e9da20&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+    - 简单总结：
+
+        - 1.flush 子阶段，flush 队长会把自己和队员在 prepare 阶段及之前产生的 redo 日志都刷盘，把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
+
+        - 2.sync 子阶段，如果 sync_counter + 1 大于等于系统变量 max_binlog_size 的值，sync 队长会把 binlog 日志刷盘。
+
+        - 3.commit 子阶段，如果系统变量 binlog_order_commits 的值为 true，commit 队长会把自己和队员们的 InnoDB 事务都提交，否则，commit 队长和队员各自提交自己的 InnoDB 事务。
+
+
+    - 例子：假设有 30 个事务，它们对应的用户线程编号也从 1 到 30
+
+    - 1.flush 子阶段
+
+        - 用户线程 16 加入 flush 队列，成为 flush 队长，并且通过申请获得 LOCK_log 互斥量。
+
+        - flush 队长收编用户线程 17 ~ 30 作为它的队员，队员们进入 flush 队列之后，就开始等待，收到 commit 子阶段的队长发来的通知才会结束等待。
+
+        - flush 队长开始干活之前，会带领它的队员从 flush 队列挪出来，给后面进入二阶段提交的其它事务腾出空间。
+
+        - 从 flush 队列挪出来之后，flush 队长会触发操作系统，把截止目前产生的所有 redo 日志都刷盘。
+            - 这些 redo 日志，当然就包含了它和队员们在 prepare 阶段及之前产生的所有 redo 日志了。
+
+            - 触发 redo 日志刷盘之后，flush 队长会从它自己开始，把它和队员们产生的 binlog 日志写入 binlog 日志文件。
+
+        - 以队长为例，写入过程是这样的：
+
+            - 从事务对应的 trx_cache 中把 binlog 日志读出来，存放到 trx_cache 的内存 buffer 中。
+                - 每次读取 4096（对应代码里的 IO_SIZE）字节的 binlog 日志，最后一次读取剩余的 binlog 日志（小于或等于 4096 字节）。
+
+            - 把 trx_cache 内存 buffer 中的 binlog 日志写入 binlog 日志文件。
+
+
+        - 队员们产生的 binlog 日志写入 binlog 日志文件的过程，和队长一样。队长把自己和所有队员产生的 binlog 日志都写入 binlog 日志文件之后，flush 子阶段的活就干完了。
+
+            - flush 队长写完 binlog 日志之后，如果发现 binlog 日志文件的大小大于等于系统变量 max_binlog_size 的值（默认为 1G），会设置一个标志（rotate = true），表示需要切换 binlog 日志文件。后面 commit 子阶段会用到。
+
+    - 2.sync 子阶段
+
+        - 假设用户线程 6 ~ 15 此刻还在 sync 队列中，用户线程 6 最先进入队列，是 sync 队长，用户线程 7 ~ 15 都是队员。
+
+        - 用户线程 16（flush 队长）带领队员们来到 sync 子阶段，发现 sync 队列中已经有先行者了。
+            - 有点遗憾，用户线程 16 不能成为 sync 子阶段的队长，它和队员们都会变成 sync 子阶段的队员。
+            - 此时，用户线程 6 是 sync 队长，用户线程 7 ~ 30 是队员。
+            - 进入 sync 子阶段之后，用户线程 16（flush 队长）会释放它在 flush 子阶段获得的 LOCK_log 互斥量，flush 子阶段下一屇的队长就可以获得 LOCK_log 互斥量开始干活了。
+
+        - sync 队长会申请 LOCK_sync 互斥量，获得互斥量之后，就开始准备给自己和队员们干 sync 子阶段的活了。
+            - 队员们依然在一旁当吃瓜群众，等待 sync 队长给它们干活。它们会一直等待，收到 commit 子阶段的队长发来的通知才会结束等待。
+
+        - 就在 sync 队长准备甩开膀子大干一场时，它发现前面还有一个关卡：本次组提交能不能触发操作系统把 binlog 日志刷盘。 sync 队长怎么知道自己能不能过这一关？
+
+            - 它会查看一个计数器的值（sync_counter），如果 sync_counter + 1 大于等于系统变量 `sync_binlog` 的值，就说明自己可以过关。
+
+                - sync_counter：
+
+                    - sync_counter 的值从 0 开始，某一次组提交的 sync 队长没有过关，不会触发操作系统把 binlog 日志刷盘，sync_counter 就加 1。
+
+                    - sync_counter 会一直累加，直到后续的某一次组提交，sync_counter + 1 大于等于系统变量 sync_binlog 的值，sync 队长会把 sync_counter 重置为 0，并且触发操作系统把 binlog 日志刷盘。接着又会开始一个新的轮回。
+
+                - 如果 sync 队长不过关了：用户线程 6 作为队长的 sync 子阶段就到此结束了，它什么都不用干。
+
+                - 如果 sync 队长过关了：
+
+                    - sync 队长会带领队员们继续在 sync 队列中等待，以收编更多队员。这个等待过程是有期限的，满足以下两个条件之一，就结束等待：
+
+                        - 已经等待了系统变量 binlog_group_commit_sync_delay 指定的时间（单位：微妙），默认值为 0。
+                        - sync 队列中的用户线程数量（sync 队长和所有队员加在一起）达到了系统变量 binlog_group_commit_sync_no_delay_count 的值，默认值为 0。
+
+                    - 等待结束之后，sync 队长会带领队员们从 sync 队列挪出来，给后面进入二阶段提交的其它事务腾出空间。
+
+            - 接下来，sync 队长终于可以大干一场了，它会触发操作系统把 binlog 日志刷盘，确保它和队员们产生的 binlog 日志写入到磁盘上的 binlog 日志文件中。
+                - 这样即使服务器突然异常关机，binlog 日志也不会丢失了。
+
+            - 刷盘完成之后，用户线程 6 作为队长的 sync 子阶段，就到此结束。
+
+    - 3.commit 子阶段
+
+        - 假设用户线程 1 ~ 5 此刻还在 commit 队列中，用户线程 1 最先进入队列，是 commit 队长，用户线程 2 ~ 5 都是队员。
+
+            - 用户线程 6（sync 队长）带领队员们来到 commit 子阶段，发现 commit 队列中也已经有先行者了。
+
+            - 用户线程 6 和队员们一起，都变成了 commit 子阶段的队员。
+
+        - 此刻，用户线程 1 是 commit 队长，用户线程 2 ~ 30 是队员。
+
+        - 进入 commit 子阶段之后，用户线程 6（sync 队长）会释放它在 sync 子阶段获得的 LOCK_sync 互斥量，sync 子阶段下一屇的队长就可以获得 LOCK_sync 互斥量开始干活了。
+
+        - commit 队长会申请 LOCK_commit 互斥量，获得互斥量之后，根据系统变量 binlog_order_commits 的值决定接下来的活要怎么干。
+
+            - 值为true：commit 队长会把它和队员们的 InnoDB 事务逐个提交，然后释放 LOCK_commit 互斥量。
+
+                - 提交 InnoDB 事务完成之后，commit 队长会通知它的队员们（用户线程 2 ~ 30）：所有活都干完了，你们都散了吧，别围观了，该干啥干啥去。
+
+                - 队员们收到通知之后，作鸟兽散，它们的二阶段提交也都结束了。
+
+            - 值为false：commit 队长不会帮助队员们提交 InnoDB 事务，它提交自己的 InnoDB 事务之后，就会释放 LOCK_commit 互斥量。
+
+                - 然后，通知所有队员（用户线程 2 ~ 30）：flush 子阶段、sync 子阶段的活都干完了，你们自己去提交 InnoDB 事务。
+
+                - 队员们收到通知之后，就各自提交自己的 InnoDB 事务，谁提交完成，谁的二阶段提交就结束了。
+
+        - 最后，commit 队长还要处理最后一件事。
+
+            - 如果用户线程 16（flush 队长）把 rotate 设置为 true 了，说明 binlog 日志文件已经达到了系统变量 max_binlog_size 指定的上限，需要切换 binlog 日志文件。
+
+            - 切换指的是关闭 flush 子阶段刚写入的 binlog 日志文件，创建新的 binlog 日志文件，以供后续事务提交时写入。
+
+            - 如果需要切换 binlog 日志文件，切换之后，还会根据系统变量 binlog_expire_logs_auto_purge、binlog_expire_logs_seconds、expire_logs_days 清理过期的 binlog 日志。
+
+            - 处理完切换 binlog 日志文件的逻辑之后，commit 队长的工作就此结束，它的二阶段提交就完成了。
 
 #### 配置
 
@@ -480,18 +740,6 @@ expire_logs_days = 7
 # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
 # 执行n 次事务提交后，才fsync到磁盘
 sync_binlog=1
-```
-
-![image](./Pictures/mysql/binlog.avif)
-
-```sql
-# 我这里是 row 格式
-show variables like 'binlog_format';
-+---------------+-------+
-| Variable_name | Value |
-+---------------+-------+
-| binlog_format | ROW   |
-+---------------+-------+
 ```
 
 随着时间的推移日志文件会越来越多，可以设置日志有效期，自动清理
@@ -640,17 +888,68 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
 
 ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
-#### [canal](https://github.com/alibaba/canal)
+#### [binlog2sql](https://github.com/danfengcao/binlog2sql)
 
-- canal 模拟 slave 的方式，获取 binlog 日志数据. binlog 设置为 row 模式以后，不仅能获取到执行的每一个增删改的脚本，同时还能获取到修改前和修改后的数据.
+```sql
+drop table if exists test;
 
-- 支持高性能,实时数据同步
+CREATE TABLE test(
+    id int (8),
+    name varchar(50),
+    date DATE
+);
 
-- 支持 docker
+insert into test (id,name,date) values
+(1,'tz1','2020-10-24'),
+(10,'tz2','2020-10-24'),
+(100,'tz3','2020-10-24');
 
-[canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
+commit;
 
-[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
+select current_timestamp();
++---------------------+
+| current_timestamp() |
++---------------------+
+| 2020-11-19 01:59:05 |
++---------------------+
+
+delete from test
+where id = 1;
+
+update test
+set id = 20
+where id = 10;
+
+insert into test (id,name,date) values
+(1000,'tz4','2020-10-24');
+
+commit;
+
+select * from test;
+
+show master status;
++------------+----------+--------------+------------------+
+| File       | Position | Binlog_Do_DB | Binlog_Ignore_DB |
++------------+----------+--------------+------------------+
+| bin.000014 |     6337 |              |                  |
++------------+----------+--------------+------------------+
+
+select current_timestamp();
++---------------------+
+| current_timestamp() |
++---------------------+
+| 2020-11-19 01:59:34 |
++---------------------+
+```
+
+```sh
+mysqlbinlog --no-defaults -v --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" /var/lib/mysql/bin.000014 --result-file=/tmp/result.sql
+
+python binlog2sql/binlog2sql.py -uroot -p -dtest --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
+
+python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
+# 失败
+```
 
 ### redo log (重做日志)
 
@@ -751,6 +1050,8 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
         - 如果write pos追上checkpoint，表示日志文件组满了，这时候不能再写入新的redo log记录，MySQL得停下来，清空一些记录，把checkpoint推进一下。
             ![image](./Pictures/mysql/redo-log日志文件组2.avif)
 
+#### [一树一溪：Redo 日志从产生到写入日志文件](https://mp.weixin.qq.com/s/kMdD7jUaouWnHxjdmKSV4A)
+
 ### binlog和redo log
 
 - binlog是逻辑日志，记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
@@ -782,14 +1083,60 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
         - 使用两阶段提交后，写入binlog时发生异常也不会有影响，因为MySQL根据redo log日志恢复数据时，发现redo log还处于prepare阶段，并且没有对应binlog日志，就会回滚该事务。
         ![image](./Pictures/mysql/binlog_and_redolog5.avif)
 
-### undo log回滚日志）
+### undo log（回滚日志）
 
-- 保证事务的原子性（ACID的A）：要么全部成功，要么全部失败，不可能出现部分成功的情况。
+
+- redo 日志只有崩溃恢复的时候才能派上用场，undo 日志不一样，它承担着多重职责，MySQL 崩溃恢复、以及正常提供服务期间，都有它的身影。
+
+    - 职责 1：为 MVCC 服务，减少读写事务之间的相互影响，提升数据库的并发能力。
+    - 职责 2：保证数据库运行过程中的数据一致性。事务回滚时，把事务中被修改的数据恢复到修改之前的状态。
+    - 职责 3：保证数据库崩溃之后的数据一致性。崩溃恢复过程中，恢复没有完成提交的事务，并根据事务的状态和 binlog 日志是否写入了该事务的 xid 信息，共同决定事务是提交还是回滚。
 
 - undo log 逻辑日志：
     - 事务未提交的时候,所有事务进行的修改都会先先记录到这个回滚日志中，并持久化到磁盘上。
     - 系统崩溃时，没 COMMIT 的事务 ，就需要借助 undo log 来进行回滚至事务开始前的状态。
     - 保存在`ibdata*`
+
+- undo 日志序号
+    - 事务每次改变（插入、更新、删除）某个表的一条记录，都会产生一条 undo 日志。这条 undo 日志中会存储它自己的序号。
+    - 每个事务都维护着各自独立的 undo 日志序号，和其它事务无关。
+    - InnoDB 的 savepoint 结构中会保存创建 savepoint 时事务对象的 undo_no 属性值。
+
+### undo log的存储结构
+
+- undo 日志需要为数据一致性和 MVCC 服务，除了要支持多事务同时写入日志，还要支持多事务同时读取日志。
+
+    - 为了有更好的读写并发性能，它拥有与 redo 日志完全不一样的存储结构。
+
+- 存储结构
+
+    ![image](./Pictures/mysql/undo-log-存储结构.avif)
+
+    - 以下的undo log组成部分，从下（被管理）往上（管理）讲
+
+    - undo log header：一个事务可能产生多条 undo 日志，也可能只产生一条 undo 日志，不管事务产生了多少条 undo 日志，这些日志都归属于事务对应的日志组，日志组由 undo log header 负责管理。
+
+    - undo 页：undo log header 和 undo 日志都存储于 undo 页中。
+
+    - undo 段：为了多个事务同时写 undo 日志不相互影响，undo 日志也使用了无锁设计，InnoDB 会为每个事务分配专属的 undo 段，每个事务只会往自己专属 undo 段的 undo 页中写入日志。
+
+        - 一个 undo 段可能会包含一个或多个 undo 页，多个 undo 页会形成 undo 页面链表。
+
+        - inode：每个 undo 段都会关联一个 inode。undo 段本身并不具备管理 undo 页的能力，有了 inode 这个外挂之后，undo 段就可以管理段中的 undo 页了。
+
+    - 回滚段：一个回滚段管理着 1024 个 undo 段
+
+        - 每个回滚段的段头页中都有 1024 个小格子，用来记录 undo 段中第一个 undo 页的页号，这个小格子就叫作 undo slot。
+
+        - 一个事务可能会需要 1 ~ 4 个 undo 段
+
+    - undo 表空间：一个 undo 表空间最多可以支持 128 个回滚段。
+
+        - 假设每个事务都只需要 1 个 undo 段，如果只有一个回滚段也只能支持 1024 个事务同时执行。对于拥有几十核甚至百核以上 CPU 的服务器来说，这显然会限制它们的发挥。
+
+        - InnoDB 还能够最多支持 127 个 undo 表空间，这样算起来，所有回滚段总共能够管理的 undo 段数量是：1024 * 128 * 127 = 16646144。
+
+- [详情请看。一树一溪：Undo 日志用什么存储结构支持无锁并发写入？](https://mp.weixin.qq.com/s/pzVMnsOPpAqxbttaTuwWnQ)
 
 ## 性能优化
 
@@ -1495,6 +1842,191 @@ ALTER TABLE cnarea_2019 ENGINE = MYISAM;
 
         - 综上所述，我们建议单表数据量大小在两千万。当然这个数据是根据每条行记录的大小为 1K 的时候估算而来的，而实际情况中可能并不是这个值，所以这个建议值两千万只是一个建议，而非一个标准。
 
+            - [（视频）小白debug：为什么说mysql数据库单表最大两千万？依据是啥？](https://www.bilibili.com/video/BV13s4y1N724)
+
+##### [爱可生开源社区：第14期：数据页合并](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247489731&idx=1&sn=6409bf468cf064b92f571050973cb59d&chksm=fc96fa5ccbe1734ad22601557ad09041129d66e4a422deea2f1fe7a2232e125cb8e9c839e5b5&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+
+- MySQL InnoDB 表数据页或者二级索引页（简称数据页或者索引页）的合并与分裂对 InnoDB 表整体性能影响很大；数据页的这类操作越多，对 InnoDB 表数据写入的影响越大。
+
+- MySQL 提供了一个数据页合并临界值`MERGE_THRESHOLD`，在某些场景下，可以人为介入，减少数据页的合并与分裂。
+
+- 在 InnoDB 表里，每个数据页默认16K 大小，默认 MERGE_THRESHOLD 值为 50，取值范围从 1 到 50，默认值即是最大值。
+    - 也就是当页面记录数占比小于 50% 时，MySQL 会把这页和相邻的页面进行合并，保证数据页的紧凑，避免太多浪费。
+    - 当然，设置成最小值 1，基本上不会合并了。
+
+- 触发临界值场景
+    - 1.页 A 里本来数据占用 100%，有一部分记录被删掉后，数据占用小于 50%，刚好触发了临界值。
+    - 2.页 B 里存放的记录被更新为更短的形式，比如记录值由 rpad（'我爱你们所有人' , 10000, '添加冗余字符'）变为 '我只爱你' ，这时候记录对数据页占用也小于 50%，刚好触发了临界值。
+
+- 简述数据页的合并：
+    - 页 A 在删除一些记录后，此页里剩余记录对页 A 的占用小于 MERGE_THRESHOLD 设定的值，此时刚好页 A 相邻的一个页 C，数据占用也不到 50%，这时候 MySQL 会把页 C 的记录并入页 A，之后页 C 的空间就被释放，不包含任何数据，页 C 就可用于以后新记录的写入，避免空间的浪费。
+
+- 简述数据页的分裂：
+
+    - 页 D 和页 E，两个页面记录占用都在 49%。那么页合并后，页 D 记录占用 98%，只剩下 2%。
+    - 此时有新的插入请求过来，这条记录的主键刚好在页 D 和页 F 之间，可是页 D 和页 F 都只剩下 2% 的空间，不够插入这条记录。
+    - 那怎么办？此时只能拆分页 D。建立一个新的页 I，完了把页 D 原来的记录和新插入的记录做一个排序，再按照新的顺序把页 D 填满，剩下的数据放到页 I。
+    - 所以页分裂会涉及到老页数据的迁移到新建页的建立，如果页的分裂频繁，那开销很大。
+
+- `MERGE_THRESHOLD`
+
+    ```sql
+    -- 对整张表设置 MERGE_THRESHOLD，需要把这个值放入表的 comment 中。
+    -- 注意！MERGE_THRESHOLD 不能小写，必须大写！小写就会被 MySQL 当作简单的注释。
+    CREATE TABLE sample1(
+        id INT PRIMARY KEY, r1 INT, r2 VARCHAR(1000)
+    ) COMMENT 'MERGE_THRESHOLD=40';
+
+    -- 针对之前的表更改 MERGE_THRESHOLD 值
+    ALTER TABLE t1 comment 'MERGE_THRESHOLD=40'
+
+    -- 对单个索引列设置 MERGE_THRESHOLD 值，单个列的 MERGE_THRESHOLD 优先级比表高，也就是会覆盖掉表的设置。
+    CREATE TABLE t1(
+        id INT, KEY idx_id(id) COMMENT 'MERGE_THRESHOLD=40'
+    );
+
+    -- 或者先删除索引，再建立新的。
+    ALTER TABLE t1 DROP key idx_id, ADD KEY idx_id(id) COMMENT 'MERGE_THRESHOLD=40';
+    -- 创建索引时，设置MERGE_THRESHOLD
+    CREATE INDEX idx_id ON t1(id) COMMENT 'MERGE_THRESHOLD=40';
+    ```
+
+- MERGE_THRESHOLD 设置效果评估
+
+    - innodb_metrics 表提供了两个计数器来跟踪页合并
+
+    ```sql
+    -- 这两个计数器默认是屏蔽的，需要显式开启，
+    SELECT NAME, COMMENT FROM INFORMATION_SCHEMA.INNODB_METRICS
+    WHERE NAME like '%index_page_merge%';
+    +-----------------------------+----------------------------------------+
+    | NAME                        | COMMENT                                |
+    +-----------------------------+----------------------------------------+
+    | index_page_merge_attempts   | Number of index page merge attempts    |
+    | index_page_merge_successful | Number of successful index page merges |
+    +-----------------------------+----------------------------------------+
+
+    -- 开启这两个计数器
+    SET GLOBAL innodb_monitor_enable='index_page_merge_attempts';
+    SET GLOBAL innodb_monitor_enable='index_page_merge_successful';
+    ```
+
+    - 建立两张表：MERGE_THRESHOLD 分别为默认值（50）和 20。导入同样的 5000 条记录，看看页面合并的对比。
+
+        ```sql
+        CREATE TABLE t1_max(
+            id INT PRIMARY KEY, r1 INT, KEY idx_r1 (r1)
+        );
+        CREATE TABLE t1_min(
+            id INT, PRIMARY KEY (id) COMMENT 'MERGE_THRESHOLD=20', r1 INT, KEY idx_r1 (r1)
+        );
+        ```
+
+    - t1_max表性能测试
+        ```sql
+        -- 对比前，先清空计数器；禁止后；重置计数器。
+        SET GLOBAL innodb_monitor_disable='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_disable='index_page_merge_successful';
+        SET GLOBAL innodb_monitor_reset_all='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_reset_all='index_page_merge_successful';
+        SET GLOBAL innodb_monitor_enable='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_enable='index_page_merge_successful';
+
+        -- 确认计数器为0
+        SELECT name,count,max_count,avg_count  FROM INFORMATION_SCHEMA.INNODB_METRICS WHERE NAME like '%index_page_merge%';
+        +-----------------------------+-------+-----------+-----------+
+        | name                        | count | max_count | avg_count |
+        +-----------------------------+-------+-----------+-----------+
+        | index_page_merge_attempts   | 0     | <null>    | 0.0       |
+        | index_page_merge_successful | 0     | <null>    | 0.0       |
+        +-----------------------------+-------+-----------+-----------+
+
+        -- 先往表 t1_max 里随机插入 5000 条记录。执行5000次INSERT INTO t1_max (id, r1) VALUE (v_counter, v_counter);
+        DELIMITER $$
+
+        CREATE PROCEDURE InsertRandomData()
+        BEGIN
+          DECLARE v_max INT DEFAULT 5000;
+          DECLARE v_counter INT DEFAULT 1;
+
+          WHILE v_counter <= v_max DO
+            INSERT INTO t1_max (id, r1) VALUE (v_counter, v_counter);
+            SET v_counter = v_counter + 1;
+          END WHILE;
+        END$$
+
+        DELIMITER ;
+
+        -- 执行
+        CALL InsertRandomData();
+
+        -- 查看行数
+        SELECT COUNT(*) FROM t1_max;
+        +----------+
+        | COUNT(*) |
+        +----------+
+        | 5000     |
+        +----------+
+
+        -- 再删掉 2500 条记录
+        DELETE FROM t1_max LIMIT 2500;
+
+        -- 查看计数器结果。尝试合并 472 次，合并成功 7 次。
+        SELECT name,count,max_count,avg_count  FROM INFORMATION_SCHEMA.INNODB_METRICS WHERE NAME like '%index_page_merge%';
+        +-----------------------------+-------+-----------+------------+
+        | name                        | count | max_count | avg_count  |
+        +-----------------------------+-------+-----------+------------+
+        | index_page_merge_attempts   | 2739  | 2739      | 18.5068    |
+        | index_page_merge_successful | 7     | 7         |  0.0472973 |
+        +-----------------------------+-------+-----------+------------+
+        ```
+
+    - t1_min表性能测试
+        ```sql
+        -- 清空计数器
+        SET GLOBAL innodb_monitor_disable='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_disable='index_page_merge_successful';
+        SET GLOBAL innodb_monitor_reset_all='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_reset_all='index_page_merge_successful';
+        SET GLOBAL innodb_monitor_enable='index_page_merge_attempts';
+        SET GLOBAL innodb_monitor_enable='index_page_merge_successful';
+
+        -- 删除刚才存储过程
+        DROP PROCEDURE InsertRandomData
+        -- 往表 t1_min 里随机插入 1000 条记录。执行1000次INSERT INTO t1_min (id, r1) VALUE (v_counter, v_counter);
+        DELIMITER $$
+
+        CREATE PROCEDURE InsertRandomData()
+        BEGIN
+          DECLARE v_max INT DEFAULT 5000;
+          DECLARE v_counter INT DEFAULT 1;
+
+          WHILE v_counter <= v_max DO
+            INSERT INTO t1_min (id, r1) VALUE (v_counter, v_counter);
+            SET v_counter = v_counter + 1;
+          END WHILE;
+        END$$
+
+        DELIMITER ;
+
+        -- 执行
+        CALL InsertRandomData();
+
+        -- 再删掉 2500 条记录
+        DELETE FROM t1_min LIMIT 2500;
+
+        -- 查看计数器结果。比默认的合并次数有所减少
+        SELECT name,count,max_count,avg_count  FROM INFORMATION_SCHEMA.INNODB_METRICS WHERE NAME like '%index_page_merge%';
+        +-----------------------------+-------+-----------+------------+
+        | name                        | count | max_count | avg_count  |
+        +-----------------------------+-------+-----------+------------+
+        | index_page_merge_attempts   | 1855  | 1855      | 25.0676    |
+        | index_page_merge_successful | 5     | 5         |  0.0675676 |
+        +-----------------------------+-------+-----------+------------+
+
+        -- 当然，设置成最小值 1，基本上不会合并了
+        ```
+
 #### 通用表空间
 
 - 通用表空间先是出现在 MySQL Cluster 里，也就是 NDB 引擎。从 MySQL 5.7 引入到 InnoDB 引擎。
@@ -1661,6 +2193,160 @@ alter table t1 tablespace ts1;
 
 #### TRANSACTION (事务)
 
+##### 事务详解
+
+- [爱可生开源社区：第 01 期 [事务] 事务的起源：事务池和管理器的初始化](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513012&idx=1&sn=8f9c1355822d8e1865ea854da8e8c66f&chksm=fc95512bcbe2d83d6b4afad772e607600ee7fd98a8faa4364d33fb68e0763a71ce28c059a993&scene=21#wechat_redirect)
+
+- MySQL 被设计为支持高并发，支持很多客户端同时连接到数据库，这些连接可以同时执行 SQL。
+
+    - 如果这些 SQL 都要读写 InnoDB 表，InnoDB 会为每个连接启动一个事务，这意味着需要同时启动很多事务。
+
+- 对于 OLTP 场景，通常情况下，事务都会很快执行完成。启动事务、执行 SQL、提交事务的整个流程只会持续很短的时间。
+
+- 以这样一个场景为例：
+    - 客户端连接到 MySQL。
+    - 客户端执行 begin 语句。
+    - 客户端执行一条 update 语句，按主键 ID 更新一条记录。
+    - 这个步骤中，InnoDB 会在执行 update 语句之前，真正启动一个事务。
+    - 客户端执行 commit 语句。
+    - 客户端关闭数据库连接。InnoDB 会在这一步释放事务。
+
+    - 在这个场景下，InnoDB 事务从启动到释放的整个生命周期，有可能只持续 1 ~ 2 毫秒（甚至更短）。
+
+- 事务池（Pool）
+
+    - 由于要存放事务 ID、事务状态、Undo 日志编号、事务所属的用户线程等信息，每个事务都有一个与之对应的对象，我们称之为事务对象。
+
+    - 每个事务对象都要占用内存，如果每启动一个事务都要为事务对象分配内存，释放事务时又要释放内存，会降低数据库性能。
+
+    - 为了避免频繁分配、释放内存对数据库性能产生影响，InnoDB 引入了事务池（Pool），用于管理事务。
+
+- 事务池管理器（PoolManager）
+
+    - 事务池也一样有大小限制，不能无限制的存放事务对象。数据库繁忙的时候，有很多很多事务对象，需要多个事务池来管理。
+
+    - 事务池多了之后，又会引发另一些问题，例如： 怎么创建新的事务池？ 客户端创建了一个新的数据库连接，要获取一个新的事务对象，从哪个事务池获取？等
+        - 为了解决这些问题，InnoDB 又引入了事务池管理器（PoolManager），用于管理事务池。
+
+- MySQL 启动过程中，InnoDB 先创建事务池管理器，然后，事务池管理器创建并初始事务池。
+
+    - 事务池的初始化，主要是为了得到一些事务对象。
+
+    - 事务池有一个队列，用于存放已经初始化的事务对象。我们称这个队列为事务队列。
+
+    - 创建事务池的过程中，InnoDB 会分配一块 4M 的内存用于存放事务对象。
+
+        - 每个事务对象的大小为 992 字节，4M 内存能够存放 4194304 / 992 = 4228 个事务对象。
+
+    - InnoDB 初始化事务池的过程中，不会初始化全部的 4228 块小内存，只会初始化最前面的 16 块小内存，得到 16 个事务对象并放入事务队列。
+
+    - 那么，剩余的 4212 块小内存什么时候会被初始化？
+
+        - 它们会在这种情况下被初始化：启动过程中初始化的 16 个事务对象都被取走使用了，事务队列变成空队列了。
+
+        - 此时，需要再分配一个事务对象用于启动新事务，InnoDB 就会把剩余的 4212 块小内存全部初始化，得到 4212 个事务对象并放入事务队列。
+
+- `BEGIN` 语句都干什么了？
+
+    - 提交老事务
+
+        - 例子：
+            - 在 MySQL 客户端命令行（mysql）中，我们通过 BEGIN 语句开始了一个事务（事务 1），并且已经执行了一条 INSERT 语句。
+            - 事务 1 还没有提交（即处于活跃状态），我们在同一个连接中又执行了 BEGIN 语句，事务 1 会发生什么？
+            - 答案是：事务 1 会被提交。
+            - 原因是：MySQL 不支持嵌套事务。事务 1 没有提交的情况下，又要开始一个新事务，事务 1 将无处安放，只能被动提交了。
+
+    - 准备新事务
+
+        - 启动事务也需要分配资源，遵循不铺张浪费的原则，BEGIN 语句执行过程中，并不会马上启动一个新事务，只会为新事务做一点点准备工作（给当前连接的线程打上 OPTION_BEGIN 标志）。
+
+            ```c
+            thd->variables.option_bits |= OPTION_BEGIN;
+            ```
+
+        - 语句 1 ~ 5 都不会马上启动新事务，只会给执行这些语句的线程打上 OPTION_BEGIN 标记，在这之后执行第一条 SQL 时，才会真正的启动事务。
+
+                ```sql
+                /* 1 */ BEGIN
+                /* 2 */ BEGIN WORK
+                /* 3 */ START TRANSACTION
+                /* 4 */ START TRANSACTION READ WRITE
+                /* 5 */ START TRANSACTION READ ONLY
+                /* 6 */ START TRANSACTION WITH CONSISTENT SNAPSHOT
+                /* 7 */ START TRANSACTION WITH CONSISTENT SNAPSHOT, READ WRITE
+                /* 8 */ START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY
+                ```
+
+        - 有了 OPTION_BEGIN 标志，MySQL 就不会每次执行完一条 SQL 语句就提交事务，而是需要用户发起 commit 语句才提交事务，这样的事务就可以执行多条 SQL 了。
+
+- 执行的第一条 SQL 语句不同，以不同身份启动：
+
+    - 1.执行的第一条 SQL 语句是 insert：以读写事务身份启动事务。
+
+        - 读写事务的启动过程，主要会做这几件事：
+            - 为用户普通表分配回滚段，用于写 Undo 日志。
+            - 分配事务 ID。
+            - 把事务对象加入 trx_sys->rw_trx_list 链表。这个链表记录了所有读写事务。
+                ```c
+                UT_LIST_ADD_FIRST(trx_sys->rw_trx_list, trx);
+                ```
+
+    - 2.执行的第一条 SQL 语句是 select、update、delete：以读事务身份启动事务。
+
+        - 读事务启动时，没有分配事务 ID 和回滚段，事务对象也没有加入到 trx_sys->rw_trx_list 链表。
+
+        - 以读事务身份启动的事务，并不意味着一直都是读事务，它可以在某些时间点变成读写事务。
+
+        - 根据执行的第一条 SQL 语句不同，读事务变成读写事务的时间点可以分为两类：
+
+            - 1.第一条 SQL 语句是 select
+
+                - 在 select 语句执行过程中，读事务不会变成读写事务；这条 SQL 语句执行完之后、事务提交之前，第一次执行 insert、update、delete 语句时，读事务才会变成读写事务。
+
+                    - 如果最先碰到 insert 语句，server 层准备好要插入的记录的每个字段之后，会触发 InnoDB 执行插入操作。
+                    - 如果最先碰到的是 update 或 delete 语句，则和以下的第一条 SQL 语句是 update 或 delete一样
+
+            - 2.第一条 SQL 语句是 update 或 delete。
+
+                - 发生变化的具体时间点，又取决于这两类 SQL 语句更新或删除记录的第一个表是什么类型。
+                    - 1.如果第一个表是用户普通表，InnoDB 从表中读取一条记录之前，会给表加意向排他锁（IX）。
+
+                        - 加意向排他锁时，如果以下三个条件成立，InnoDB 就会把这个事务变成读写事务：
+
+                            - 事务还没有为用户普通表分配回滚段。
+                            - 事务 ID 为 0，说明这个事务现在还是读事务。
+                            - 事务的只读标识 trx->read_only = false，说明这个事务可以变成读写事务。
+
+                    - 2.如果第一个表是用户临时表，因为它的可见范围只限于创建这个表的数据库连接之内，其它数据库连接中执行的事务都看不到这个表，更不能改变表中的数据，所以，update、delete 语句改变用户临时表中的数据，不需要加意向排他锁。
+
+                        - 读事务变成读写事务的操作会延迟到 server 层触发 InnoDB 更新或删除记录之后，InnoDB 执行更新或删除操作之前。
+
+                        - 在这个时间节点，如果以下三个条件成立，InnoDB 就会把这个事务变成读写事务：
+
+                            - 事务已经启动了。
+                            - 事务 ID 为 0，说明这个事务现在还是读事务。
+                            - 事务的只读标识 trx->read_only = false，说明这个事务可以变成读写事务。
+
+
+- 只读事务：是读事务的特例
+
+    ```sql
+    -- 以 start transaction 开始一个事务时，如果包含了 read only 关键字，这个事务就是一个只读事务。
+    start transaction read only
+    ```
+
+    - 只读事务不能改变（插入、更新、删除）系统表、用户普通表的数据，但是能改变用户临时表的数据。
+
+    - 改变用户临时表的数据，同样需要为事务分配事务 ID，为用户临时表分配回滚段。
+
+    - 根据只读事务执行的第一条 SQL 语句不同，这两个操作发生的时间点也可以分为两类。
+        - 1.第一条 SQL 语句是 select。
+            - 具体过程等同于上面的读事务
+        - 2.第一条 SQL 语句是 update 或 delete。
+            - 具体过程等同于上面的读事务变成读写事务
+
+##### 基本使用
+
 | 事务sql语句   | 操作           |
 | ------------- | -------------- |
 | BEGIN         | 开始一个事务   |
@@ -1747,6 +2433,98 @@ rollback to abc;
         - ROLLBACK 这是一个相对昂贵的操作 请避免对大量行进行更改,然后回滚这些更改.
 
 - 2.如果只是查询表,没有大量的修改,应设置 `autocommit = 1`
+
+##### [爱可生开源社区：MySQL 核心模块揭秘 | 13 期 | 回滚到 savepoint](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247514601&idx=1&sn=4b8ff384ce70af1fc8edf983a7881ef6&chksm=fc955b76cbe2d2603f8393fe24ac674684702a054e467fe3e037a3b4b81e7c7a1593e9b81596&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+- 准备工作
+    ```sql
+    -- 创建测试表
+    CREATE TABLE `t1` (
+      `id` int unsigned NOT NULL AUTO_INCREMENT,
+      `i1` int DEFAULT '0',
+      PRIMARY KEY (`id`) USING BTREE,
+      KEY `idx_i1` (`i1`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+
+    -- 插入测试数据
+    INSERT INTO `t1` (`id`, `i1`) VALUES
+    (10, 101), (20, 201),
+    (30, 301), (40, 401);
+    ```
+
+- savepoint示例
+    ```sql
+    /* 1 */ begin;
+    /* 2 */ insert into t1 (id, i1) values (50, 501);
+    /* 3 */ savepoint savept1;
+    /* 4 */ insert into t1(id, i1) values(60, 601);
+    /* 5 */ savepoint savept2;
+    /* 6 */ update t1 set i1 = 100 where id = 10;
+    /* 7 */ savepoint savept3;
+    /* 8 */ insert into t1(id, i1) values(70, 701);
+    /* 9 */ rollback to savept2;
+    ```
+
+    - 每条 SQL 前面的数字是它的编号，9 条 SQL 分别为 SQL 1、SQL 2、...、SQL 9，其中，SQL 9 是本文的主角。
+
+        - SQL 2 插入记录 <id = 50, i1 = 501> 产生的 undo 日志编号为 0。
+        - SQL 4 插入记录 <id = 60, i1 = 601> 产生的 undo 日志编号为 1。
+        - SQL 6 更新记录 <id = 10> 产生的 undo 日志编号为 2。
+        - SQL 8 插入记录 <id = 70, 701> 产生的 undo 日志编号为 3。
+
+    - 每个用户线程都有一个 m_savepoints 链表，用户每创建一个 savepoint，它的对象都会追加到链表末尾。
+        - 示例 SQL 中，SQL 3、5、7 分别创建了 savept1、savept2、savept3，这 3 个 savepoint 对象形成的 m_savepoints 链表如下：
+        ![image](./Pictures/mysql/事务-savepoints.avif)
+
+        - 要回滚到某个 savepoint，第 1 步就是根据名字找到它，因为它里面保存着两个重要数据：
+
+            - 创建 savepoint 时的 binlog offset。
+            - 创建 savepoint 之前，最后产生的一条 undo 日志的编号。
+
+        - 如果遍历完 m_savepoints 链表都没有找到目标 savepoint 对象，就会报错：
+            ```sql
+            (1305, 'SAVEPOINT xxx does not exist')
+            ```
+
+    - binlog回滚
+
+        - 回滚到某个 savepoint 的过程中，binlog 回滚就是把创建该 savepoint 之后执行 SQL 产生的 binlog 日志都丢弃。
+
+        - 事务提交之前，产生的 binlog 日志都临时存放于 trx cache，而 trx cache 包含内存 buffer 和磁盘临时文件两部分。
+            - 情况 1：丢弃内存 buffer 中的部分或全部 binlog 日志。
+            - 情况 2：丢弃内存 buffer 中的全部 binlog 日志，同时还要丢弃磁盘临时文件中的部分或全部 binlog 日志。
+
+    - InnoDB 回滚
+
+        - 事务执行过程中，改变（插入、更新、删除）表中的每条数据，都会对应产生一条 undo 日志。
+
+        - 回滚到某个 savepoint 的过程中，InnoDB 回滚，就是按照 undo 日志产生的时间，从后往前读取 undo 日志。
+
+        - 每读取一条 undo 日志之后，解析 undo 日志，然后执行产生这条日志的操作的反向操作，也就是回滚。
+            - 如果某条 undo 日志是插入操作产生的，反向操作就是删除。
+            - 如果某条 undo 日志是更新操作产生的，更新操作把字段 A 的值从 101 改为 100，反向操作就是把字段 A 的值从 100 改回 101。
+            - 如果某条 undo 日志是删除操作产生的，反向操作就是把记录再插回到表里。
+
+    - 回滚到哪条 undo 日志才算完事呢？
+
+        - savepoint 中，保存着它创建之前，最后产生的那条 undo 日志的编号，回滚到这条 undo 日志的下一条 undo 日志就完事了。
+
+        - 以 SQL 5 为例，创建 savept2 之前，最后一条 undo 日志是插入记录 <id = 60, i1 = 601> 产生的，编号为 2。
+
+        - SQL 9，rollback to savept2 回滚到编号为 2 的 undo 日志的下一条 undo 日志（编号为 3）就完事了。
+
+
+    - 删除 savepoint
+
+        - 执行完 binlog 和 InnoDB 的回滚操作之后，还需要删除该 savepoint 之后创建的其它 savepoint。
+
+        - 示例 SQL 中，SQL 5 创建 savept2 之后，SQL 7 又创建了 savept3。
+
+            - SQL 9 回滚到 savept2，执行完 binlog 和 InnoDB 的回滚操作之后，savept3 就没用了，会被删除。
+
+            - 删除 savept3 之后，m_savepoints 链表如下图所示：
+
+            ![image](./Pictures/mysql/事务-savepoints1.avif)
 
 ##### [事务隔离性](https://mariadb.com/kb/en/set-transaction/)
 
@@ -1865,15 +2643,102 @@ rollback to abc;
     - 左边为事务 b
     ![image](./Pictures/mysql/committed.gif)
 
-###### MVCC(多版本并发控制)：解决幻读问题
+###### MVCC(多版本并发控制)
+
+- [MySQL数据库联盟：一文搞懂MVCC](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485309&idx=1&sn=0521e2b452c8c444c75657e61a88c0db&chksm=e8406234df37eb22dcd9595e0bca98a76d92becf53a8e41a5e3964a1aba70317081939930740&scene=178&cur_album_id=3234198021790154762#rd)
 
 - MVCC并非乐观锁，但是InnoDB存储引擎所实现的MVCC是乐观的，它和之前所提到的用户行为的“乐观锁”都采用的是乐观机制，属于不同的“乐观锁”手段，它们都是“乐观家族”的成员。
 
-- InnoDB 中的 RC 和 RR 隔离事务是基于多版本并发控制（MVVC）实现高性能事务。
+- MVCC的给MySQL带来的好处
 
-- InnoDB的MVCC，是通过在每行记录后保存两个隐藏的列来实现的（用户不可见）。
-    - 一个列保存行创建的时间
-    - 一个列保存行过期（删除）的时间，这里所说的时间并不是传统意义上的时间，而是系统版本号
+    - MVCC 最大的好处是读不加锁，读写不冲突，极大地增加了 MySQL 的并发性。
+
+    - 通过 MVCC，保证了事务 ACID 中的 I（隔离性）特性。
+
+- MVCC只在RC和RR隔离级别下有
+
+    - 在RU（READ UNCONNMITTED）隔离级别下，每次只要取到最新的值就行，不需要考虑多个版本，自然也不需要MVCC
+
+    - 而在SERIALIZABLE隔离级别下，使用锁保障数据完全互相隔离，也不需要使用MVCC。
+
+- 准备工作
+    ```sql
+    drop table if exists t1;
+
+    -- 创建测试表
+    CREATE TABLE `t1` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `a` int NOT NULL,
+    `b` int NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_c` (`a`)
+    ) ENGINE=InnoDB CHARSET=utf8mb4;
+
+    -- 插入测试数据
+    insert into t1(a,b) values (1,1);
+    ```
+
+- RC和RR的对比
+
+    - 另外需要补充的一点就是，在 RR 和 RC 隔离级别下，获取 Read View 的时机也是不一样的：
+
+    - 在读已提交隔离级别（RC）下，同一个事务中，同样的查询语句在每次读请求发起时都会重新获得 Read View。
+
+    - 在可重复读隔离级别（RR）下，同一个事务中，查询语句只是在第一个读请求发起时获取 Read View，而后面相同的查询语句都会使用这个 Read View。
+
+    - 读已提交隔离级别（RC）的实验
+
+        ```sql
+        truncate table t1;
+        insert into t1(a,b) values (1,1);
+        ```
+
+        |   | session1                                            | session2                                            |
+        |---|-----------------------------------------------------|-----------------------------------------------------|
+        | 1 | set session transaction_isolation='READ-COMMITTED'; | set session transaction_isolation='READ-COMMITTED'; |
+        | 2 | select * from t1;                                   |                                                     |
+        | 3 | begin;                                              |                                                     |
+        | 4 | update t1 set b=3 where a=1;                        |
+        | 5 |                                                     | begin;                                              |
+        | 6 | select * from t1 where a=1;  结果是：1 1 3          | select * from t1 where a=1;  结果是：1 1 1          |
+        | 7 | commit;                                             |                                                     |
+        | 8 |                                                     | select * from t1 where a=1;  结果是：1 1 3          |
+        | 9 |                                                     | commit;                                             |
+
+        - 第 6 步中，session2 查询的结果是 session1 修改之前的记录，根据 Read View 原理，被查询行的隐藏事务 ID 就在当前活跃事务 ID 集合中。
+
+            - 因此，这一行记录对该事物（session2 中的事务）是不可见的，可以知道 session2 查询的 a=1 这行记录实际就是来自 Undo log 中。
+
+            - 我们看到的现象就是同一条记录在系统中存在了多个版本，这就是 MySQL 的多版本并发控制（MVCC）。
+
+    - 可重复读隔离级别（RR）的实验
+
+        - 第8步与RC下不同
+
+        ```sql
+        -- 默认就是RR
+        select @@transaction_isolation
+        +-------------------------+
+        | @@transaction_isolation |
+        +-------------------------+
+        | REPEATABLE-READ         |
+        +-------------------------+
+
+        truncate table t1;
+        insert into t1(a,b) values (1,1);
+        ```
+
+        |   | session1                                             | session2                                             |
+        |---|------------------------------------------------------|------------------------------------------------------|
+        | 1 | set session transaction_isolation='REPEATABLE-READ'; | set session transaction_isolation='REPEATABLE-READ'; |
+        | 2 | select * from t1;                                    |                                                      |
+        | 3 | begin;                                               |                                                      |
+        | 4 | update t1 set b=3 where a=1;                         |
+        | 5 |                                                      | begin;                                               |
+        | 6 | select * from t1 where a=1;  结果是：1 1 3           | select * from t1 where a=1;  结果是：1 1 1           |
+        | 7 | commit;                                              |                                                      |
+        | 8 |                                                      | select * from t1 where a=1;  结果是：1 1 1           |
+        | 9 |                                                      | commit;                                              |
 
 - mvcc在不同sql语句的操作：
 
@@ -1886,6 +2751,128 @@ rollback to abc;
     - INSERT：InnoDB为新插入的每一行保存当前系统版本号作为行版本号。
     - DELETE：InnoDB为删除的每一行保存当前系统版本号作为行删除标识（第二个隐藏列的作用来了）。
     - UPDATE：InnoDB将更新后的列作为新的行插入数据库（并不是覆盖），并保存当前系统版本号作为该行的行版本号，同时保存当前系统版本号到原来的行作为行删除标识。
+
+- MVCC的整体流程
+    ![image](./Pictures/mysql/mvcc的整体流程.avif)
+
+- MVCC原理总结
+
+    - InnoDB 每一行数据都有一个隐藏的回滚指针，用于指向该行修改前的一些历史版本，这些历史版本存放在 Undo log 中。
+
+    - 如果要执行更新操作，会将原记录放入 Undo log 中，并通过隐藏的回滚指针指向 Undo log 中的原记录。
+
+    - 其它事务此时需要查询时，就是查询 Undo log 中这行数据的最后一个历史版本。
+
+
+- 隐藏列：InnoDB ，每行记录除了我们创建的字段外，其实还包含 3 个隐藏的列
+
+    | 隐藏列      | 说明                                                                                                             |
+    |-------------|------------------------------------------------------------------------------------------------------------------|
+    | DB_ROW_ID   | 隐藏的自增 ID，如果表没有主键，InnoDB 会自动以 ROW ID 产生一个聚集索引树。                                       |
+    | DB_TRX_ID   | 事务 ID，记录最后一次修改该记录的事务 ID，包括insert、update、delete。                                           |
+    | DB_ROLL_PTR | 回滚指针，指向这条记录的上一个版本的Undo log记录。如果记录更新了，那么Undo log包含在更新之前重建行所需要的信息。 |
+
+
+- Read View（读取视图）：当一个事务需要查询这行记录时，它可能面临多个版本的选择。这时候就需要使用Read View（读取视图）来确定应该读取哪个版本的记录。
+
+    - 大致包含以下内容：
+        - trx_ids：生成Read View时，数据库系统当前活跃事务的ID集合；
+        - low_limit_id：生成Read View时，系统中应该分配下一个事务的ID值；
+        - up_limit_id：生成Read View时，活跃事务中最小的事务 ID；
+        - creator_trx_id：创建这个Read View的事务 ID。
+
+    - Read View如何判断行数据的哪个版本可用？
+
+        - 某个事务，创建了 Read View，那么它的 creator_trx_id 就为这个事务的 ID
+        - 假如需要访问某一行，假设这一行记录的隐藏事务 ID 为 DB_TRX_ID，那么可能出现的情况如下（DB_TRX_ID表示最后一次修改这行记录的事务ID）
+
+            ![image](./Pictures/mysql/mvcc-read_view.avif)
+
+    - 例子：
+
+        ```sql
+        truncate table t1;
+        set session transaction_isolation='READ-COMMITTED';
+        ```
+
+        ![image](./Pictures/mysql/mvcc-read_view1.avif)
+
+        - 在步骤1，session1里面
+
+            - trx_ids是生成Read View时，数据库系统当前活跃事务的ID集合，当前就这个事务本身活跃，我们假设session1里的事务ID（表头里的：DB_TRX_ID就是假设的值）是1，那trx_ids也为1；
+            - low_limit_id是生成Read View时，系统中应该分配下一个事务的ID值，因为现在事务ID已经到1了，下一个事务ID自然就是2；
+            - up_limit_id是生成Read View时，活跃事务中最小的事务 ID，自然也是1；
+            - creator_trx_id是创建这个Read View的事务 ID，也是1。
+
+            - 所以满足条件：DB_TRX_ID=creator_trx_id，说明当前创建视图的事务是这行数据的创建者。自然这一行记录对该事务是可见的。
+
+
+        - 在步骤3，session3里面
+
+            - 当前活跃事务的ID是2（session2执行的，还未提交），那trx_ids为2；
+            - 下一个事务ID，也就是low_limit_id为3；
+            - 活跃事务中最小的事务 ID，自然up_limit_id是2；
+            - 默认只读事务的事务ID是0，所以创建这个Read View的事务 ID，也就是creator_trx_id为0；
+
+            - 满足条件：up_limit_id <= DB_TRX_ID < low_limit_id，并且DB_TRX_ID 也在 trx_ids 中。
+            - 说明 DB_TRX_ID 还未提交，那么这一行记录对该事物是不可见的，然后再找Undo Log版本链前一个版本。找到DB_TRX_ID=1的版本，返回结果。
+
+        - 在步骤7，session5里面
+
+            - 当前活跃事务的ID是3（session3执行的，还未提交），那trx_ids为3；
+            - 下一个事务ID，也就是low_limit_id为5（因为session4已经使用了事务ID4）；
+            - 活跃事务中最小的事务 ID，自然up_limit_id是3；
+            - 默认只读事务的事务ID是0，所以创建这个Read View的事务 ID，也就是creator_trx_id为0；
+
+            - 满足条件：up_limit_id <= DB_TRX_ID < low_limit_id，并且DB_TRX_ID 不在 trx_ids 中。
+            - 说明事务 DB_TRX_ID 已经提交了，那么这一行记录对该事物是可见的。
+
+- Undo log
+
+    - Undo Log的作用，除了用于事务回滚，还可以用在MVCC。
+
+    - 当多个事务对同一行记录进行更新时，每个事务的修改会生成一个历史快照，这些快照被保存在数据库的Undo log（撤销日志）中。
+
+    - 不同事务或相同事务对同一记录的修改，会导致该记录对应的Undo Log成为一条记录版本的线性表，即事务链，Undo Log的链首就是最新的旧记录，链尾就是最老的旧记录。
+
+
+- mvcc实现原理
+
+    ```sql
+    -- 先清空t1表
+    truncate table t1;
+
+    -- 再写入测试数据
+    insert into t1(a,b) values (1,1);
+    ```
+
+    ```sql
+    -- 开启一个事务，更新表t1中的数据
+    update t1 set b=3 where a=1;
+    ```
+
+    ![image](./Pictures/mysql/mvcc-实现原理.avif)
+
+    - 结合图分析将字段b的值修改为3的步骤：
+
+        - 1.数据库先对满足条件的行添加排他锁；
+        - 2.将原记录的修改复制到Undo表空间中；
+        - 3.将字段b的值修改为3，事务ID的值修改为2；
+        - 4.回滚字段写入回滚指针的地址；
+        - 5.提交事务释放排他锁。
+
+    ```sql
+    -- 再次更新表t1中的数据：
+    update t1 set b=4 where a=3;
+    ```
+    ![image](./Pictures/mysql/mvcc-实现原理1.avif)
+
+    - 结合上图分析表t1第二次更新的步骤。
+        - 1.数据库先对满足条件的行添加排他锁；
+        - 2.将原记录的修改复制到Undo表空间中；
+        - 3.将字段b的值修改为4，事务ID的值修改为3；
+        - 4.回滚字段写入回滚指针的地址；
+        - 5.提交事务释放排他锁。
 
 ##### 结合业务场景，使用不同的事务隔离
 
@@ -2139,6 +3126,85 @@ rollback to abc;
 
     - 2:发起死锁检测,发现死锁后,主动回滚死锁链条中的某一个事务,让其他事务得以继续执行.将参数 `innodb_deadlock_detect` 设置为 `on`.但是它有额外负担的.每当一个事务被锁的时候,就要看看它所依赖的线程有没有被别人锁住,如此循环,最后判断是否出现了循环等待,也就是死锁
 
+#### Change Buffer（更改缓冲区）
+
+- [MySQL数据库联盟：一文弄懂MySQL更改缓冲区](https://mp.weixin.qq.com/s/sLfQhKQeluJz4k32E6yLWw) 
+
+- 问题：假如有一条MySQL更新语句，它要更新的数据页不在Buffer Pool里面，那自然就会去磁盘中读取。
+
+- 解决方法：MySQL就引入了更改缓冲区，也就是Change Buffer，可以把修改操作暂存在Change Buffer中。
+
+    - 在后续查询访问到这个数据页的时候，将数据页读入内存，然后应用Change Buffer中之前缓存的修改操作。
+
+- Change Buffer介绍
+
+    ![image](./Pictures/mysql/change_buffer.avif)
+
+    ```sql
+    -- 查看Change Buffer的使用情况：
+    SELECT (SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_BUFFER_PAGE
+           WHERE PAGE_TYPE LIKE 'IBUF%') AS change_buffer_pages,
+           (SELECT COUNT(*) FROM INFORMATION_SCHEMA.INNODB_BUFFER_PAGE) AS total_pages,
+           (SELECT ((change_buffer_pages/total_pages)*100))
+           AS change_buffer_page_percentage;
+    +---------------------+-------------+-------------------------------+
+    | change_buffer_pages | total_pages | change_buffer_page_percentage |
+    +---------------------+-------------+-------------------------------+
+    | 18                  | 8064        | 0.2232                        |
+    +---------------------+-------------+-------------------------------+
+    ```
+
+    - 当二级索引（假设是非唯一的二级索引）页不在缓冲池时，它会缓存二级索引的更改（包括insert、update、delete等DML操作）。
+
+    - 并且Change Buffer会缓存多次二级索引的更改操作，并在合适的时间写入磁盘。
+
+    - 这里要注意的是，只是非唯一的二级索引才能用到Change Buffer，对于唯一索引，所有操作都需要判断是否违反唯一性约束。
+
+        - 而唯一性判断，会将数据页读入到内存。所以更新操作直接在内存中进行就可以了。
+
+- 关于Change Buffer的一些问题
+
+    - 为什么更改缓冲区的存在可以减少随机访问I/O呢？
+
+    - 这主要是因为二级索引数据的写入以页为基本单位，多次操作可能位于同一页面，将同一页面上的多次更改操作合并后再写入磁盘，可以将多次磁盘写入转换为一次磁盘写入。
+
+    - Change Buffer有什么好处？
+
+        - 当二级索引页不在缓冲池中时，缓存二级索引的变更，可以避免立即从磁盘读取受影响的索引页所需要的随机IO。
+
+        - 当页面被其他读操作读入缓冲池时，缓存的更改可以在之后批量应用到磁盘。
+
+- Change Buffer在什么时候合并？
+
+    - 1.当页面被读入缓冲池时，缓冲的更改会在读取完成后合并，然后页面才可用；
+
+    - 2.另外，通过参数innodb_io_capacity 控制，这个参数能决定每秒从buffer pool刷新到磁盘的次数，以及合并change buffer数据的次数；
+
+    - 3.在崩溃恢复期间执行合并；
+
+    - 4.更改缓冲区中的变更操作，不单单在内存中，也会被写入到磁盘。在实例重启后，更改缓冲区合并操作会是恢复的一部分工作。
+
+- Change Buffer的配置
+
+    - `innodb_change_buffering`：可以决定哪些操作会启用Change Buffer：
+
+        | 值      | 数值 | 描述                                                                               |
+        | none    | 0    | 不缓冲任何操作                                                                     |
+        | inserts | 1    | 缓存插入操作                                                                       |
+        | deletes | 2    | 缓存删除标记操作； 严格来说，是标记索引记录以便稍后在清除操作期间删除的写入        |
+        | changes | 3    | 缓冲插入和删除标记索引记录操作                                                     |
+        | purges  | 4    | 缓冲后台发生的物理删除操作                                                         |
+        | all     | 5    | 默认； 也就是前面几个值的合集； 表示缓冲插入、删除标记操作和后台发生的物理删除操作 |
+
+
+    - `innodb_change_buffer_max_size`：用来设置Change Buffer为Buffer Pool总大小的百分比。
+
+        - 默认25，最大值可以设置为50。
+
+        - 当有大量插入、更新和删除操作，应该适当增加这个值。
+
+        - 如果Change Buffer消耗了过多的Buffer Pool的内存空间，可以降低这个值。
+
 ### frm文件解析利器mysqlfrm
 
 - 可以解析innodb和Myisam的.frm文件，转换为CREATE TABLE语句
@@ -2190,129 +3256,1215 @@ grep "^CREATE TABLE" createtb.sql |wc -l
     innodb_flush_method = O_DSYNC
     ```
 
+## 主从复制 (Master Slave Replication )
+
+### 传统binlog复制模式
+
+- 原理
+    - master提交完事务后，写入binlog
+    - slave连接到master，获取binlog
+    - master创建dump线程，推送binglog到slave
+    - slave启动一个IO线程读取同步过来的master的binlog，记录到relay log中继日志中
+    - slave再开启一个sql线程读取relay log事件并在slave执行，完成同步
+    - slave记录自己的binglog
+
+    ![image](./Pictures/mysql/主从复制原理.avif)
+
+- mysql默认的复制方式是异步的：主库把日志发送给从库后不关心从库是否已经处理，这样会产生一个问题就是假设主库挂了，从库处理失败了，这时候从库升为主库后，日志就丢失了。
+
+- 全同步复制：主库写入binlog后强制同步日志到从库，所有的从库都执行完成后才返回给客户端，但是很显然这个方式的话性能会受到严重影响。
+
+- 半同步复制：和全同步不同的是，半同步复制的逻辑是这样，从库写入日志成功后返回ACK确认给主库，主库收到至少一个从库的确认就认为写操作完成。
+
+### MYSQL5.6的GTID复制模式
+
+- [运维记事：一文带你了解MySQL中的GTID](https://mp.weixin.qq.com/s/ba2KPKDCfA9keQihf8BcRQ)
+
+- 问题：传统的binlog复制模式存在2个问题：
+
+    - 问题1：首次开启主从复制的步骤复杂
+        - 第一次开启主从同步时，要求从库和主库是一致的。
+        - 找到主库的 binlog 位点。
+        - 设置从库的 binlog 位点。
+        - 开启从库的复制线程。
+
+    - 问题2：恢复主从复制的步骤复杂
+
+        - 找到从库复制线程停止时的位点。
+
+        - 解决复制异常的事务。无法解决时就需要手动跳过指定类型的错误，比如通过设置slave_skip_errors=1032,1062。当然这个前提条件是跳过这类错误是无损的。（1062 错误是插入数据时唯一键冲突；1032 错误是删除数据时找不到行）
+
+- 解决问题：GTID的复制模式
+
+    - MySQL能够通过内部机制 GTID 自动找点同步，并且通过 GTID可以保证每个主库提交的事务在集群中都有唯一的一个事务ID，强化了数据库主从的一致性和故障恢复数据的容错能力，在主库宕机发生主从切换的情况下，GTID方式可以让其他从库自动找到新主库复制的位置。
+
+    - 而且GTID可以忽略已经执行过的事务，减少了数据发生错误的概率。
+
+- GTID相较与传统复制的优势
+    - 主从搭建更加简便，不用手动特地指定position位置。
+    - 复制集群内有一个统一的标识，识别、管理上更方便。
+    - 故障转移failover更容易，不用像传统复制那样需要找 log_File 和 log_Position的位置。
+    - 通常情况下GTID是连续没有空洞的，更能保证数据的一致性。
+    - 相对于ROW复制模式，数据安全性更高，切换更简单。
+    - 比传统的复制更加安全，一个GTID在一个MySQL实例上只会执行一次，避免重复执行导致数据混乱或者主从不一致。
+
+
+- GTID 使用中的限制条件
+
+    - GTID 复制是针对事务来说的，一个事务只对应一个 GTID，好多的限制就在于此。其中主要限制如下：
+    - 在一个复制组中，必须要求统一开启GTID或者是关闭GTID。
+    - 开启GTID需要重启(5.7除外)
+    - 不支持 `create table table_name select * from table_name`语句复制。
+        - 因为会生成两个sql，一个是DDL创建表SQL，一个是insert into 插入数据的sql。由于DDL会导致自动提交，所以这个sql至少需要两个GTID，但是GTID模式下，只能给这个sql生成一个GTID )
+
+    - 不允许在一个事务中既包含事务表（使用 InnoDB 存储引擎的表）的操作又包含非事务表（使用 MyISAM 存储引擎的表）。
+    - 不支持创建或删除临时表操作，如 CREATE TEMPORARY TABLE or DROP TEMPORARY TABLE 语句操作。
+    - 使用 GTID 复制从库跳过错误时，不支持执行该 sql_slave_skip_counter 参数的语法，传统复制可以使用这个命令跳过事务。
+
+- GTID的复制原理
+    - 主节点执行事务提交前会产生一个 GTID，其会随着事务一起记录到 binlog 日志中。
+    - 从节点 I/O Thread 会读取主节点的 binlog 日志文件并存储在从节点的 relaylog 日志中。从节点将主节点的 GTID 这个值配置到 gtid_next 中，即下一个要读取的 GTID 值。
+    - 从节点SQL线程从relay log中读取 gtid_next 中的值，然后查找自己的 binlog 日志中是否有这个 GTID。
+        - 如果有这个记录：说明这个 GTID 的事务已经执行过了，就忽略掉。
+        - 如果没有这个记录：从节点会从relay log中执行该GTID的事务，并记录到自己的 binlog 日志中。同时在读取执行事务前会先检查其他 session 中是否持有该 GTID，确保不被重复执行。
+
+- GTID 指的是全局事务 ID，全称是 Global Transaction Identifier，具有如下特点：
+
+    - GTID事务是全局唯一性的，并且一个事务对应一个GTID值。
+
+    - 一个GTID值在同一个MySQL实例上只会执行一次。
+
+    - GTID 由 server_uuid + tid 组成，其中：
+        - server_uuid： server_uuid 是在 Mysql 首次启动过程中自动生成的一个 uuid(128位) 随机值，生成后会将该值存储到数据目录的auto.cnf文件中。
+        - tid： 代表了该实例上已经提交的事务数量，并且随着事务提交单调递增，所以GTID能够保证每个MySQL实例事务的执行（不会重复执行同一个事务，并且会补全没有执行的事务）。
+        ```
+        # 样式
+        26630fed-fe68-11ec-b051-000c29509871:1-27
+        ```
+
+#### 搭建
+
+- 主要在 Mysql 配置文件中添加下面2条配置：
+
+    ```ini
+    # 开启 gtid 模式
+    gtid_mode=on
+    # 配置不允许任何事务违反 GTID 一致性,用于保证数据一致性
+    enforce_gtid_consistency=on
+    ```
+
+- 从库配置同步的参数：
+
+    - `master_auto_position` 标识主从关系使用的 GTID 协议。
+        - 相比之前 Binlog 复制模式由人为指定binlog的pos位点改为了MASTER_AUTO_POSITION=1自动获取binlog的pos位点的配置，MASTER_LOG_FILE 和 MASTER_LOG_POS 参数已经不需要了。
+
+    ```ini
+    CHANGE MASTER TO
+    MASTER_HOST=$host_name
+    MASTER_PORT=$port
+    MASTER_USER=$user_name
+    MASTER_PASSWORD=$password
+    master_auto_position=1
+    ```
+
+- [运维记事：MySQL基于GTID构建主从](https://mp.weixin.qq.com/s?__biz=MzU0MTgyMjA1MA==&mid=2247484087&idx=1&sn=5a4bd5dd020713c1a578f39e34e0a1aa&chksm=fb255fbacc52d6ac2ea74865fe3826848e55bff32b0d71a4c8a244e82f65a88c94d0621ee7e0&cur_album_id=2629958258165809153&scene=189#wechat_redirect)
+
+#### GTID相关命令
+
+- 查看GTID相关参数
+
+    ```sql
+    show variables like '%gtid%';
+    +-------------------------+-----------+
+    | Variable_name           | Value     |
+    +-------------------------+-----------+
+    | gtid_binlog_pos         | 0-1-33361 |
+    | gtid_binlog_state       | 0-1-33361 |
+    | gtid_cleanup_batch_size | 64        |
+    | gtid_current_pos        | 0-1-33361 |
+    | gtid_domain_id          | 0         |
+    | gtid_ignore_duplicates  | OFF       |
+    | gtid_pos_auto_engines   |           |
+    | gtid_seq_no             | 0         |
+    | gtid_slave_pos          |           |
+    | gtid_strict_mode        | OFF       |
+    | last_gtid               |           |
+    | wsrep_gtid_domain_id    | 0         |
+    | wsrep_gtid_mode         | OFF       |
+    | wsrep_gtid_seq_no       | 0         |
+    +-------------------------+-----------+
+    ```
+
+    | 参数名                           | 含义介绍                                                                                                                                                                               |
+    |----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | binlog_gtid_simple_recovery      | 该参数是控制当MySQL服务重启或启动时候自动寻找GTIDs的值。                                                                                                                               |
+    | enforce_gtid_consistency         | 该参数是强制要求只允许复制事务安全的事务，请看上面步骤的具体限制条件。                                                                                                                 |
+    | gtid_executed_compression_period | 启用GTID时，服务器会定期在mysql.gtid_executed表上执行压缩。通过设置gtid_executed_compression_period系统变量，可以控制压缩表之前允许的事务数，从而控制压缩率。设置为0时，则不进行压缩。 |
+    | gtid_mode                        | 是否开启GTID模式。                                                                                                                                                                     |
+    | gtid_next                        | 表示下一个要执行的GTID信息。                                                                                                                                                           |
+    | gtid_owned                       | 该参数包含全局和session，全局表示所有服务器拥有GTIDs，session级别表示当前client拥有的所有GTIDs。                                                                                       |
+    | gtid_purged                      | 已经purge掉的GTIDs，purged掉的GTIDs会包含到gtid_executed中。                                                                                                                           |
+    | session_track_gtids              | 该参数是控制用于捕获的GTIDs和在OK PACKE返回的跟踪器。                                                                                                                                  |
+
+- 如何判断复制方式是GTID还是pos
+    ```sql
+    -- 查看Auto_Position字段。0是pos 方式， 1是gtid方式。
+    show slave status
+    ```
+
+- gtid变更为pos方式：
+
+    ```sql
+    change master to master_auto_position=0;
+    ```
+
+- 当前执行gtid信息
+
+    ```sql
+    SELECT @@GLOBAL.GTID_EXECUTED;
+    +-------------------------------------------------------------------------------------+
+    | @@GLOBAL.GTID_EXECUTED |
+    +-------------------------------------------------------------------------------------+
+    | 26630fed-fe68-11ec-b051-000c29509871:1-31,
+    bf480f97-fe64-11ec-9b9d-000c29af7696:1-3 |
+    +-------------------------------------------------------------------------------------+
+
+    SELECT * FROM mysql.gtid_executed;
+    +--------------------------------------+----------------+--------------+
+    | source_uuid | interval_start | interval_end |
+    +--------------------------------------+----------------+--------------+
+    | 26630fed-fe68-11ec-b051-000c29509871 |             1 |           29 |
+    | 26630fed-fe68-11ec-b051-000c29509871 |             30 |           30 |
+    | bf480f97-fe64-11ec-9b9d-000c29af7696 |             1 |           1 |
+    +--------------------------------------+----------------+--------------+
+    ```
+
+    - mysql.gtid_executed表是由MySQL服务器提供给内部使用的。它允许副本在副本上禁用二进制日志记录时使用GTIDs，并允许在二进制日志丢失时保留GTID状态。
+
+        - RESET MASTER命令，gtid_executed表将被清除。
+
+        - 服务意外停止的情况下，当前二进制日志文件中的gtid集不会保存在gtid_executed表。在恢复期间，这些gtid将从二进制日志文件添加到表中，以便可以继续复制。
+
+    - 关于gtid_executed表
+
+        - 若MySQL服务器启用了二进制日志，则表mysql.gtid_executed的更新仅在二进制rotation时发生，因为发生重启等情况依旧可以通过扫描二进制日志判断得知当前运行的GTID位置。
+
+        - 简单来说，该表会记录当前执行的GTID在MySQL 5.6中必须配置参数log_slave_updates的最重要原因在于当slave重启后，无法得知当前slave已经运行到的GTID位置，因为变量gtid_executed是一个内存值：MySQL 5.7将gtid_executed这个值给持久化。采用的技巧与MySQL 5.6处理SQL thread保存位置的方式一样，即将GTID值持久化保存在一张InnoDB表中，并与用户事务一起进行提交，从而实现数据的一致性。触发条件：
+
+            - 在binlog发生rotate(flush binary logs/达到max_binlog_size)或者关闭服务时，会把所有写入到binlog中的Gtid信息写入到mysql.gtid_executed表。
+
+            - 从库：如果没有开启log_bin或者没有开启log_slave_updates，从库在应用relay-log中的每个事务会执行一个insert mysql.gtid_executed操作。
+
+- 除了传统的查看binlog和pos值之外，GTID模式可以更直观的查看某个事务执行的情况。
+
+    ```sql
+    show slave status\G;
+    ```
+
+    | 参数名             | 含义介绍                               |
+    |--------------------|----------------------------------------|
+    | Retrieved_Gtid_Set | Slave节点已经接收到的Master节点的GTIDs |
+    | Executed_Gtid_Set  | Slave节点已经执行的GTIDs               |
+    | Auto_Position      | 自动获取position位置，显示为1          |
+
+- gtid跳过gtid_next
+
+    ```
+    -- 备注：该操作类似于sql_slave_skip_counter，只是跳过错误，不能保证数据一致性，需要人工介入，固强烈建议从机开启read_only=1
+    stop slave;
+    set gtid_next='26630fed-fe68-11ec-b051-000c29509871:37'
+    begin;commit;
+    set gtid_next='automatic';
+    start slave;
+    ```
+
+### 主从复制不会复制已经存在的数据库数据。因此需要自己导入
+
+- 在master服务器上：导出主从复制设置的数据库
+
+    ```sh
+    # 导出
+
+    # 进入数据库后给数据库加上一把锁,阻止对数据库进行任何的写操作
+    flush tables with read lock;
+
+    # 导出tz数据库
+    mysqldump -uroot -pYouPassward tz > /root/tz.sql
+
+    # 对数据库解锁,恢复对主数据库的操作
+    unlock tables;
+    ```
+
+    ```sh
+    # 复制主服务器的tz.sql备份文件
+    scp -r "root@192.168.100.208:/root/tz.sql" /tmp/
+    # 创建tz数据库
+    mysql -uroot -p
+    ```
+
+- 在slave服务器上：恢复 tz 数据库
+
+    ```sql
+    # 先创建 tz 数据库
+    create database tz;
+
+    # 导入
+    mysql -uroot -p tz < /tmp/tz.sql
+
+    # 如果出现以下核对错误
+    ERROR 1273 (HY000) at line 47: Unknown collation: 'utf8mb4_0900_ai_ci'
+    # 通过修改编码修复
+    sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /tmp/tz.sql
+    # 再次运行
+    mysql -uroot -p tz < /tmp/tz.sql
+    ```
+
+### 主服务器配置
+
+- `/etc/my.cnf` 文件配置
+
+    ```sh
+    [mysqld]
+    server-id=129            # 默认是 1 ,这个数字必须是唯一的
+    log_bin=centos7
+
+    binlog-do-db=tz          # 同步指定库tz
+    binlog-ignore-db=tzblock # 忽略指定库tzblock
+
+    # 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
+    binlog_format=row
+
+    # 设置一个 binlog 文件的最大字节。设置最大 100MB
+    max_binlog_size=100M
+
+    # 设置了 binlog 文件的有效期（单位：天）
+    expire_logs_days = 7
+
+    # 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
+    # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
+    # 执行n 次事务提交后，才fsync到磁盘
+    sync_binlog=1
+    ```
+
+- 设置远程登陆的权限
+    ```sql
+    # 启用slave权限
+    grant PRIVILEGES SLAVE on *.* to  'root'@'%';
+    # 或者启用所有权限
+    grant all on *.* to  'root'@'%';
+
+    # 刷新权限
+    FLUSH PRIVILEGES;
+    ```
+
+- 重启mariadb
+    ```sh
+    systemctl restart mariadb
+    ```
+
+- 查看主服务状态
+
+    ```sql
+    # 日志目录 /var/lib/mysql/centos7.000001
+
+    mysql> show master status;
+    ERROR 2006 (HY000): MySQL server has gone away
+    No connection. Trying to reconnect...
+    Connection id:    7
+    Current database: tz
+
+    +----------------+----------+--------------+------------------+-------------------+
+    | File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
+    +----------------+----------+--------------+------------------+-------------------+
+    | centos7.000001 |      156 |              |                  |                   |
+    +----------------+----------+--------------+------------------+-------------------+
+    1 row in set (0.02 sec)
+    ```
+
+### 从服务器配置
+
+- `/etc/my.cnf` 文件配置
+
+    ```sh
+    [mysqld]
+    server-id=128
+
+    replicate-do-db = tz     #只同步tz库
+    slave-skip-errors = all   #忽略因复制出现的所有错误
+    ```
+
+- 进入slave服务器后，配置master服务器
+    ```sql
+    -- 关闭同步
+    stop slave;
+
+    # 开启同步功能
+    CHANGE MASTER TO
+    MASTER_HOST = '192.168.100.208',
+    MASTER_USER = 'root',
+    MASTER_PASSWORD = 'YouPassword',
+    -- 在master上执行show master status;查看MASTER_LOG_FILE、MASTER_LOG_POS
+    MASTER_LOG_FILE='centos7.000001',
+    MASTER_LOG_POS=156;
+
+    -- 开启同步
+    start slave;
+    ```
+
+- 查看是否成功
+    ```sql
+    MariaDB [tz]> show slave status\G;
+    *************************** 1. row ***************************
+                    Slave_IO_State: Connecting to master
+                       Master_Host: 192.168.100.208
+                       Master_User: root
+                       Master_Port: 3306
+                     Connect_Retry: 60
+                   Master_Log_File: centos7.000001
+               Read_Master_Log_Pos: 6501
+                    Relay_Log_File: tz-pc-relay-bin.000001
+                     Relay_Log_Pos: 4
+             Relay_Master_Log_File: centos7.000001
+                  Slave_IO_Running: Connecting
+                 Slave_SQL_Running: Yes
+    ```
+
+### docker 主从复制
+
+[docker 安装 mysql 教程](#docker)
+
+启动两个 mysql:
+
+```sh
+docker run -itd --name mysql-tz -p 3306:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
+
+docker run -itd --name mysql-slave -p 3307:3306 -e MYSQL_ROOT_PASSWORD=YouPassword mysql
+```
+
+进入 docker 修改 `my.cnf` 配置文件
+
+```sh
+docker exec -it mysql-tz /bin/bash
+echo "server-id=1" >> /etc/mysql/my.cnf
+echo "log-bin=bin.log" >> /etc/mysql/my.cnf
+echo "bind-address=0.0.0.0" >> /etc/mysql/my.cnf
+
+docker exec -it mysql-slave /bin/bash
+echo "server-id=2" >> /etc/mysql/my.cnf
+echo "log-bin=bin.log" >> /etc/mysql/my.cnf
+
+退出docker后,重启mysql
+docker container restart mysql-slave
+docker container restart mysql-tz
+```
+
+进入 master(主服务器) 创建 backup 用户,并添加权限:
+
+```sql
+mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
+
+create user 'backup'@'%' identified by 'YouPassword';
+GRANT replication slave ON *.* TO 'backup'@'%';
+FLUSH PRIVILEGES;
+```
+
+查看 master 的 ip:
+
+```sh
+sudo docker exec -it mysql-tz cat '/etc/hosts'
+```
+
+我这里为 `172.17.0.2`
+
+![image](./Pictures/mysql/docker-replication.avif)
+
+开启 **slave**:
+
+```sql
+# MASTER_HOST 填刚才查询的ip
+
+mysql -uroot -pYouPassword -h 127.0.0.1 -P3307
+CHANGE MASTER TO
+MASTER_HOST = '172.17.0.2',
+MASTER_USER = 'backup',
+MASTER_PASSWORD = 'YouPassword';
+start slave;
+```
+
+docker 主从复制测试:
+
+- 左为 3307 从服务器
+- 右为 3306 主服务器
+
+在主服务器**新建数据库 tz,hello 表**,并插入 1 条数据.可以看到从服务器可以 select hello 表;在主服务器删除 tz 数据库,从服务器也跟着删除.
+
+![image](./Pictures/mysql/docker-replication.gif)
+
+## 高可用
+
+- [爱可生开源社区：第三期话题：MySQL 高可用 VS Oracle 高可用，MySQL 能否取代 Oracle 在金融行业的垄断局面？](https://mp.weixin.qq.com/s/qEOduHQw1ptVLvN2YAPv4g)
+
+### 高可用方案
+
+- [MySQL数据库联盟：MySQL 常用高可用方案](https://mp.weixin.qq.com/s/3ICMQUF_vQpuDm2nHi1qqw)
+
+![image](./Pictures/mysql/高可用-高可用方案投票.avif)
+
+- 1.主从或主主 + Keepalived
+
+    - 主从或主主 + Keepalived 算是历史比较悠久的 MySQL 高可用方案
+
+    - 其大致原理是：在主实例的 Keepalived 中，增加监测本机 MySQL 是否存活的脚本，如果监测 MySQL 挂了，就会重启 Keepalived，从而使 VIP 飘到从实例。
+
+    ![image](./Pictures/mysql/高可用-Keepalived.avif)
+
+    - 优点
+        - 部署简单。
+        - 只有两个节点，没有主实例宕机后选主的问题。
+    - 缺点：
+        - 级联复制或者一主多从在切换之后，其他从实例需要重新配置连接新主。
+        - 云环境使用不了。
+
+- 2.MHA
+
+    - MHA（Master High Avaliable） 是一款 MySQL 开源高可用程序，MHA 在监测到主实例无响应后，可以自动将同步最靠前的 Slave 提升为 Master，然后将其他所有的 Slave 重新指向新的 Master。
+
+    ![image](./Pictures/mysql/高可用-MHA.avif)
+
+    - 优点
+        - 可以根据需要扩展 MySQL 的节点数量。
+        - 只要复制没有延迟，MHA 通常可以在几秒内实现故障切换。
+        - 可以使用任何存储引擎。
+    - 缺点
+        - 仅监视主数据库。
+        - 需要做 SSH 互信
+        - 使用 Perl 开发，二次开发困难。
+        - 跟不上 MySQL 新版本，最近一次发版是 2018 年。
+
+- 3.PXC
+
+    - PXC（Percona XtraDB Cluster）是一个完全开源的 MySQL 高可用解决方案。它将 Percona Server、Percona XtraBackup 与 Galera 库集成在一起，以实现多主复制的 MySQL 集群。
+
+    ![image](./Pictures/mysql/高可用-PXC.avif)
+
+    - 优点
+        - 去中心：任何节点宕机，集群都可以继续运行而不会丢失任何数据。
+        - 每个节点都可以写入数据并自动同步到其他节点。
+        - 数据写入需要集群所有节点验证通过才会提交，保证了数据的强一致性。
+    - 缺点
+        - 只支持 InnoDB 引擎。
+        - 木桶效应：集群吞吐量取决于性能最差的节点。
+        - 增加节点时，必须从现有节点之一复制完整的数据集。
+
+- 4.MGR/InnoDB Cluster
+
+    - MySQL 5.7 推出了 MGR（MySQL Group Replication），与 PXC 类似，也实现了多节点数据写入和强一致性的特点。MGR 采用 GCS（Group Communication System）协议同步数据，GCS 可保证消息的原子性。
+
+    ![image](./Pictures/mysql/高可用-MGR.avif)
+
+    - MGR 是基于分布式一致性算法 Paxos 来实现的一套高可用解决方案，并不是主从复制。
+
+    - MGR 最最重要的一个特点，它是多写的！MGR 的 share nothing 架构，每个实例都有自己的存储，每个节点都可以写入。
+
+        - 数据库是一个有状态的服务，可以通过 MGR 多写的机制，可以把数据库变成一种弱状态。任何时间、任何节点都可以写，如果不能写，我就不停的尝试，总有一个节点可以写。你会发现这件事情会变得非常简单。我们以前做容灾很复杂，数据库要做切换、等待、balabalabala…… 很多事。像业务现在就可以不用关心数据库层，数据库本身就可以完成。
+
+        - Oracle 在金融行业用的最多的一种数据架构是 Rac。Rac 也是每个节点都可写，但是对标 MGR 有些不公平。因为虽然 Rac 每个节点可写，但是下面的存储就是一个共享存储。MGR 每个节点都可写，但每份数据是 share nothing。
+
+        - Rac 对比 MySQL 的 share nothing 其实是存在缺点的。
+
+            - 如果共享存储出了问题就没办法了。有同学会说，下面的共享存储是几百万、几千万的设备啊！它是不会坏的，性能是很 NB 的 balabalabala…… 但不可否认的它就是个单点，就是会坏。一年不会坏两年会坏，两年不会坏三年会坏，它还是存在坏的可能性。
+
+            - 并不是说 Rac 不好，是 share nothing 和 share everything 长远来看肯定是 share nothing 好。
+
+    - InnoDB Cluster 由以下技术组成：
+        - MySQL Shell，MySQL 的高级客户端和代码编辑器，用于管理 MGR 集群。
+        - Group Replication，提供一组高可用的 MySQL 实例。
+        - MySQL Router，在应用程序和集群之间提供透明的路由。当 MGR 发生切换树，自动路由到新的 MGR 主节点。
+
+    - 优点
+        - 支持多节点写入，有冲突检测机制。
+        - 强一致性。
+    - 缺点
+        - 只支持 InnoDB 表，每张表都要有主键。
+        - 最多只支持 9 个节点。
+
+- 5.Xenon
+
+    - Xenon 是一个使用 Raft 协议的 MySQL 高可用和复制管理工具，使用 Go 语音编写。
+
+    ![image](./Pictures/mysql/高可用-Xenon.avif)
+
+    - Xenon 基于 Raft 协议进行无中心化选主，并能实现秒级切换。
+    - 优点
+        - 不需要管理节点。
+        - 无数据丢失的快速故障转移。
+    - 缺点
+        - 只适用于 GTID。
+        - 默认情况下，Xenon 和 MySQL 跑在同一个账号下。
+
+- 6.Orchestrator
+    - Orchestrator是 Go 语音编写的 MySQL 高可用性和复制管理工具，作为服务运行并提供命令行访问、HTTP API 和 Web 界面。
+
+    ![image](./Pictures/mysql/高可用-Orchestrator.avif)
+
+    - 优点
+        - 自动发现 MySQL 拓扑，可以拖动拓扑图进行复制关系的变更。
+        - 提供命令行和 API 接口，方便运维管理。
+        - 快速故障转移。
+        - 多种故障等级，应对不同故障等级可配置不同处理办法。
+    - 缺点
+        - 相对于其他高可用组件，参数多很多。
+        - 在某些场景可能出现丢数据的情况，数据补偿机制需要优化。
+
+### MHA
+
+- [运维记事：MySQL高可用之MHA+延迟备份搭建指导](https://mp.weixin.qq.com/s?__biz=MzU0MTgyMjA1MA==&mid=2247483800&idx=1&sn=0c2652dea2b27115e3e793f626690d7f&chksm=fb255c95cc52d5833507ccd78dd54f9b3c528c630f4d9311c0d5a27da493cddce611cea224e8&cur_album_id=2629958258165809153&scene=190#rd)
+
+### MGR（MySQL Group Replication）
+
+- [爱可生开源社区：第四期话题：MySQL Group Replication 能否在生产环境中大规模使用？](https://mp.weixin.qq.com/s/gYb3yE8IfiOFqkTvMYfjQA)
+
+## 中间件
+
+- [爱可生开源社区：第六期话题：MySQL 中间件的选择，ProxySQL、Spider、MyCAT、DBLE 怎么选？](https://mp.weixin.qq.com/s/Q7rd47eZI1A5Cq3ZfvQV2g)
+
+- 人口问题，国外的互联网并发量远小于中国。即便是美国也才 2-3 亿人，中国 14 亿，再算算移动互联网的使用人数，绝对是中国多。所以在国外 MySQL 不做这件事情，就是因为对分布式需求没有这么强烈，但中国有！各种节日的购物情景，老外是想象不到的。
+
+- 某个功能是 Oracle MySQL 官方的人来做，还是开源社区的人来做？
+
+- 商业数据库思维逻辑：如果是 Oracle 的角度，在我的闭环之内，那就是你要什么我给你什么
+    - 像 Oracle 这样的数据库就是希望做的大而全。但我们也看到 SQL Server 也在慢慢的拥抱开源，现在对 Hive 等大数据平台的支持做的也很好。
+
+- 开源数据库思维逻辑：到目前为止，MySQL 官方并没有一个中间件的产品，而是由社区驱动开发了很多中间件产品。这就是开源社区和商业很大的一个不同，开源就是我做一个基础内核，通过迭代发展，不需要大而全。
+    - 你会发现所有的互联网公司都有类似的中间件产品，比如阿里最早的 TDDL、网易的 DDB、京东的 shardingsphere，银行业也开发了自己的中间件产品，中信银行使用了 GoldenDB、工行使用了 DBLE，所以你会发现每个银行都会用中间件产品去做分布式数据库架构
+
+- 我知道很多公司都在做 Oracle 到 MySQL 的转型。
+    - 比如收快递行业的圆通是 Oracle 迁到了 MySQL。这些公司是比较典型的基于中间件的 MySQL 分布式架构完成去 O。
+
+- 对于运维或者架构 DBA，希望你能掌握基于中间件做分布式架构的能力。主要的问题就是怎么分库分表。分库分表听起来很简单，无非就是 hash 和 range，但想用好分库分表是需要有些经验的。
+    - 比如用分区表还是直接分表？肯定是分表。如果有项目经验就知道分区表有哪些问题。
+    - 分库分表之后，有二级索引的查询该怎么办？是做索引表还是冗余数据呢？这就要根据每个业务的情况再去设计了。还有上次和虎青聊到一个非常难解决的问题：分布式事务。这些都是分布式架构中常见的问题。
+
+- 中间件限制
+
+    - 任何的分布式数据库限制都多，因为使用分布式数据库要有一个前提条件，90% 的查询是根据分区键访问的。
+
+        - 如果你告诉我用户查询的维度非常多，那就用 ES 就好了。
+
+        - 所以 MySQL 解决的是什么问题，一定要搞清楚。并不是中间件产品限制多，而是分布式数据库架构本身就多。不能把分布式数据库等同于单机数据库。
+
+- 对于 MySQL 开发人员，你会发现每家公司几乎都会有分布式中间件的需求，那么你要去熟悉这些产品，做一些定制化的开发，那你也会很有竞争力。一方面是架构，一方面是产品本身。接下来我们看一下业界有哪些常见的中间件产品。
+
+- ProxySQL
+    - 这个产品是不支持分库分表的，只支持代理功能。将我的某条 SQL 代理到下面的节点，然后做读写分离的工作。我记得是 C++ 写的，因为它刚发布时由 Percona 推，所以 ProxySQL 火了一阵子就没声音了。
+    - 如果代理只是做读写分离、负载均衡操作价值不是特别大。用 ProxySQL 做高可用效果不一定很好。我希望的架构是，计算层在上面，存储层在下面。ProxySQL 在计算层做的比较少，算不上真正的计算层。
+
+- Mycat
+
+    - 它早期用户量非常非常多的产品。后来 Mycat 的主程和团队都去了其他公司，甚至创业了。没有做好这件产品，有些可惜，但 Mycat 是在爱可生的 DBLE 出现之前最成熟的中间件产品。我见过非常非常多的公司把 Mycat 用于生产环境。虽然 Mycat 有很多 Bug，但对于简单查询支持得是很不错的。
+
+    - Mycat 就做好了一件事情：分库分表。
+
+        - 一个配置文件设置好配置规则，它就做好这一件事情用户就很多了，因为这个需求是分布式数据库架构中占 90% 的需求。真的做很多 Join、Group By、子查询，这就不是分布式数据库应该做的事情。
+
+        - 从产品经理的角度来看，千万不要做太多，做好一件事情就够了，后面都是慢慢的迭代，通过迭代把事情越做越好越完善
+
+            - MySQL 就是这样的。MySQL 以前我自己都说它是玩具数据库，但它好几件事情就 OK 了，InnoDB 能做好 OLTP 再支持个 MVCC就 OK 了。
+
+    - Mycat 文档等等方面都不完善，使用上要靠大家去悟。但是如果把 Mycat 放在一家公司，不断地由 DBA 和开发人员理解、尝试、调试，是能做起来的。
+        - 这也是为什么爱可生的 DBLE 能做起来的原因，就是公司有一群专业的人长期投入做这件事情就能做好。另外爱可生本身又有客户，产品通过不断地迭代打磨产品，得到很好的实践。
+
+    - 所以现在我并不建议大家使用 Mycat，而是选择 DBLE。我本身最喜欢的就是 Mycat，现在来看爱可生接手了 Mycat 以 DBLE 这款产品的形式去做，那的确是市面上开源产品中比较优秀的，甚至是最优秀的产品。
+        - 但是直接把 DBLE 拿来用，也不一定能 hold 住，这也是爱可生公司本身存在价值，可以提供优质的服务。
+
+- Spider
+
+    - Spider 是一个 MySQL 引擎，一个分布式存储引擎。连接 Spider，它会自动将数据路由到下面的节点。
+
+    - 是由日本人做的，现在也不怎么开发了，在持续维护的就是腾讯互娱团队 Tspider。这个产品是做数据库内核的人做出来的，相对做 Mycat 的团队并不是做 MySQL 内核出身的。
+        - 它是把分布式数据库理解成一张分区表，每个分区不在一台机器上，而是在每个 DataNode 上，更加接近分布式数据库本身的概念。很多开发人员还是理解到分库分表，打散数据而已。因为它是基于存储引擎的，所以上层所有 SQL 的解析都是由 MySQL 本身做的，对 SQL 的支持是 100%。
+
+    - Spider 最大的缺点是，因为是存储引擎，下发到节点（数据层），返回给 Spider 再返回上面。你会发现它的链路是迂回的，所以它的性能会比较差。另外它使用的 MySQL 本身的分区机制，5.7 分区功能还是有很多性能瓶颈的，分区多性能会非常差。Spider 建议不要超过 128 个分区，超过的话性能下降非常明显。所以它没有做起来的主要原因就是性能比较差，但兼容性是最好的。
+
+    - 在工程领域和在理论领域是完全不同的两件事，比如分布式事务理论应该用差异事务去做，但工程领域绝对不会这么去做，因为性能太差，我们可以用最终一致性实现。在工程上可以有很多的取舍，但数据库产品用很严谨的角度去实现，反而会带来很多局限性。这就是如何在工程和理论中平衡。
+
+- 分布式中间件的产品三类：ProxySQL 一类；Mycat/DBLE/ShardingSphere 都是用 Java 开发比较完善，业界使用非常多的。三款推荐一款那就是 DBLE；还有就是基于 C++ 开发的 Spider 存储引擎，缺点就是性能不如前两类，好处就是兼容性。
+
+- 谈谈 PolarDB？
+
+    - PolarDB 与基于中间件的分布式数据库架构是完全不同的。它是计算与存储分离，容量可扩展，性能并不怎么可扩展。我们叫它云原生数据库，是因为在云环境中很多用户并不要求很高的性能，但他希望我的业务不要终断，可以迅速的扩缩容。
+    - 为什么 PolarDB 卖的好？本质上还是 MySQL 协议，在体系内的产品。个人觉得这只是云原生数据库的样子，不一定是未来数据库的样子。
+
+- 做 MySQL 开发如何？
+
+    - 很好，这就是 DBA 该有的样子。一方面业务，一方面有开发能力。我经常建议传统运维 DBA 做一件事情，MHA 这样的软件用 Perl 写的，你去把它用 Python 也好 Go 也好重写一遍。或者把 mydumper 备份工具用 C++ 写的，用 Python 或 Go 重写一遍。从小的项目开始练练手吗。
+
+### DBLE
+
 ## 备份与恢复
 
-- 备份工具可以分为：
+- [MySQL解决方案工程师：MySQL的备份](https://mp.weixin.qq.com/s?__biz=MzU1NzkwMjQ2MQ==&mid=2247486675&idx=1&sn=5e8aa7d23093409f4a25af98f7249553&chksm=fc2ff3c1cb587ad737a892c295a1a4e2f1265f34d6898e453350854e26fb61350d8439c335be&scene=21&poc_token=HJ83IWaj3Dd95Y8l8qyyc_wa_LnNKp_Mc9tvGh5W)
 
-    - 1.物理备份：直接包含了数据库的数据文件，适用于大数据量，需要快速恢复的数据库。
+- 备份类型：影响应用程序与数据库的交互
 
-    - 2.逻辑备份：包含的是一系列文本文件，其中是代表数据库中数据结构和内容的SQL语句，适用于较小数据量或是跨版本的数据库备份恢复。
+    - 热备份：允许应用程序完整访问数据。
+
+        - 备份可以在数据读取和修改期间进行，系统保留读取和修改数据的能力。在备份期间采用多版本并行控制（MVCC），会使用行锁。
+
+    - 冷备份：不允许应用程序访问数据。
+
+        - 备份时数据无法被用户访问，通常情况下，服务器需要进入拒绝访问模式或关机。用户在备份期间无法读取和修改任何数据。
+
+        ```sh
+        # 停服务
+        mysqladmin –uroot –proot shutdown
+
+        # 备份数据目录
+        cp –r /opt/mysql newdirectory
+
+        # 恢复
+        cp –r newdirectory /opt/mysql #将备份的数据替换原目录重启数据库即可
+        ```
+
+    - 温备份：允许应用程序进行只读操作，不允许更改数据。
+
+        - 备份时允许用户读取数据，无需完全封闭用户，但缺点是备份期间无法修改数据、可能会导致性能问题。
+
+- 备份的方法可以分为：
+
+    - 1.逻辑备份：MySQL的逻辑备份可以通过SQL语句、mysqldump、mydumper、XtraBackup以及MySQL5.7以后出现的mysqlpump 多线程备份，但由于mysqlpump使用的较少且不安全，不在此次讲述范围之内。
+
+        - 优点：
+
+            - 创建一个SQL脚本，用户可以在MySQL服务器上执行，并可以利用该脚本在不同架构的主机或服务器上重新加载数据。
+                - 独立于存储引擎
+
+            - 逻辑备份可以备份全部的数据库或其中的一个/部分数据库或表，并且可以备份本地和远程的服务器。
+
+        - 缺点
+            - 逻辑备份的速度远慢于物理备份
+                - MySQL服务器必须读取表并解释表的内容，之后将其转换为磁盘文件或者发送到一个客户端程序。
+            - 逻辑备份的恢复慢于物理备份的恢复
+                - 原因在于恢复过程中执行的脚本包含独立的创建和插入语句，这些语句在后台创建表，并插入数据。
+
+            - 备份语句使用的磁盘空间可能会超过实际数据使用的磁盘空间，因为通常情况下，文本数据要比二进制数据消耗更多的磁盘空间，但对于InnoDB而言，由于其在数据页中保存数据，会包含一部分未使用的空间，它所占用的磁盘空间会超过实际数据大小。
+
+        - 通常情况下逻辑备份属于温备份，使用时有如下要求：
+            - 创建备份时，要求MySQL服务器必须运行。
+            - 备份期间应用程序可以执行只读操作。
+            - 服务器通过读取正在备份的表的结构和内容来创建文件，然后将结构和数据转换为SQL语句或文本文件。
+            - 利用InnoDB 的MVCC可以实现热备份，使用“REPEATABLE READ”隔离级别实现一致的时间点备份。
+
+    - 2.物理备份：主要是指复制数据文件。用户可以使用标准的“tar”，“cp”等命令操作，也可以通过物理镜像、块操作，及快照文件等实现。
+        - 优点：
+            - 物理备份的优势在于执行备份和恢复时远超逻辑备份的速度，其快速的原因是其作为一个文件或文件系统进行复制
+            - 备份文件的大小与数据文件的实际大小相同。
+        - 缺点：
+            - 数据恢复时，必须恢复到相同的MySQL版本和存储引擎。
+            - 物理备份期间，服务器不能修改文件。InnoDB要求服务器关机，MyISAM要求只读。用户可以使用快照、MySQL复制，DRDB等方法在后台分开数据文件，以降低备份对MySQL和应用程序的影响。
+
+        - 1.在线磁盘复制
+
+            - 用户可以使用RAID镜像，DRDB等技术进行在线磁盘复制。这些技术提供在线或者接近在线的备份能力，可以在硬件发生故障时快速恢复数据，其缺点是因为它具有实时复制的能力，无法利用该技术处理人为或应用程序导致的数据丢失。
+
+        - 2.基于快照的备份
+
+            - 基于快照的备份等同于创建了一个具有时间点的数据副本，提供了一个逻辑上冻结的文件系统版本。快照无需包含具有一致性的数据库镜像，当利用快照进行恢复时，InnoDB必须执行它自身的恢复过程，以确保完整的事务。
+
+            - 基于快照的备份使用MySQL外部的快照功能，例如，数据文件在Linux的LVM2 逻辑卷，包含一个ext4的文件系统，用户可以创建一个基于快照的备份。基于快照的备份系统适用于支持事务的存储引擎，使用“Copy-on-write”方法来确保它们几乎是瞬时完成的。“Copy-on-write”方法类似于InnoDB的UNDO日志和MVCC，当执行快照时，LVM标记随后更改的所有块，并记录这些块的快照版本
+
+        - 3.基于MySQL复制的备份
+
+            - MySQL支持单向的异步复制，在复制的拓扑中一台服务器作为主服务器，其余的服务器作为从服务器。备份时，主服务器作为生产环境的服务器使用，从服务器用于备份，该方法的优势是可以最大限度减小对生产环境的影响，缺点则是主从之间可能存在延迟、需要额外的服务器存放数据库的副本。
+
+        - 4.二进制日志备份
+
+            - 二进制日志备份记录了数据的变更，用于在上次完整备份后恢复到最新数据时使用。
+            - 优点：是记录了完整的数据更改，用户可以安顺序保存应用多个二进制日志备份。
+            - 缺点：是用户必须按照顺序从上一次的完整备份结束之后保存日志，恢复时间可能会很长。
+            - 用户可以使用“mysqlbinlog”创建日志流，例如：
+                ```sh
+                mysqlbinlog --read-from-remote-server --host=server_host --raw --stop-never binlog.000101
+                ```
+
+            - 用户可以在MySQL的会话级别控制二进制日志的开启，例如：
+
+                ```sql
+                SET SQL_LOG_BIN = 1
+                ```
+
+                - 进行逻辑或物理备份时，需要刷新二进制日志进行同步，以用于备份。当需要进行增量备份时，需要复制增量部分的二进制日志。此外，二进制日志也适用于时间点恢复，用户可以识别出错的事务，并跳过该事务进行恢复。
+
+- 备份方法对比
+
+    ![image](./Pictures/mysql/备份方法对比.avif)
+
+- 备份策略
+
+    - 取决于数据记录的完整性和备份频率的要求，以及能够承受的系统宕机时长和恢复数据量的要求。
+
+    ![image](./Pictures/mysql/备份策略.avif)
+
+### 备份工具性能对比
+
+| 导出             | 导入                           | 优点         | 推荐度（效率）    |
+|------------------|--------------------------------|--------------|-------------------|
+| mysqldump        | source xxx.sql  MySQL< xxx.sql | 原生，可远程 | ⭐⭐⭐ 数据量<10G |
+| mydumper         | myloader                       | 多线程       | ⭐⭐⭐ 数据量>50G |
+| SELECT OUTFILE   | LOAD  DATA                     | 最灵活       | ⭐⭐ 数据量<20G   |
+| Util.dumpTables  | Util.loadDump                  | 原生，多线程 | ⭐⭐⭐ 数据量<50G |
+| Util.exportTable | Util.importTable               | 原生，单线程 | ⭐ 数据量<20G     |
+
+- SELECT OUTFILE 语句
+    - 适合于单表数据的导出，不支持多表。
+    - 可自定义导出部分列，导出导入速度较快，最常用。
+
+- mysqldump：单线程
+    - 1G 的备份文件，测试结果如下：
+    - 使用 mysql< xxx.sql 导入，耗时 5 分钟。
+    - 使用 source xxx.sql 导入，耗时 10 分钟。
+
+- mydumper
+    - 在数据量大于 50G 的场景中，更推荐 mydumper。
+
+### 导出不同文件格式
+
+```sh
+# \G格式导出数据
+mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+# html
+mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+# xml
+mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+```
+
+```sql
+# csv
+SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
+FIELDS TERMINATED BY ',' ENCLOSED BY '"'
+LINES TERMINATED BY '\r\n';
+```
+
+### LOAD DATA/OUTFILE 导入/导出文件
+
+- [爱可生开源社区：技术分享 | MySQL Load Data 的多种用法](https://mp.weixin.qq.com/s/WNXRshkvC3bFcc5NDaWlrw)
+
+```sql
+-- 创建源数据表
+CREATE TABLE load_data_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  data VARCHAR(64) DEFAULT NULL,
+  ts TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
+INSERT INTO load_data_test VALUES
+(1, 'one', '2014-08-20 18:47:00'),
+(2, 'two', '2015-08-20 18:47:00'),
+(3, 'three', '2016-08-20 18:47:00');
+
+-- 将表数据输出/tmp/test文件。也是csv的格式
+SELECT * INTO OUTFILE '/tmp/test'
+  CHARACTER SET utf8mb4
+  FIELDS TERMINATED BY ','
+  ENCLOSED BY '"'
+  LINES TERMINATED BY '\n'
+  FROM load_data_test;
+
+cat test.txt
+"1","one","2014-08-20 18:47:00"
+"2","two","2015-08-20 18:47:00"
+"3","three","2016-08-20 18:47:00"
+
+-- 创建导入数据的表
+CREATE TABLE load_data1_test (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  data VARCHAR(64) DEFAULT NULL,
+  ts TIMESTAMP,
+  PRIMARY KEY (id)
+);
+
+-- 导入数据
+LOAD DATA INFILE '/tmp/test'
+  INTO TABLE load_data1_test
+  CHARACTER SET utf8mb4
+  FIELDS TERMINATED BY ','
+  ENCLOSED BY '"'
+  LINES TERMINATED BY '\n'
+```
+
+- 自定义导入的字段的列
+    ```sql
+    -- 只导入id和data字段的列
+    DELETE FROM load_data1_test; -- 删除刚才导入的数据
+
+    LOAD DATA INFILE '/tmp/test'
+      INTO TABLE load_data1_test
+      CHARACTER SET utf8mb4
+      FIELDS TERMINATED BY ','
+      ENCLOSED BY '"'
+      LINES TERMINATED BY '\n'
+      (@C1,@C2,@C3) -- 该部分对应test文件中3列数据
+      -- 设置导入的字段与对应的列
+      SET id=@C1,
+          data=@C2;
+
+    -- 查看是否只导入id和data字段的列
+    SELECT * FROM load_data1_test
+    +----+-------+--------+
+    | id | data  | ts     |
+    +----+-------+--------+
+    | 1  | one   | <null> |
+    | 2  | two   | <null> |
+    | 3  | three | <null> |
+    +----+-------+--------+
+    ```
+
+- 对导入的列，进行函数处理
+
+    - 假设前2列的导入没有问题，第3列的数据类型与函数处理报错；那么依然会导入前2列的数据、第3列的值为`NULL`
+
+    - `now()`： 生成当前时间数据
+    - `upper()`：转换为大写
+    - `lower()`：转换为小写
+    - `concat(id, ',', data)` ：拼接id和data字段
+    - `trim(substr(@C2,1,2))`：使用substr取前2个字符,并去除头尾空格数据
+    - `if(hire_date<'1988-01-01','Y','N')`：对需要生成的值基于某一列做条件运算
+
+    ```sql
+    -- 对data字段转换为大写
+    DELETE FROM load_data1_test; -- 删除刚才导入的数据
+
+    LOAD DATA INFILE '/tmp/test'
+      INTO TABLE load_data1_test
+      CHARACTER SET utf8mb4
+      FIELDS TERMINATED BY ','
+      ENCLOSED BY '"'
+      LINES TERMINATED BY '\n'
+      (@C1,@C2,@C3) -- 该部分对应test文件中3列数据
+      -- 设置导入的字段与对应的列
+      SET id=@C1,
+          data=upper(@C2); -- 转换为大写
+    ```
 
 ### mysqldump 备份和恢复
 
-- 先创建一个数据表
+- mysqldump 可以保证数据一致性且不影响业务的运行，所产生的备份，最终是要结合 binlog 进行恢复。备份的过程是先从 buffer 中找到需要备份的数据进行备份，如果 buffer 中没有，则去磁盘的数据文件中查找并调回到 buffer 里面在备份，最后形成一个可编辑的以 .sql 结尾的备份文件。
 
-```sql
-use china;
-create table tz (
-    id   int (8),
-    name varchar(50),
-    date DATE
-);
+- 单线程
 
-insert into tz (id,name,date) values
-(1,'tz','2020-10-24');
-```
+- 它可以执行逻辑备份，如果执行备份的对象是InnoDB存储引擎，则可以执行热备份，默认情况下，它对所有的引擎执行温备份。
 
-- 1.使用 `mysqlimport` 导入(不推荐)
+- 备份的基本流程如下：
+    - 1.调用 FTWRL(flush tables with read lock)，全局禁止读写
+    - 2.开启快照读，获取此时的快照(仅对 innodb 表起作用)
+    - 3.备份非 innodb 表数据(*.frm,*.myi,*.myd等)
+    - 4.非 innodb 表备份完毕后，释放 FTWRL锁
+    - 5.逐一备份 innodb 表数据
+    - 6.备份完成。
 
-  > 因为 `mysqlimport` 是把数据**导入新增**进去表里,而非恢复
+- 注意事项：
 
-```sql
-# 导出tz表. 注意:路径要加''
-SELECT * FROM tz INTO OUTFILE '/tmp/tz.txt';
+    - 有删除表，建立表的语句，小心导入目标库时，删除表的语句，造成数据误删。
 
-# 删除表和表的数据
-drop table tz;
+    - INSERT 语句没有字段名称，导入时表结构要一致。
 
-# 导入前要创建一个新的表
-create table tz (
-    id int (8),
-    name varchar(50),
-    date DATE
-);
-```
+    - 导入过程中有 `lock table write` 操作，导入过程中相关表不可写。
 
-回到终端使用 `mysqlimport` 进行数据导入:
+    - `ALTER TABLE 表 DISABLE KEYS` 此语句将禁用该表的所有非唯一索引，这可以提高插入大量数据时的性能。 对应的文件末尾有 `ALTER TABLE 表 ENABLE KEYS;` 重新构建索引
 
-```sh
-mysqlimport china /tmp/tz.txt
-```
 
-- 2.使用 `mysqldump` 备份
+- 参数
 
-```sql
-# 备份 china 数据库
+    - --hex-blob：是 mysqldump 工具的一个选项，它的作用是将 BLOB 类型的数据导出为十六进制字符串。这对于存储二进制数据（如图片、文件等）非常有用
 
-mysqldump -uroot -pYouPassward china > china.sql
+    - `--routines`、`--event`，`--trigger`：分别用于转储存储例程、事件调度器的事件，及触发器。
 
-# 备份 china 数据库里的 tz 表
+    - `--opt`选项是以下语句的简写：`--add-drop-table --add-locks --create-options --disable-keys --extended-insert --lock-tables --quick--set-charset`。它提供了一个快速的转储操作，并产生一个可以快速重新加载到MySQL服务器的转储文件。
 
-mysqldump -uroot -pYouPassward china tz > tz-tables.sql
+    - 用于创建对象的选项：
 
-# 备份所有数据库
+        - `--no-create-db`：不写入`CREATE DATABASE`语句。
+        - `--no-create-info`：不写入`CREATE DATABASE`语句。
+        - `--no-data`：创建数据库和表的结构，但是不包含数据。
+        - `--no-tablespaces`：不写入`CREATE LOGFILE GROUP`或`CREATE TABLESPACE`。
+        - `--quick`：快速从表中查询一条记录，不使用表的缓冲集。
 
-mysqldump -uroot -pYouPassward --all-databases > all.sql
+    - 用于删除对象的选项：
 
-# -d 只备份所有数据库表结构(不包含表数据)
+        - `--add-drop-database`：在创建数据语句之前增加`DROP DATABASE`语句。
+        - `--add-drop-table`：在创建表语句之前增加`DROP TABLE`语句。
 
-mysqldump -uroot -pYouPassward -d --all-databases > mysqlbak-structure.sql
+- 部分遇到的问题可以使用下面参数解决。
 
-# 恢复到 china 数据库
+    | 参数                            | 说明                                                           |
+    |---------------------------------|----------------------------------------------------------------|
+    | --no-create-info 不包含建表语句 | （可以手动创建 create table tablename like dbname.tablename;） |
+    | --skip-add-drop-database        | 不包含删库语句                                                 |
+    | --skip-add-drop-table           | 不包含删表语句                                                 |
+    | --skip-add-locks INSERT         | 语句前不包含 LOCK TABLES t_order_info WRITE;                   |
+    | --complete-insert INSERT        | 语句中包含 列名称（新表的列有增加的时候）。                    |
 
-mysql -uroot -pYouPassward china < china.sql
+- 创建一个测试数据和一个测试表
 
-# 恢复所有数据库
+    ```sql
+    -- 创建新数据库
+    use china;
 
-mysql -uroot -pYouPassward < all.sql
-```
+    -- 创建测试表
+    create table tz (
+        id   int (8),
+        name varchar(50),
+        date DATE
+    );
 
-### [mydumper：比 MySQL 自带的 mysqldump 快很多](https://github.com/maxbube/mydumper)
+    -- 插入测试数据
+    insert into tz (id,name,date) values
+    (1,'tz','2020-10-24'),
+    (2,'tz','2020-10-25');
+    ```
 
-- [详细参数](https://linux.cn/article-5330-1.html)
+- 单表导出。保证数据一致性
 
-```sh
-# 带压缩备份--compress(gz)
-mydumper \
---database=china \
---user=root \
---password=YouPassword \
---outputdir=/tmp/china.sql \
---rows=500000 \
---compress \
---build-empty-files \
---threads=10 \
---compress-protocol
-```
+    - `--master-data=2` ：在备份期间对所有表加锁 FLUSH TABLES WITH READ LOCK，并执行 SHOW MASTER STATUS 语句以获取二进制日志信息。该参数有 1 和 2 两个值
+        - 如果值等于 1，就会在备份出来的文件中添加一个 CHANGE MASTER 的语句（搭建主从复制架构）
+        - 如果值等于 2，就会在备份出来的文件中添加一个 CHANGE MASTER 的语句，并在语句前面添加注释符号（后期配置搭建主从架构）。
+            - 如果您不需要进行主从复制，则可以考虑不使用 --master-data=2 参数。
 
-![image](./Pictures/mysql/du.avif)
+    - `--dump-slave`： 该参数用于在从库端备份数据，在线搭建新的从库时使用。该参数也有 1 和 2 两个值。
+        - 值为 1 时，也是在备份文件中添加一个 CHANGE MASTER 的语句
+        - 值为 2 时，则会在 CHANGE MASTER 命令前增加注释信息。
 
-```sh
-# 不带压缩备份,最后再用7z压缩
-mydumper \
---database=china \
---user=root \
---password=YouPassword \
---outputdir=/tmp/china.sql \
---rows=500000 \
---build-empty-files \
---threads=10 \
---compress-protocol
-```
+    - `--single-transaction`：用于保证 InnoDB 备份数据时的一致性，配合可重复读 RR（repetable read）隔离级别使用，当发生事务时，读取一个事务的快照，直到备份结束时，都不会读取到事务开始之后提交的任何数据。
 
-![image](./Pictures/mysql/du1.avif)
+    - `--master-data`和`--single-transaction`：同时使用两个选项时，InnoDB无需锁表并能够保证一致性，在备份操作开始之前，取得全局锁以获得一致的二进制日志位置。当事务的隔离级别为`repeatable read`时，开启`--single-transaction`选项读取InnoDB的数据，可以获得非锁定的数据一致性。[必须有]
 
-```sh
-# 恢复
-myloader \
---database=china \
---directory=/tmp/china.sql \
---queries-per-transaction=50000 \
---threads=10 \
---compress-protocol \
---verbose=3
-```
+    ```sql
+    # 备份china数据库中的tz表
+    mysqldump --master-data=2 --single-transaction china tz > tz-table.sql
+    ```
 
+    - 导出的`tz-table.sql`内容如下
+
+    ```sql
+    DROP TABLE IF EXISTS `tz`;
+    /*!40101 SET @saved_cs_client     = @@character_set_client */;
+    /*!40101 SET character_set_client = utf8 */;
+    CREATE TABLE `tz` (
+      `id` int(8) DEFAULT NULL,
+      `name` varchar(50) DEFAULT NULL,
+      `date` date DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    -- 表明这些语句只有在 MySQL 版本号为 4.01.01 或者更高条件下才可以被执行。
+    /*!40101 SET character_set_client = @saved_cs_client */;
+
+    --
+    -- Dumping data for table `tz`
+    --
+
+    LOCK TABLES `tz` WRITE;
+    /*!40000 ALTER TABLE `tz` DISABLE KEYS */;
+    INSERT INTO `tz` VALUES
+    (1,'tz','2020-10-24'),
+    (2,'tz','2020-10-25');
+    /*!40000 ALTER TABLE `tz` ENABLE KEYS */;
+    UNLOCK TABLES;
+    /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+    ```
+
+
+- 基本使用
+
+    ```sql
+    # 备份 china 数据库
+    mysqldump -uroot -pYouPassward --single-transaction china > china.sql
+
+    # 通过pv命令显示进度
+    mysqldump -uroot -pYouPassward --single-transaction china | pv > china.sql
+
+    # 复制到另一台mysql服务器
+    mysqldump -uroot -pYouPassward --single-transaction orig-db | mysql -uroot -pYouPassward copy-db
+
+    # 备份 china 数据库里的 tz 表
+    mysqldump -uroot -pYouPassward --single-transaction china tz > tz-table.sql
+
+    # where语句
+    mysqldump -uroot -pYouPassward --single-transaction china tz --where="date>'2020-10-24'" > tz-table.sql
+
+    # 备份所有数据库
+    mysqldump -uroot -pYouPassward --single-transaction --all-databases > all.sql
+
+    # -d 只备份所有数据库表结构(不包含表数据)
+    mysqldump -uroot -pYouPassward --single-transaction -d --all-databases > mysqlbak-structure.sql
+
+    # 恢复到 china 数据库
+    mysql -uroot -pYouPassward china < china.sql
+
+    # 恢复所有数据库
+    mysql -uroot -pYouPassward < all.sql
+
+    # 使用mysql客户端处理.sql文件，使用mysqlimport处理.txt文件。
+    mysqlimport -uroot -pYouPassward database table.txt
+    ```
+
+### [mydumper：比mysqldump更快](https://github.com/maxbube/mydumper)
+
+- 支持多线程导入/导出
+
+| 参数                                            | 说明                                                                         |
+|-------------------------------------------------|------------------------------------------------------------------------------|
+| -B                                              | --database 要转储的数据库                                                    |
+| -T                                              | --tables-list 逗号分隔的转储表列表(不会被正则表达式排除)                     |
+| -o                                              | --outputdir 保存输出文件的目录                                               |
+| -s                                              | --statement-size 插入语句的字节大小                                          | 默认是1000000个字节 |
+| -r                                              | --rows 把表按行数切块                                                        |
+| -c                                              | --compress 压缩输出文件                                                      |
+| -e                                              | --build-empty-files 空表也输出文件                                           |
+| -x                                              | --regex 匹配‘db.table’的正则表达式                                           |
+| -i                                              | --ignore-engines 以逗号分隔的被忽略的存储引擎列表                            |
+| -m                                              | --no-schemas 不转储表架构                                                    |
+| -k                                              | --no-locks 不执行临时共享读锁。警告: 这会导致备份的不一致性                  |
+| -l                                              | --long-query-guard 设置长查询的计时器秒数，默认是60秒                        |
+| --kill-long-queries 杀死长查询 (而不是退出程序) |
+| -b                                              | --binlogs 获取二进制日志文件快照并转储数据                                   |
+| -D                                              | --daemon 开启守护进程模式                                                    |
+| -I                                              | --snapshot-interval 每个转储快照之间的间隔时间(分钟)                         | 需要开启 --daemon   | 默认是60分钟 |
+| -L                                              | --logfile 日志文件的名字，默认是stdout                                       |
+| -h                                              | --host 要连接的主机                                                          |
+| -u                                              | --user 有转储权限的用户名                                                    |
+| -p                                              | --password 用户密码                                                          |
+| -P                                              | --port 连接的TCP/IP端口                                                      |
+| -S                                              | --socket 用于连接的Unix套接字文件                                            |
+| -t                                              | --threads 使用的线程数，默认是4                                              |
+| -C                                              | --compress-protocol 在MySQL连接上使用压缩                                    |
+| -V                                              | --version 查看程序版本号                                                     |
+| -v                                              | --verbose 输出信息的等级,0 = silent,1 = errors,2 = warnings,3 = info,默认是2 |
+
+- 压缩对比
+
+    ```sh
+    # 带压缩备份--compress(gz)
+    mydumper \
+    --database=china \
+    --user=root \
+    --password=YouPassword \
+    --outputdir=/tmp/china.sql \
+    --rows=500000 \
+    --compress \
+    --build-empty-files \
+    --threads=10 \
+    --compress-protocol
+    ```
+
+    ![image](./Pictures/mysql/du.avif)
+
+    ```sh
+    # 不带压缩备份,最后再用7z压缩
+    mydumper \
+    --database=china \
+    --user=root \
+    --password=YouPassword \
+    --outputdir=/tmp/china.sql \
+    --rows=500000 \
+    --build-empty-files \
+    --threads=10 \
+    --compress-protocol
+    ```
+
+    ![image](./Pictures/mysql/du1.avif)
+
+    ```sh
+    # 恢复
+    myloader \
+    --database=china \
+    --directory=/tmp/china.sql \
+    --queries-per-transaction=50000 \
+    --threads=10 \
+    --compress-protocol \
+    --verbose=3
+    ```
+
+### [go-mydumper：比mysqldump更快](https://github.com/xelabs/go-mydumper)
+
+### [MySQL解决方案工程师：InnoDB的物理备份方法](https://mp.weixin.qq.com/s/TkFzpIdZQ5gGF5PbSJZ-ag)
+
+- 为了保证一致性，进行文件复制时，必须停掉MySQL服务器，因此，该方法是冷备份的方法。
+
+- 二进制文件的物理备份具有可移植性。二进制文件可以从一台MySQL服务器直接复制到另外一台服务器，在不同架构的服务器间进行备份时非常有用。
+
+- InnoDB：全部的表空间和日志文件可以直接复制，数据库的路径名称在源/目标服务器上必须保持一致。
+
+- MyISAM和Archive：每个表的所有文件都可以直接复制，元数据文件需要从.sdi文件中导入。
+
+- InnoDB的二进制文件物理备份过程
+
+    - 1.关闭MySQL服务器（慢关机）
+
+        - 要求`innodb_fast_shutdown=0`，默认值是1。
+        - 在关机前允许InnoDB完成额外的刷新操作。
+        - 关闭耗时长，但启动非常快。
+
+    - 2.复制InnoDB全部的数据、日志，及配置文件。包括：
+
+        - 数据文件：“ibdata”和“*.ibd”
+        - 重做日志：“ib_logfile*”
+        - 撤销日志：“undo_*”
+        - 全部的配置文件，例如，“my.cnf”
+
+    - 3.重新启动服务器
+
+- 备份恢复
+
+    - 1.停止服务器
+    - 2.使用备份过程中的副本替换当前服务器全部的组件
+    - 3.重启服务器
+
+- 注意，InnoDB使用共享表空间存储表的元数据，因此需要：
+
+    - 将共享表空间和独立表空间文件作为一组进行复制
+    - 复制对应的重做日志和撤销日志
+
+### [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](https://mp.weixin.qq.com/s/tdVSYP862XgDUZBfqjm_Kg)
+
+- 备份InnoDB的表时，可以使用可移动表空间执行部分备份，可以备份单独的表，也可以备份具有相同业务功能的多个表。
+
+- 当用户将希望将源服务器上的一个表复制到另外一台服务器上时，可以采用可移动表空间来实现，具体如下：
+
+    - 1.在源服务器上执行“FLUSH TABLE ... FOR EXPORT”将表静止并创建“.cfg”元数据文件。
+
+        ```sql
+        FLUSH TABLES actor FOR EXPORT;
+        ```
+
+        ```sh
+        # “.cfg”文件将会创建在数据路径下：
+
+        C:\ProgramData\MySQL\MySQL Server 8.3\Data\sakila 的目录
+        2024/03/06  15:24    <DIR>          .
+        2024/03/04  13:59    <DIR>          ..
+        2024/03/06  15:24             1,003 actor.cfg
+        2024/01/17  10:51           131,072 actor.ibd
+        ```
+
+    - 2.将“.ibd”文件和“.cfg”文件复制到目标服务器。
+
+    - 3.在源服务器上执行`UNLOCK TABLES`释放表上的锁。
+
+    - 4.在目标服务器上创建一个相同结构的表，之后销毁表空间
+
+        ```sql
+        ALTER TABLE actor DISCARD TABLESPACE;
+        ```
+
+    - 5.在目标服务器上导入复制过来的表空间
+        ```sql
+        ALTER TABLE actor IMPORT TABLESPACE;
+        ```
+
+    - 注意，如果进行备份的表是带有分区的InnoDB表，则需要对每个分区导出元数据文件，并需要将每个分区的“.ibd”文件和“.cfg”文件执行导出、导入的操作。
 
 ### XtraBackup 热备份
 
@@ -2395,25 +4547,997 @@ rpm -ivh
 yum install -y percona-xtrabackup
 ```
 
-### 导出不同文件格式
+### [MySQL解决方案工程师：MySQL的备份工具——MySQL企业版备份](https://mp.weixin.qq.com/s?__biz=MzU1NzkwMjQ2MQ==&mid=2247486683&idx=1&sn=130c6d2a4ed13e6818622fa02b367301&chksm=fc2ff3c9cb587adf8e4e46bd860203c01430db50939f6596718c3bb01cc00e6d4bf8a6bc966f&cur_album_id=2325042420926742528&scene=189#wechat_redirect)
+
+- `mysqlbackup`命令
+
+- 对于InnoDB存储引擎，MySQL企业版备份能够执行热备份，（备份可以在应用程序连接时运行）备份不会阻挡数据库的正常操作。
+
+- 对于其他的存储引擎，MySQL企业版执行温备份，应用程序可以对数据库进行只读操作。
+
+- MySQL企业版具有如下功能：
+    - 增量备份
+    - 差异备份
+    - 单一文件备份
+    - 流形式发送到其他存储或服务器
+    - 备份至磁带
+    - 备份至云
+    - 备份加密
+    - 备份压缩
+    - 部分备份
+    - 可传输表空间
+
+- MySQL企业版备份
+
+    - 备份InnoDB时：会备份InnoDB的原生文件，包括：
+
+        - ibdata*：共享表空间文件，包含系统表空间及部分用户表的数据。
+        - mysql.ibd：mysql表空间文件，包含数据路径。
+        - .ibd：独立表空间文件和通用表空间文件。
+        - undo_*：Undo日志表空间文件。
+        - ib_logfile*：从“ib_logfile*”文件抽取的备份文件名为“ibbackup_logfile”，包括备份期间发生更改产生的Redo日志信息。
+
+    - 备份非InnoDB时：需要MySQL中包含至少一个innoDB表，默认情况下，MySQL企业版将备份MySQL服务器数据路径下的全部文件，如果用户指定了“--only-known-file-types”选项，备份将仅包含MySQL相关的文件。
+
+#### 备份
+
+- 备份过程
+    - 1.`mysqlbackup`开启一个MySQL服务器的连接。
+    - 2.`mysqlbackup`执行一个InnoDB在线备份。（该步骤不会干扰正常的数据库处理）
+    - 3.当`mysqlbackup`执行接近完成时，它将执行`LOCK INSTANCE FOR BACKUP`语句。该语句将阻挡DDL，但不会阻挡DML。
+    - 4.执行`FLUSH TABLES tbl_name, ...WITH READ LOCK`锁定非InnoDB表进行备份
+    - 5.备份结束，释放表和实例。
+
+- 完整备份
+    ```sh
+    # “--backup_dir”选项指定存储备份文件的路径。“command”命令包括“backup”执行备份的初始部分，“backup-and-apply-log”执行备份的初始部分及第二部分，第二部分包括备份期间更改的数据内容。
+    mysqlbackup --user=username --password --port=portnumber --backup_dir=backup-directory command
+    ```
+
+- 单一文件备份
+
+    ```sh
+    # 使用“backup-to-image”命令可以将备份写入一个单一文件，单一文件易于管理，并能够流式传送至其他服务器、磁带，云等。
+
+    # “--backup-image”选项指定用于存储备份的文件路径和名称。“--backup_dir”选项指定一个临时文件夹用于存储备份的元数据。
+
+    mysqlbackup -uuser -ppassword --backup_dir=temp-backup-dir --backup-image=image-file backup-to-image
+    ```
+
+- 单一文件操作
+
+    - `--src-entry`：指定一个文件或路径用于抽取。
+    - `--dst-entry`：指定一个路径用于从单一文件中抽取文件或路径。
+
+    ```sql
+    # 可以将备份的路径转换为单一文件，例如：
+    mysqlbackup --backup_dir=backup-dir --backup-image=image-file backup-dir-to-image
+
+    # 列出单一文件的内容：
+    mysqlbackup --backup-image=image-file list-image
+
+    # 从单一文件中抽取文件：
+    mysqlbackup --backup-image=image-file --src-entry=file-to-extract --dst-entry=file-to-extract extract
+    ```
+
+- 增量备份
+
+    - 增量备份仅备份从上一次备份结束后产生变化的数据，上一次备份可以是完整备份，也可以是一次增量备份。可以大幅提高备份速度，降低存储要求。例如：
+
+    - `--incremental`选项表示执行一个增量备份。
+    - `--incremental-base`选项用于指定上一次备份，并将上一次备份用于这次的增量备份。
+    - `--incremental-base=history:last_backup`选项将使`mysqlbackup`查询上次记录在`bakupu_history`表中的`end_lsn`的值。此外，用户也可以指定`dir:directory_path`为`--incremental-base`指定包含上一次备份的路径。
+    - `--start-lsn`用于替换`--incremental-base`选项，用户可以指定上一次备份中包含最高的LSN，用于此次的增量备份。
+
+    ```sql
+    mysqlbackup --user=username --password --port=portnumber --incremental --incremental-base=history:last_backup --backup_dir=incr-backup-directory backup
+    ```
+
+- 差异备份
+
+    - 差异备份属于特殊的增量备份，与增量备份的区别是上一次的备份必须是完整备份。例如：
+    - 用户也可以使用`backup-to-image`替换`backup`命令，并指定`--backup-image`选项，备份成为单一文件。
+
+    ```sql
+    mysqlbackup --user=username --password --port-portnumber --incremental --incremental-base=history:last_full_backup --backup_dir=incr-backup-directroy backup
+    ```
+
+- `validate`操作：用于校验备份的完整性，检查每个数据叶的校验和。
+
+    ```sql
+    -- 校验备份文件
+    mysqlbackup --backup-image=image-file validate
+
+    -- 校验备份文件夹
+    mysqlbackup --backup-dir=backup-directory validate
+    ```
+
+- 更新操作
+
+    - 在完整备份时，利用`apply-log`选项进行更新。
+
+        ```sql
+        mysqlbackup --backup-dir=backup-dir apply-log
+        ```
+
+    - `backup-dir`中的完整备份可以使用`apply-incremental-backup`选项更新为增量备份。
+
+        ```sql
+        mysqlbackup --incremental-backup-dir=incr-backup-dir --backup-dir=backup-dir apply-incremental-backup
+        ```
+
+#### 恢复
+
+- 恢复过程
+    - 1.关闭MySQL服务器
+    - 2.删除服务器数据路径下的全部文件
+    - 3.运行“mysqlbackup”从完整备份中恢复文件
+    - 4.恢复增量或差异备份的数据（如果适用）
+    - 5.应用备份文件后产生的二进制日志
+    - 6.启动MySQL服务器
+
+- 恢复命令
+
+    - `copy-back`：恢复备份路径（已使用`apply-log`保证一致性）。例如，将`backup-dir`中的文件恢复到服务器的数据路径：
+
+        ```sql
+        mysqlbackup --backup-dir=backup-dir copy-backup
+        ```
+
+    - `copy-back-and-apply-log`：恢复单一文件或数据路径，并执行应用日志操作。例如，从`image-file`中恢复到服务器的数据路径，并使用`temp-backup-dir`存储临时文件：
+
+        ```sql
+        mysqlbackup --backup-dir=temp-backup-dir --backup-image=image-file copy-back-and-apply-log
+        ```
+
+- 当使用“copy-back”命令时，“mysqlbackup”将复制数据文件、日志及其他的备份文件至其原来的位置，在恢复过程中，“mysqlbackup”无法从MySQL服务器查询相关的配置信息，只能通过标准的配置文件获得相关的选项，如果用户希望恢复到不同的服务器上，需要通过“--defaults-file”选项指定一个配置文件进行。
+
+- 恢复增量备份时，首先需要恢复一个正确的基本备份，以用于增量或差异备份，其次使用“--incremental”选项进行恢复操作。例如：
+
+    ```sql
+    mysqlbackup --incremental-backup-dir=incr-backup-dir --incremental copy-back-and-apply-log
+    mysqlbackup --backup-dir=temp-backup-dir --backup-image=image-file --incremental copy-backup-and-apply-log
+    ```
+
+## ETL数据迁移
+
+- ETL是数据抽取（Extract）、转换（Transform）、加载（Load ）的简写，它是将OLTP系统中的数据经过抽取，并将不同数据源的数据进行转换、整合，得出一致性的数据，然后加载到数据仓库中。简而言之ETL是完成从 OLTP系统到OLAP系统的过程
+
+- 数据仓库的架构
+    - 星型架构中间为事实表，四周为维度表， 类似星星
+    - 雪花型架构中间为事实表，两边的维度表可以再有其关联子表，而在星型中只允许一张表作为维度表与事实表关联，雪花型一维度可以有多张表，而星型 不可以。
+    - 考虑到效率时，星型聚合快，效率高，不过雪花型结构明确，便于与OLTP系统交互。
+
+- ETL和SQL的区别与联系
+
+    - ETL的优点：
+        - 比如我有两个数据源，一个是数据库的表，另外一个是excel数据，而我需要合并这两个数据，通常这种东西在SQL语句中比较难实现。但是ETL却有很多现成的组件和驱动，几个组件就搞定了。
+        - 比如跨服务器，并且服务器之间不能建立连接的数据源，比如我们公司系统分为一期和二期，存放的数据库是不同的，数据结构也不相同，数据库之间也不能建立连接，这种情况下，ETL就显得尤为重要和突出。
+
+    - SQL的优点：效率高的多
+
+### ETL构建企业级数据仓库五步法的流程
+
+- 1.确定主题
+    - 即 确定数据分析或前端展现的某一方面的分析主题，例如我们分析某年某月某一地区的啤酒销售情况，就是一个主题。主题要体现某一方面的各分析角度（维度）和统 计数值型数据（量度），确定主题时要综合考虑，一个主题在数据仓库中即为一个数据集市，数据集市体现了某一方面的信息，多个数据集市构成了数据仓库。
+
+- 2.确定量度
+    - 在 确定了主题以后，我们将考虑要分析的技术指标，诸如年销售额此类，一般为数值型数据，或者将该数据汇总，或者将该数据取次数，独立次数或取最大最小值 等，这样的数据称之为量度。量度是要统计的指标，必须事先选择恰当，基于不同的量度可以进行复杂关键性能指标（KPI）等的计算。
+
+- 3.确定事实数据粒度
+    - 在 确定了量度之后我们要考虑到该量度的汇总情况和不同维度下量度的聚合情况，考虑到量度的聚合程度不同，我们将采用“最小粒度原则”，即将量度的粒度设置 到最小，例如我们将按照时间对销售额进行汇总，目前的数据最小记录到天，即数据库中记录了每天的交易额，那么我们不能在ETL时将数据进行按月或年汇总， 需要保持到天，以便于后续对天进行分析。而且我们不必担心数据量和数据没有提前汇总带来的问题，因为在后续的建立CUBE时已经将数据提前汇总了。
+
+- 4.确定维度
+
+    - 维 度是要分析的各个角度，例如我们希望按照时间，或者按照地区，或者按照产品进行分析，那么这里的时间、地区、产品就是相应的维度，基于不同的维度我们可 以看到各量度的汇总情况，我们可以基于所有的维度进行交叉分析。这里我们首先要确定维度的层次（Hierarchy）和级别（Level），维度的层次是指该维度的所有级别，包括各级别的属性；维度的级别是指该维度下的成员，例如当建立地区维度时我们将地区维度作为一 个级别，层次为省、市、县三层，考虑到维度表要包含尽量多的信息，所以建立维度时要符合“矮胖原则”，即维度表要尽量宽，尽量包含所有的描述性信息，而不 是统计性的数据信息。
+
+    - 还有一种常见的情况，就是父子型维度，该维度一般用于非叶子节点含有成员等情况，例如公司员工 的维度，在统计员工的工资时，部 门主管的工资不能等于下属成员工资的简单相加，必须对该主管的工资单独统计，然后该主管部门的工资等于下属员工工资加部门主管的工资，那么在建立员工维度 时，我们需要将员工维度建立成父子型维度，这样在统计时，主管的工资会自动加上，避免了都是叶子节点才有数据的情况。
+
+    - 另外，在建立维度表时要充 分使用代理键，代理键是数值型的ID号码，好处是代理键唯一标识了每一维度成员信息，便于区分，更重要的是在聚合时由于数值型匹 配，JOIN效率高，便于聚合，而且代理键对缓慢变化维度有更重要的意义，它起到了标识历史数据与新数据的作用，在原数据主键相同的情况下，代理键起到了 对新数据与历史数据非常重要的标识作用。
+
+    - 有时我们也会遇到维度缓慢变化的情况，比如增加了新的产品，或者产品的ID号码修改了，或者产品增加了一个新的属性，此时某一维度的成员会随着新的数据的加入而增加新的维度成员，这样我们要考虑到缓慢变化维度的处理，对于缓慢变化维度，有三种情况：
+
+        - 1.缓慢变化维度第一种类型：历史数据需要修改。这样新来的数据要改写历史数据，这时我们要使用UPDATE，例如产品的ID号码为123，后来发现ID 号码错误了，需要改写成456，那么在修改好的新数据插入时，维度表中原来的ID号码会相应改为456，这样在维度加载时要使用第一种类型，做法是完全更 改。
+
+        - 2.缓慢变化维度第二种类型：历史数据保留，新增数据也要保留。这时要将原数据更新，将新数据插入，需要使用UPDATE / INSERT，比如某一员工2005年在A部门，2006年时他调到了B部门。那么在统计2005年的数据时就应该将该员工定位到A部门；而在统计 2006年数据时就应该定位到B部门，然后再有新的数据插入时，将按照新部门（B部门）进行处理，这样我们的做法是将该维度成员列表加入标识列，将历史的 数据标识为“过期”，将目前的数据标识为“当前的”。另一种方法是将该维度打上时间戳，即将历史数据生效的时间段作为它的一个属性，在与原始表匹配生成事 实表时将按照时间段进行关联，这样的好处是该维度成员生效时间明确。
+
+        - 3.缓慢变化维度第三种类型：新增数据维度成员改变了属性。例如某一维度成 员新加入了一列，该列在历史数据中不能基于它浏览，而在目前数据和将来数据中可 以按照它浏览，那么此时我们需要改变维度表属性，即加入新的列，那么我们将使用存储过程或程序生成新的维度属性，在后续的数据中将基于新的属性进行查看。
+
+- 5.创建事实表
+
+    - 在确定好事实数据和维度后，我们将考虑加载事实表。
+
+    - 在公司的大量数据堆积如山时，我们想看看里面究竟是什么，结果发现里面是一笔笔生产记录，一笔笔交易记录… 那么这些记录是我们将要建立的事实表的原始数据，即关于某一主题的事实记录表。
+
+    - 我 们的做法是将原始表与维度表进行关联，生成事实表。注意在关联时有为空的数据时（数据源脏），需要使用外连接，连接后我们将 各维度的代理键取出放于事实表中，事实表除了各维度代理键外，还有各量度数据，这将来自原始表，事实表中将存在维度代理键和各量度，而不应该存在描述性信 息，即符合“瘦高原则”，即要求事实表数据条数尽量多（粒度最小），而描述性信息尽量少。
+
+    - 如果考虑到扩展，可以将事实表加一唯一标识列，以为了以后扩展将该事实作为雪花型维度，不过不需要时一般建议不用这样做。
+
+    - 事 实数据表是数据仓库的核心，需要精心维护，在JOIN后将得到事实数据表，一般记录条数都比较大，我们需要为其设置复合主键和索引，以为了数据的完整性和 基于数据仓库的查询性能优化，事实数据表与维度表一起放于数据仓库中，如果前端需要连接数据仓库进行查询，我们还需要建立一些相关的中间汇总表或物化视图，以方便查询。
+
+### ETL工具
+
+- [数仓与大数据：数据仓库ETL工具全解](https://mp.weixin.qq.com/s/JTE3K6VfiYEAOSyYgN-KPA)
+
+#### [kettle](https://github.com/pentaho/pentaho-kettle)
+
+- [Kettle实战100篇博文](https://github.com/xiaoymin/KettleInAction100)
+
+- [kettle-scheduler：一款简单易用的Kettle调度监控平台](https://github.com/zhaxiaodong9860/kettle-scheduler)
+
+#### [canal](https://github.com/alibaba/canal)
+
+- [李文周：Canal介绍和使用指南](https://mp.weixin.qq.com/s/9jDlMssry-_UWzSm1R-Ypg)
+
+- Canal 是阿里开源的一款 MySQL 数据库增量日志解析工具，提供增量数据订阅和消费。使用Canal能够实现异步更新数据，配合MQ使用可在很多业务场景下发挥巨大作用。
+    ![image](./Pictures/mysql/canal.avif)
+
+- MySQL主备复制原理
+    - MySQL master 将数据变更写入二进制日志( binary log, 其中记录叫做二进制日志事件binary log events，可以通过 show binlog events 进行查看)
+    - MySQL slave 将 master 的 binary log events 拷贝到它的中继日志(relay log)
+    - MySQL slave 重放 relay log 中事件，将数据变更反映它自己的数据
+
+- Canal 工作原理
+    - Canal 模拟 MySQL slave 的交互协议，伪装自己为 MySQL slave ，向 MySQL master 发送 dump 协议
+    - MySQL master 收到 dump 请求，开始推送 binary log 给 slave (即 Canal )
+    - Canal 解析 binary log 对象(原始为 byte 流)
+
+[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
+
+##### 安装
+
+- [canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
+
+- 1.需要先开启MySQL的 Binlog 写入功能。`my.cnf`配置
+    ```ini
+    [mysqld]
+    log-bin=mysql-bin # 开启 binlog
+    binlog-format=ROW # 选择 ROW 模式
+    server_id=1 # 配置 MySQL replaction 需要定义，不要和 canal 的 slaveId 重复
+    ```
+
+    - 重启mysql
+
+    - 验证
+        ```sql
+        -- 查看是否开启了binlog
+        show variables like 'log_bin';
+        +---------------+-------+
+        | Variable_name | Value |
+        +---------------+-------+
+        | log_bin       | ON    |
+        +---------------+-------+
+
+        -- 查看是否为row格式
+        show variables like 'binlog_format';
+        +---------------+-------+
+        | Variable_name | Value |
+        +---------------+-------+
+        | binlog_format | ROW   |
+        +---------------+-------+
+        ```
+
+- 2.添加授权
+    ```sql
+    -- 下面的命令是先创建一个名为canal的账号，密码为canal。再对其进行授权，如果已有账户可直接 grant。
+    CREATE USER canal IDENTIFIED BY 'canal';
+    GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
+    -- GRANT ALL PRIVILEGES ON *.* TO 'canal'@'%' ;
+    FLUSH PRIVILEGES;
+    ```
+
+- 3.安装canal
+
+    - 在[release页面](https://github.com/alibaba/canal/releases) 下载
+
+    ```sh
+    # 这里的版本为1.0.17
+    curl -LO https://github.com/alibaba/canal/releases/download/canal-1.1.7/canal.deployer-1.1.7.tar.gz
+
+    # 解压缩
+    x canal.deployer-1.1.7.tar.gz
+
+    # 一共5个目录
+    cd canal.deployer-1.1.7
+    ll
+    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I bin/
+    drwxr-xr-x 5 - tz tz 20 Apr 17:31 -I conf/
+    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I lib/
+    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I logs/
+    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I plugin/
+    ```
+
+- 4.修改配置文件`canal.deployer-1.1.7/conf/example/instance.properties`
+
+    - 将canal.instance.master.address修改为你的MySQL地址。
+    - 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
+    - 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
+
+    ```
+    canal.instance.master.address=127.0.0.1:3306
+    canal.instance.tsdb.dbUsername=canal
+    canal.instance.tsdb.dbPassword=canal
+    ```
+- 启动
+
+    ```sh
+    sh bin/startup.sh
+    ```
+
+- 查看server日志
+    ```sh
+    cat logs/canal/canal_stdout.log
+    ```
+
+- 关闭
+    ```sh
+    sh bin/stop.sh
+    ```
+
+##### docker安装
 
 ```sh
-# \G格式导出数据
-mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+# 拉取canal
+docker pull canal/canal-server:latest
 
-# html
-mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+# 启动容器
+docker run -d --name canal-server -p 11111:11111 canal/canal-server
 
-# xml
-mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+# 进入容器
+docker exec -it canal-server /bin/bash
+
+# 修改配置
+# 将canal.instance.master.address修改为你的MySQL地址。
+# 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
+# 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
+vi canal-server/conf/example/instance.properties
+
+# 重启容器
+docker container restart canal-server
 ```
 
-```sql
-# csv
-SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
-FIELDS TERMINATED BY ',' ENCLOSED BY '"'
-LINES TERMINATED BY '\r\n';
+- 启动Canal Server之后，我们可以使用Canal客户端连接Canal进行消费，本文以Go客户端canal-go为例，演示如何从canal-server消费数据。
+
+```go
+package main
+
+import (
+ "fmt"
+ "time"
+
+ pbe "github.com/withlin/canal-go/protocol/entry"
+
+ "github.com/golang/protobuf/proto"
+ "github.com/withlin/canal-go/client"
+)
+
+// canal-go client demo
+
+func main() {
+ // 连接canal-server
+ connector := client.NewSimpleCanalConnector(
+  "127.0.0.1", 11111, "", "", "example", 60000, 60*60*1000)
+ err := connector.Connect()
+ if err != nil {
+  panic(err)
+ }
+
+ // mysql 数据解析关注的表，Perl正则表达式.
+ err = connector.Subscribe(".*\\..*")
+ if err != nil {
+  fmt.Printf("connector.Subscribe failed, err:%v\n", err)
+  panic(err)
+ }
+
+ // 消费消息
+ for {
+  message, err := connector.Get(100, nil, nil)
+  if err != nil {
+   fmt.Printf("connector.Get failed, err:%v\n", err)
+   continue
+  }
+  batchId := message.Id
+  if batchId == -1 || len(message.Entries) <= 0 {
+   time.Sleep(time.Second)
+   fmt.Println("===暂无数据===")
+   continue
+  }
+  printEntry(message.Entries)
+ }
+}
+
+func printEntry(entries []pbe.Entry) {
+ for _, entry := range entries {
+  // 忽略事务开启和事务关闭类型
+  if entry.GetEntryType() == pbe.EntryType_TRANSACTIONBEGIN || entry.GetEntryType() == pbe.EntryType_TRANSACTIONEND {
+   continue
+  }
+  // RowChange对象，包含了一行数据变化的所有特征
+  rowChange := new(pbe.RowChange)
+  // protobuf解析
+  err := proto.Unmarshal(entry.GetStoreValue(), rowChange)
+  if err != nil {
+   fmt.Printf("proto.Unmarshal failed, err:%v\n", err)
+  }
+  if rowChange == nil {
+   continue
+  }
+  // 获取并打印Header信息
+  header := entry.GetHeader()
+  fmt.Printf("binlog[%s : %d],name[%s,%s], eventType: %s\n",
+   header.GetLogfileName(),
+   header.GetLogfileOffset(),
+   header.GetSchemaName(),
+   header.GetTableName(),
+   header.GetEventType(),
+  )
+  //判断是否为DDL语句
+  if rowChange.GetIsDdl() {
+   fmt.Printf("isDdl:true, sql:%v\n", rowChange.GetSql())
+  }
+
+  // 获取操作类型：insert/update/delete等
+  eventType := rowChange.GetEventType()
+  for _, rowData := range rowChange.GetRowDatas() {
+   if eventType == pbe.EventType_DELETE {
+    printColumn(rowData.GetBeforeColumns())
+   } else if eventType == pbe.EventType_INSERT || eventType == pbe.EventType_UPDATE {
+    printColumn(rowData.GetAfterColumns())
+   } else {
+    fmt.Println("---before---")
+    printColumn(rowData.GetBeforeColumns())
+    fmt.Println("---after---")
+    printColumn(rowData.GetAfterColumns())
+   }
+  }
+ }
+}
+
+func printColumn(columns []*pbe.Column) {
+ for _, col := range columns {
+  fmt.Printf("%s:%s  update=%v\n", col.GetName(), col.GetValue(), col.GetUpdated())
+ }
+}
 ```
+
+##### 配置kafka
+
+- Canal 1.1.1版本之后，默认支持将Canal Server接收到的binlog数据直接投递到MQ，目前默认支持的MQ系统有Kafka、RocketMQ、RabbitMQ、PulsarMQ。
+
+- 加入mq配置`canal.deployer-1.1.7/conf/example/instance.properties`
+    ```
+    # mq config
+    # 设置默认的topic
+    canal.mq.topic=example
+    # 针对库名或者表名发送动态topic
+    #canal.mq.dynamicTopic=mytest,.*,mytest.user,mytest\\..*,.*\\..*
+    canal.mq.partition=0
+    # hash partition config
+    #canal.mq.partitionsNum=3
+    #库名.表名: 唯一主键，多个表之间用逗号分隔
+    #canal.mq.partitionHash=mytest.person:id,mytest.role:id
+    ```
+
+    - `canal.mq.dynamicTopic`配置说明。
+
+        - Canal 1.1.3版本之后, 支持配置格式为：schema 或 schema.table，多个配置之间使用逗号或分号分隔。
+
+            - 例子1：test\\.test 指定匹配的单表，发送到以test_test为名字的topic上
+            - 例子2：.*\\..* 匹配所有表，则每个表都会发送到各自表名的topic上
+            - 例子3：test 指定匹配对应的库，一个库的所有表都会发送到库名的topic上
+            - 例子4：test\\..* 指定匹配的表达式，针对匹配的表会发送到各自表名的topic上
+            - 例子5：test,test1\\.test1，指定多个表达式，会将test库的表都发送到test的topic上，test1\\.test1的表发送到对应的test1_test1 topic上，其余的表发送到默认的canal.mq.topic值
+
+        - 为满足更大的灵活性，Canal还允许对匹配条件的规则指定发送的topic名字，配置格式：topicName:schema 或 topicName:schema.table。
+
+            - 例子1: test:test\\.test 指定匹配的单表，发送到以test为名字的topic上
+            - 例子2: test:.*\\..* 匹配所有表，因为有指定topic，则每个表都会发送到test的topic下
+            - 例子3: test:test 指定匹配对应的库，一个库的所有表都会发送到test的topic下
+            - 例子4：testA:test\\..* 指定匹配的表达式，针对匹配的表会发送到testA的topic下
+            - 例子5：test0:test,test1:test1\\.test1，指定多个表达式，会将test库的表都发送到test0的topic下，test1\\.test1的表发送到对应的test1的topic下，其余的表发送到默认的canal.mq.topic值
+
+- 修改canal 配置文件 `canal.deployer-1.1.7/conf/canal.properties`
+
+    ```
+    # ...
+    # 可选项: tcp(默认), kafka,RocketMQ,rabbitmq,pulsarmq
+    canal.serverMode = kafka
+    # ...
+
+    # 是否为flat json格式对象
+    canal.mq.flatMessage = true
+    # Canal的batch size, 默认50K, 由于kafka最大消息体限制请勿超过1M(900K以下)
+    canal.mq.canalBatchSize = 50
+    # Canal get数据的超时时间, 单位: 毫秒, 空为不限超时
+    canal.mq.canalGetTimeout = 100
+    canal.mq.accessChannel = local
+
+    ...
+
+    ##################################################
+    #########                    Kafka                   #############
+    ##################################################
+    # 此处配置修改为你的Kafka环境地址
+    kafka.bootstrap.servers = 127.0.0.1:9092
+    kafka.acks = all
+    kafka.compression.type = none
+    kafka.batch.size = 16384
+    kafka.linger.ms = 1
+    kafka.max.request.size = 1048576
+    kafka.buffer.memory = 33554432
+    kafka.max.in.flight.requests.per.connection = 1
+    kafka.retries = 0
+
+    kafka.kerberos.enable = false
+    kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
+    kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
+
+    # sasl demo
+    # kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
+    # kafka.sasl.mechanism = SCRAM-SHA-512
+    # kafka.security.protocol = SASL_PLAINTEXT
+    ```
+
+- 按上述修改Canal配置后，重启Canal服务即可。
+
+
+## 字符集（character set）
+
+- [爱可生开源社区：第06期：梳理 MySQL 字符集的相关概念](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247488276&idx=1&sn=f6d928c1b34b8e0030a0876d5f3cd9d3&chksm=fc96f18bcbe1789d92d75ffe8e62f9127d4a732f2aa1385b0367f6e1f698cc291334a9e249ce&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+
+- [爱可生开源社区：第07期：有关 MySQL 字符集的 SQL 语句](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247488399&idx=1&sn=54e69b700341ff150de7d2ff0dbdc8a4&chksm=fc96f110cbe17806e1072603d06b598f1390cfeb2223b06f44355076bab9f626182a3b4a23c0&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+
+- 字符集的内容包含：字符集（character set）和排序规则（collation rule）
+
+    - 字符集：是一套字符与一套编码的映射集合
+
+        | 字符 | 编码 |
+        |------|------|
+        | A    | 0    |
+        | B    | 1    |
+        | ...  | ...  |
+
+    - 排序规则：比如要比较字符 A 和 B 的大小，最简单直观的方法就是对比他们对应的编码。显然编码 0 < 1，这种规则下 A < B。
+
+- MySQL 常用字符集
+
+    - 1.Latin1 是 cp1252 或者 ISO-8859-1 的别名。ISO-8859-1 编码是单字节编码，向下兼容 ASCII。
+
+        - 比如把一个 Utf8mb4 的编码或者 GBK 的编码存入 Latin1，不会有任何问题。因为 Latin1 保留了原始的字节流，这也就是 MySQL 长期以来把 Latin1 做默认字符集的原因。
+
+        - 但是由于 Latin1 对任何字符都存放字节流，造成了字符个数的浪费。
+
+            - 该字段中存储字符个数 UTF8 是 Latin1 的三倍！！！
+            ```sql
+            CHAR(10) CHARACTER SET LATIN1;
+            CHAR(10) CHARACTER SET UTF8;
+            ```
+
+
+    - 2.GB18030是中国官方标准字符集，向前兼容 GBK、GB2312，是这两个的超集。
+
+        - Windows 系统，默认用的就是 GB18030。
+
+        - 若只是存储中文字符，那 GB18030 最佳。
+            - 1.占用空间小，比如比 UTF8 小。
+            - 2.存储的汉字根据拼音来排序，检索快。
+
+    - 3.UTF8 是 Unicode 的编码实现，可以存储 UNICODE 编码对应的任何字符， 这也是使用最多的一种编码。最大的特点就是变长的编码方式，用 1 到 4 个字节表示一个符号，可以根据不同的符号编码字节长度。
+
+        - 字母或数字用 1 字节，汉字用 3 字节，emoji 表情符号用 4 字节。
+
+        - 注意！MySQL 里常说的 UTF8 是 UTF8MB3 的别名，UTF8MB3 是 UTF8MB4 的子集，UTF8MB4 才是真正的 4 字节 UTF8 字符集！
+
+        - UTF8MB3 表示最大支持 3 个字节存储字符，UTF8MB4 表示最大 4 个字节存储字符。
+
+        - MySQL 8.0 已经默认用 UTF8MB4 基础字符集。
+
+- UTF8MB3 与 UTF8MB4 的互相迁移
+
+    - 1.UTF8 到 UTF8MB4 升级
+
+        - 这种顺序可以做到无损迁移，前者就是后者的子集。比如从 MySQL 5.7 到 MySQL 8.0 的字符集升级，这样的场景不会有任何问题。
+
+        ```sql
+        -- 表 t1 字段 a 字符集 utf8
+        CREATE TABLE t1 (a VARCHAR(10) charset utf8);
+
+        -- 表 t2 字段 a 字符集 utf8mb4.
+        CREATE TABLE t2 (a VARCHAR(10) charset utf8mb4);
+
+        -- 表 t1 插入数据
+        INSERT INTO t1 VALUES ('消灭病毒，中国无敌！');
+
+        -- 表 t1 的数据可以直接插入到 t2。
+        INSERT INTO t2 SELECT * FROM t1;
+
+        -- 查看没有问题
+        SELECT * FROM  t2;
+        ```
+
+    - 2.UTF8MB4 到 UTF8 兼容
+
+        - 这种相当于降级模式，如果 utf8mb4 包含的字符没有超出了 utf8 的范围，则可以顺序进行；否则失败。
+        ```sql
+        truncate t1;
+        INSERT INTO t1 SELECT * FROM t2;
+        -- 没有问题
+        SELECT * FROM t1;
+
+        -- 清空表 t1,t2,
+        truncate t2;
+        truncate t1;
+        -- 插入 EMOJI 表情字符'哈哈 🍀🍎💰📱'
+        INSERT INTO t2 VALUES ('哈哈🍀🍎💰📱');
+
+        -- 这些字符不包含在 utf8mb3 中，所以插入报错。
+        insert into t1 select * from t2;
+        ERROR 1366 (HY000): Incorrect string value:
+        ```
+
+### 字符集相关sql语句
+
+- 字符集系统参数
+
+    - 客户端层、连接层、结果集层，这三层一般都是一起设置。比如 `setnames utf8;` 同时设置这三个层次的参数；
+
+    - 服务层一定得选择好对应的编码，否则可能会造成接下来的表、字段、存储过程等默认字符集不正确，产生字符集升级。如果兼容还好，不兼容就可能出现乱码或者其他的错误。
+
+    - 1.MySQL 服务层
+        - 以下两个设置 MySQL 服务层字符集和排序规则，代表 MySQL 服务启动后，默认的字符集和排序规则。
+        - `character_set_server`：服务层默认字符集编码
+        - `collation_server`：服务层默认排序规则
+
+    - 2.客户端层
+        - `character_set_client`：设置客户端的字符集。
+        - 对任何可以连接到 MySQL 服务端的客户端生效。
+
+    - 3.数据库层
+        - `character_set_database`：设置创建新数据库时默认的字符集
+        - `collation_database`：设置创建新数据库时默认排序规则名称
+
+    - 4.元数据层
+        - 数据库名，表名，列名，用户名等。
+        - `character_set_system`: MySQL 元数据默认的字符集，目前不可设置，固定为 UTF8。
+
+    - 5.结果集层
+        - `character_set_results`：设置从服务端发送数据到客户端的字符集。包括查询结果，错误信息输出等。
+
+    - 6.连接层
+        - `character_set_connection`：设置客户端发送请求到服务端，但是服务端还没有接受之前的数据编码。
+        - 比如普通字符串，或者已经写好的 SQL 语句但还没有执行。
+        - `collation_connection`: 连接层的排序规则。
+
+    - 7.文件系统层
+        - `character_set_filesystem`：设置语句中涉及到的文件名字字符集。
+        - 比如 `load dataintotable t1'/tmp/t1.txt';` 这里代表文件名字 /tmp/t1.txt 是以何种编码被 MySQL 解析。
+
+    ```sql
+    show variables like "char%";
+    +--------------------------+----------------------------+
+    | Variable_name | Value |
+    +--------------------------+----------------------------+
+    | character_set_client     | utf8mb3                    |
+    | character_set_collations |                            |
+    | character_set_connection | utf8mb3                    |
+    | character_set_database   | latin1                     |
+    | character_set_filesystem | binary                     |
+    | character_set_results    | utf8mb3                    |
+    | character_set_server     | utf8mb4                    |
+    | character_set_system     | utf8mb3                    |
+    | character_sets_dir       | /usr/share/mysql/charsets/ |
+    +--------------------------+----------------------------+
+
+    -- 修改系统参数
+    set names latin1;
+    -- 修改后查看
+    show variables like "char%";
+    +--------------------------+----------------------------+
+    | Variable_name            | Value                      |
+    +--------------------------+----------------------------+
+    | character_set_client     | latin1                     |
+    | character_set_collations |                            |
+    | character_set_connection | latin1                     |
+    | character_set_database   | latin1                     |
+    | character_set_filesystem | binary                     |
+    | character_set_results    | latin1                     |
+    | character_set_server     | utf8mb4                    |
+    | character_set_system     | utf8mb3                    |
+    | character_sets_dir       | /usr/share/mysql/charsets/ |
+    +--------------------------+----------------------------+
+
+    -- collate为排序规则
+    set names latin1 collate latin1_bin;
+    -- 改回默认值
+    set names default;
+
+    -- 修改相关系统参数
+    set session character_set_results = latin1;
+    set session character_set_client = latin1;
+    set session character_set_connection=utf8mb4;
+    set session collation_connection = latin1_bin;
+    ```
+
+- 字符集相关 sql 语句
+
+    ```sql
+    -- 查看字符集编码变量
+    SHOW VARIABLES LIKE "char%";
+
+    -- 查看表字段的字符集编码
+    SHOW FULL COLUMNS FROM table_name
+
+    -- 创建新数据库，指定字符集编码为latin1和排序规则为latin1_bin。在此数据库创建的表会继承
+    CREATE DATABASE ytt_new2 default CHARACTER SET latin1 COLLATE latin1_bin;
+    -- 查看字符集编码和排序规则
+    use ytt_new2
+    SELECT @@character_set_database,  @@collation_database;
+
+    -- 修改表为utf8mb4字符集编码
+    ALTER TABLE table_name CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    -- 修改数据库为utf8mb4字符集编码。
+    -- 修改数据库字符集与排序规则后，之前基于这个库创建的各种对象，还是沿用老的字符集与排序规则。
+    ALTER DATABASE your_database_name CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+
+- sql 语句
+
+    ```sql
+    -- 字符集 utf8mb4，排序规则 utf8mb4_bin
+    SELECT _utf8mb4 "北京加油❤!" COLLATE utf8mb4_bin AS result;
+    +------------+
+    | result     |
+    +------------+
+    | 北京加油❤! |
+    +------------+
+
+    -- 字符集 utf8mb4,collate 字句缺失，此时对应排序规则为utf8mb4_w0900_ai_ci
+    SELECT _utf8mb4 "北京加油❤!" AS result;
+    +------------+
+    | result     |
+    +------------+
+    | 北京加油❤! |
+    +------------+
+
+    -- 字符集缺失，此时字符集按照参数 @@character_set_connection 值来指定。
+    SELECT "北京加油❤!" COLLATE gb18030_chinese_ci AS result;
+    (1273, "Unknown collation: 'gb18030_chinese_ci'")
+
+    -- 查看变量 @@character_set_connection，确认其字符集不包含排序规则 gb18030_chinese_ci，所以以上语句报错。
+    SELECT @@character_set_connection;
+    +----------------------------+
+    | @@character_set_connection |
+    +----------------------------+
+    | utf8mb4 |
+    +----------------------------+
+
+    -- 那给下正确的排序规则 utf8mb4_bin，执行正确。
+    SELECT "北京加油❤!" COLLATE utf8mb4_bin AS result;
+
+    -- 字符集和排序规则都不指定，此时字符串对应的字符集和排序规则和参数 @@character_set_connection 一致。
+    SELECT "北京加油❤!" AS result;
+    -- 那这条语句其实被 MySQL 解释为
+    SELECT _utf8mb4 "北京加油❤!" COLLATE utf8mb4_0900_ai_ci AS result;
+    ```
+
+- 字符集转换函数
+
+    - 1.convert 函数
+        ```sql
+        -- 转换成功
+        SELECT CONVERT("北京加油❤!" using utf8mb4) ;
+        +-------------------------------------+
+        | CONVERT("北京加油❤!" using utf8mb4) |
+        +-------------------------------------+
+        | 北京加油❤!                          |
+        +-------------------------------------+
+
+        -- 转换失败，字符集编码不兼容。
+        SELECT CONVERT("北京加油❤!" using latin1) ;
+        +------------------------------------------+
+        | convert("北京加油❤!" using latin1) |
+        +------------------------------------------+
+        | ?????!                                   |
+        +------------------------------------------+
+        ```
+
+    - 2.charset 函数
+
+        - 检测字符串的字符集。可以检测出当前字符串在当前 session 的字符集。
+        ```sql
+        SET @a="北京加油❤!";
+        SELECT CHARSET(@a);
+        +-------------+
+        | CHARSET(@a) |
+        +-------------+
+        | utf8mb4 |
+        +-------------+
+        ```
+
+### 乱码
+
+- [爱可生开源社区：第09期：有关 MySQL 字符集的乱码问题](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247488749&idx=1&sn=85d200be05e2be02e51141f1e08a91b7&chksm=fc96f672cbe17f6454dd2028a23c22ecb9a177add568f51f0c7c90b3934429591cd449c4dd96&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+
+- 编码不一致导致乱码
+
+    ```sh
+    # 查看终端的字符集编码
+    locale
+
+    # 新建立一个连接，客户端这边字符集为 gb2312。
+    mysql -S /var/run/mysqld/mysqld.sock --default-character-set=gb2312
+
+    # 如果表使用utf8mb4字符集，插入数据可能会乱码、出现2条warnings
+    CREATE TABLE t1(a1 VARCHAR(100)) CHARSET utf8mb4;
+    INSERT INTO t1 VALUES ("病毒滚吧！");
+    Query OK, 1 row affected, 2 warnings (0.01 sec)
+
+    -- 查看waring信息
+    show warnings\G
+    *************************** 1. row ***************************
+      Level: Warning
+       Code: 1300
+    Message: Invalid gb2312 character string: 'E79785'
+    *************************** 2. row ***************************
+      Level: Warning
+       Code: 1366
+    Message: Incorrect string value: '\xE7\x97\x85\xE6\xAF\x92...' for column 'a1' at row 1
+    ```
+
+    - 解决方法1：把客户端编码设置成和表编码一致或者兼容的编码
+        ```sql
+        truncate t1;
+
+        -- 把客户端字符集设置为 utf8mb4
+        set names utf8mb4;
+
+        -- 数据正常写入
+        insert into t1 values ("病毒滚吧！");
+        ```
+
+    - 解决方法2
+
+        ```sql
+        -- 设置 SQL_MODE 为严格事务表模式，强制避免不兼容的编码插入数据。
+        set sql_mode = 'STRICT_TRANS_TABLES';
+        -- 报错信息由 warnings 变为 error 拒绝插入
+        insert into t1(a1) values ("病毒滚吧！");
+        ERROR 1366 (HY000): Incorrect string value: '\xE7\x97\x85\xE6\xAF\x92...'
+        ```
+
+- 表里的数据可能一半编码是 utf8mb4，另外一半是 gbk。
+
+    - 解决方法：前提是找到两种不同编码记录的分界点！
+
+        - 比如表 t3 的记录前三条编码和后三条的编码不一致，那可以把两种数据分别导出，再导入到一张改好的表 t4 里。
+
+    ```sql
+    -- utf8mb4 的编码数据，前三条导出
+    set names default;select *  from t3 limit 0,3 into outfile '/var/lib/mysql-files/tx.txt';
+    -- GBK 编码的数据，后三条导出
+    set names gbk;select *  from t3 limit 3,3 into outfile '/var/lib/mysql-files/ty.txt';
+
+    -- 建立一张新表 t4，编码改为统一的 utf8mb4
+    create table t4 (a1 varchar(10),a2 varchar(10)) charset utf8mb4;
+
+    -- 分别导入两部分数据
+    load data infile '/var/lib/mysql-files/tx.txt' into table t4 character set gbk;
+    load data infile '/var/lib/mysql-files/ty.txt' into table t4 ;
+
+    -- 接下来看结果，一切正常
+    set names default;
+    select * from t4;
+    ```
+
+- 每个字段的编码不一致，导致乱码
+
+    - 表 c1 字段 a1,a2
+        - a1 编码 gbk
+        - a2 编码是 utf8mb4。
+
+    - 解决方法：类似上一种解决方法，把数据导出来，再导进去。由于 MySQL 处理数据是按照行的方式，按照列的方式会麻烦一点
+
+    ```sql
+    -- 分别按列导出两个文件
+    select a2 from c1 into outfile '/var/lib/mysql-files/c1_a2.txt';
+    select a1 from c1 into outfile '/var/lib/mysql-files/c1_a1.txt';
+
+    # 在linux上用paste命令合并这两个文件
+    paste c1_a1.txt c1_a2.txt  > c1.txt
+
+    -- 创建表c2，编码统一
+    create table c2 (a1 varchar(10),a2 varchar(10)) charset utf8mb4;
+
+    -- 导入合成后的文件到表c2
+    load data infile '/var/lib/mysql-files/c1.txt' into table c2 ;
+
+    -- 删除表c1，重命名表c2为c1。
+    drop table c1;
+    alter table c2 rename to c1;
+
+    -- 显示结果正常，问题得到解决。
+    select * from c1;
+    ```
+
+- latin1字符集编码存储数据
+
+    - MYSQL 长期以来默认的编码都是 latin1，一直到发布了 8.0 才把默认字符集改为 utf8mb4。
+
+    - 问题：字符存储的字节数不一样，比如 emoji 字符 "❤"，如果用 utf8mb4 存储，占用 3 个字节，那 varchar(12) 就能存放 12 个字符，但是换成 LATIN1，只能存 4 个字符。
+
+        ```sql
+        -- 更改数据库 ytt_new10 字符集为 LATIN1
+        alter database ytt_new10 charset latin1;
+        set names latin1;
+        use ytt_new10;
+
+        -- 创建表 t2，默认字符集为 LATIN1
+        create table t2(a1 varchar(12));
+
+        -- 插入emoji字符，只能插入4个字符
+        insert into t2 values ('❤❤❤❤');
+
+        -- 但是在加一个字符，插入第五个字符报错。
+        insert into t2 values ('❤❤❤❤❤');
+        ERROR 1406 (22001): Data too long for column 'a1' at row 1
+
+
+        -- 换张表t3,字符集为utf8mb4.
+        create table t3 (a1 varchar(12)) charset utf8mb4;
+
+        -- 结果集的字符集也设置为utf8mb4.
+        set names utf8mb4;
+
+        -- 插入12个'❤'，也就是同样的表结构，存储的字符串比latin1多。
+        insert into t3 values (rpad('❤',12,'❤'));
+
+        -- 改为 utf8mb4
+        set names utf8mb4;
+
+        -- 数据显式乱码
+        select * from t2;
+        +--------------------------+
+        | a1 |
+        +--------------------------+
+        | â�¤â�¤â�¤â�¤             |
+        +--------------------------+
+        ```
+
+    - 解决方法1：把表 t2 的列 a1 先改为二进制类型，在改回来用 utf8mb4 的编码的字符类型
+        ```sql
+        -- 现改为 binary 类型
+        alter table t2 modify a1 binary(12);
+
+        -- 再改为varchar(12) utf8mb4.
+        alter table t2 modify a1 varchar(12) charset utf8mb4;
+
+        -- 数据就正常显式。
+        select * from t2;
+
+        -- 接下来，再把表的字符集改回UTF8MB4。
+        alter table t2 charset utf8mb4;
+        ```
+
+    - 解决方法2：还是用最土的方法，把数据导出来，把表编码修改好，再把数据导入到表里。
+        ```sql
+        -- 导出表t2数据。
+        select * from t2 into outfile '/var/lib/mysql-files/t2.dat';
+
+        -- 删除表
+        drop table t2;
+
+        -- 重建表，编码为utf8mb4.
+        create table t2(a1 varchar(12)) charset utf8mb4;
+
+        set names utf8mb4;
+
+        -- 导入之前导出来的数据
+        load data infile '/var/lib/mysql-files/t2.dat' into table t2;
+
+        -- 检索完全正常。
+        select * from t2;
+        ```
 
 ## 常见错误
 
@@ -2515,6 +5639,13 @@ alter table test modify id int(10);
 alter table test drop primary key;
 ```
 
+### 插入中文错误(1366, "Incorrect string value:
+
+```sql
+-- 修改表为utf8mb4字符集编码
+ALTER TABLE table_name CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
 ### 启动错误
 
 ```sh
@@ -2558,7 +5689,13 @@ REPAIR TABLE table_name;
 ALTER TABLE table_name ENGINE=INNODB;
 ```
 
+### [MySQL 主从 AUTO_INCREMENT 不一致问题分析](https://mp.weixin.qq.com/s/iQuPMPv4gD6udQub6C0h_A)
+
 ### [knowclub：在MySQL集群中，如何从几百万个抓包中找到一个异常的包？](https://mp.weixin.qq.com/s/C04qADbcfZP9e7RQDbz-Kg)
+
+### 崩溃
+
+#### [一树一溪：MySQL 崩溃恢复过程分析](https://mp.weixin.qq.com/s/PV6aXtwiMLMeMUBWhZxdvw)
 
 ## 极限值测试
 
@@ -2673,7 +5810,7 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
     sysbench --test=fileio --file-total-size=100G cleanup
     ```
 
-## 高效强大的 mysql 软件
+## 第三方工具
 
 - [awesome-mysql](http://shlomi-noach.github.io/awesome-mysql/)
 
@@ -2681,22 +5818,6 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 
 
 - [MySQL 常用工具选型和建议](https://zhuanlan.zhihu.com/p/86846532)
-
-### gui管理工具
-
-- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
-
-- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
-
-- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
-
-- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
-
-- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
-
-- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
-
-- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
 
 ### [mycli](https://github.com/dbcli/mycli)
 
@@ -2717,69 +5838,6 @@ mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host
 
 ![image](./Pictures/mysql/mysql-tui.avif)
 ![image](./Pictures/mysql/mysql-tui1.avif)
-
-### [binlog2sql](https://github.com/danfengcao/binlog2sql)
-
-```sql
-drop table if exists test;
-
-CREATE TABLE test(
-    id int (8),
-    name varchar(50),
-    date DATE
-);
-
-insert into test (id,name,date) values
-(1,'tz1','2020-10-24'),
-(10,'tz2','2020-10-24'),
-(100,'tz3','2020-10-24');
-
-commit;
-
-select current_timestamp();
-+---------------------+
-| current_timestamp() |
-+---------------------+
-| 2020-11-19 01:59:05 |
-+---------------------+
-
-delete from test
-where id = 1;
-
-update test
-set id = 20
-where id = 10;
-
-insert into test (id,name,date) values
-(1000,'tz4','2020-10-24');
-
-commit;
-
-select * from test;
-
-show master status;
-+------------+----------+--------------+------------------+
-| File       | Position | Binlog_Do_DB | Binlog_Ignore_DB |
-+------------+----------+--------------+------------------+
-| bin.000014 |     6337 |              |                  |
-+------------+----------+--------------+------------------+
-
-select current_timestamp();
-+---------------------+
-| current_timestamp() |
-+---------------------+
-| 2020-11-19 01:59:34 |
-+---------------------+
-```
-
-```sh
-mysqlbinlog --no-defaults -v --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" /var/lib/mysql/bin.000014 --result-file=/tmp/result.sql
-
-python binlog2sql/binlog2sql.py -uroot -p -dtest --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
-
-python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
-# 失败
-```
 
 ### [percona-toolkit 运维监控工具](https://www.percona.com/doc/percona-toolkit/LATEST/index.html)
 

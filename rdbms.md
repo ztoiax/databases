@@ -56,6 +56,7 @@
     * [HTAP(Hybrid transaction/analytical processing) 混合事务 / 分析处理](#htaphybrid-transactionanalytical-processing-混合事务--分析处理)
         * [列存储](#列存储)
     * [第三方工具](#第三方工具)
+        * [gui客户端工具](#gui客户端工具)
 
 <!-- vim-markdown-toc -->
 
@@ -1642,8 +1643,6 @@ Nested-Loop Join(嵌套循环连接)
 
 ## 第三方工具
 
-- [在线创建数据库的实体-关系图的工具 dbdiagram](https://dbdiagram.io)
-
 - [natural-sql：文本生成sql的llm模型](https://github.com/cfahlgren1/natural-sql)
 
 - [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
@@ -1665,9 +1664,14 @@ Nested-Loop Join(嵌套循环连接)
     print(transpile(sql, write="spark", identify=True, pretty=True)[0])
     ```
 
-- 客户端
+- 画图
 
-    - [dbgate：MySQL, PostgreSQL, SQL Server, MongoDB, SQLite and others的gui](https://github.com/dbgate/dbgate)
+    - [dbdiagram：在线创建数据库的实体-关系图的工具](https://dbdiagram.io)
+
+    - [drawdb：数据库实体关系（DBER）在线编辑器，无需注册即可直接在浏览器中使用。它提供了直观、可视化的操作界面，用户通过点击即可构建数据库表和导出建表语句，还可以导入建表语句，实现可视化编辑、错误检查等。支持 MySQL、PostgreSQL、SQLite、MariaDB、SQL Server 共 5 种常用的关系数据库。](https://github.com/drawdb-io/drawdb)
+        - [在线运行](https://drawdb.vercel.app/editor)
+
+- 客户端
 
     - [harlequin：sql tui](https://github.com/tconbeer/harlequin)
         ```sh
@@ -1683,3 +1687,23 @@ Nested-Loop Join(嵌套循环连接)
         ```
 
     - [Chat with your SQL database 📊. Accurate Text-to-SQL Generation via LLMs using RAG](https://github.com/vanna-ai/vanna)
+
+### gui客户端工具
+
+- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
+
+- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
+
+- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
+
+- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
+
+- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
+
+- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
+
+- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
+
+- [dbgate](https://github.com/dbgate/dbgate) 是一款跨平台数据库管理工具，它适用于 MySQL、PostgreSQL、SQL Server、MongoDB、SQLite 及其他数据库，可在 Windows、Linux、Mac 运行。dbgate 还可以作为 Web 应用程序运行，使用户能够通过浏览器轻松访问和管理数据库。
+
+- [mayfly-go](https://github.com/dromara/mayfly-go)web 版 linux(终端[终端回放] 文件 脚本 进程 计划任务)、数据库（mysql postgres oracle sqlserver 达梦 高斯 sqlite）、redis(单机 哨兵 集群)、mongo 等集工单流程审批于一体的统一管理操作平台
