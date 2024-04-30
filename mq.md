@@ -1,20 +1,91 @@
 # 消息队列
 
+## 什么是消息队列
+
 - [咸鱼运维杂谈：关于消息队列的那些事](https://mp.weixin.qq.com/s?__biz=MzkzNzI1MzE2Mw==&mid=2247484660&idx=1&sn=8be392c3a1b67bec66f690645b734717&chksm=c29304b0f5e48da614c2bc81b4f920fe74b9522a3354b3d84cab98c48bbcd7c6247226f7fcb5&scene=21#wechat_redirect)
 
-- 在日常当中，消息队列往往指的是消息中间件，它主要的功能就是用来存放消息，便于应用之间的消息通信
+    - 在日常当中，消息队列往往指的是消息中间件，它主要的功能就是用来存放消息，便于应用之间的消息通信
 
-- ”对象之间的关系远比对象本身要重要“
+    - ”对象之间的关系远比对象本身要重要“
 
-- 为什么需要消息队列？
+    - 为什么需要消息队列？
 
-    - 在过去业务量小的时候，企业用的都是单机架构，直接一台单机就能满足日常业务的需求了
+        - 在过去业务量小的时候，企业用的都是单机架构，直接一台单机就能满足日常业务的需求了
 
-    - 随着互联网的不断发展，公司的业务体量不断扩大，老旧的单机架构已经不能满足日常需求了，于是分布式、微服务这些新架构新方法不断涌现出来
+        - 随着互联网的不断发展，公司的业务体量不断扩大，老旧的单机架构已经不能满足日常需求了，于是分布式、微服务这些新架构新方法不断涌现出来
 
-    - 这也意味着成千上百服务之间的依赖、调用关系越来越复杂，这时候我们迫切的需要一个【中间件】来解耦服务之间的关系，控制资源的合理合时分配以及缓冲流量高峰等等
+        - 这也意味着成千上百服务之间的依赖、调用关系越来越复杂，这时候我们迫切的需要一个【中间件】来解耦服务之间的关系，控制资源的合理合时分配以及缓冲流量高峰等等
 
-- 消息队列应运而生，消息队列的三大经典场景——异步处理、服务解耦、流量控制
+    - 消息队列应运而生，消息队列的三大经典场景——异步处理、服务解耦、流量控制
+
+- [小白debug：Kafka 是什么？](https://mp.weixin.qq.com/s/SNMmCMV-gqkHtWS0Ca3j4g)
+
+    - 问题：两个服务 A 和 B。B 服务每秒只能处理 100 个消息，但 A 服务却每秒发出 200 个消息，B 服务哪里顶得住，分分钟被压垮。
+
+    - 解决方法：没有什么是加一层中间层不能解决的，如果有，那就再加一层。这次我们要加的中间层是 消息队列 Kafka。让 B 在不被压垮的同时，还能处理掉 A 的消息
+
+    - 消息队列的概念和演变过程：
+
+    - 1.offset：为了保护 B 服务，我们很容易想到可以在 B 服务的内存中加入一个队列。
+        - 其实是个链表，链表的每个节点就是一个消息。
+        - 每个节点有一个序号，我们叫它 Offset，记录消息的位置。
+        ![image](./Pictures/mq/mq概念-offset.avif)
+        ![image](./Pictures/mq/mq概念-offset1.avif)
+
+    - 2.独立进程：
+        - 问题：来不及处理的消息会堆积在内存里，如果 B 服务更新重启，这些消息就都丢了。
+        - 解决方法：将队列挪出来，变成一个单独的进程。
+            - 就算 B 服务重启，也不会影响到了队列里的消息。
+            ![image](./Pictures/mq/mq概念-独立进程.avif)
+
+        - 这样一个简陋的队列进程，其实就是所谓的消息队列。
+            - 而像 A 服务这样负责发数据到消息队列的角色，就是生产者，像 B 服务这样处理消息的角色，就是消费者。
+            ![image](./Pictures/mq/mq概念-独立进程1.avif)
+
+    - 高性能：
+
+        - 3.topic：
+            - 问题：随着生产者和消费者都变多，我们会发现它们会同时争抢同一个消息队列，抢不到的一方就得等待，这不纯纯浪费时间吗！
+            - 解决方法：对消息进行分类，每一类是一个 *topic*，然后根据 topic 新增队列的数量，生产者将数据按 topic 投递到不同的队列中，消费者则根据需要订阅不同的 topic。这就大大降低了 topic 队列的压力。
+                ![image](./Pictures/mq/mq概念-topic.avif)
+
+        - 4.partition分区：
+            - 单个 topic 的消息还是可能过多，我们可以将单个队列，拆成好几段，每段就是一个 partition分区，每个消费者负责一个 partition。这就大大降低了争抢，提升了消息队列的性能。
+                ![image](./Pictures/mq/mq概念-partition分区.avif)
+
+    - 高可用：
+
+        - 5.broker：
+            - 问题：随着 partition 变多，如果 partition 都在同一台机器上的话，就会导致单机 cpu 和内存过高，影响整体系统性能。
+                ![image](./Pictures/mq/mq概念-broker.avif)
+            - 解决方法：将 partition 分散部署在多台机器上，这每一台机器，就代表一个 broker。
+                - 我们可以通过增加 broker 缓解机器 cpu 过高带来的性能问题。
+                ![image](./Pictures/mq/mq概念-broker1.avif)
+
+        - 6.Leader和Follower：
+            - 问题：如果其中一个 partition 所在的 broker 挂了，那 broker 里所有 partition 的消息就都没了。
+            - 解决方法：给 partition 多加几个副本，也就是 replicas。Leader 负责应付生产者和消费者的读写请求，而 Follower 只管同步 Leader 的消息。
+                - 这样 Leader 所在的 broker 挂了，也不会影响到 Follower 所在的 broker, 并且还能从 Follower 中选举出一个新的 Leader partition 顶上。
+                ![image](./Pictures/mq/mq概念-Leader和Follower.avif)
+                ![image](./Pictures/mq/mq概念-Leader和Follower1.avif)
+
+    - 7.持久化和过期策略
+        - 问题：假设所有 broker 都挂了，那岂不是数据全丢了？
+        - 解决方法：
+            - 持久化：不能光把数据放内存里，还要持久化到磁盘中，这样哪怕全部 broker 都挂了，数据也不会全丢，重启服务后，也能从磁盘里读出数据，继续工作。
+                ![image](./Pictures/mq/mq概念-持久化和过期策略.avif)
+            - 过期策略：磁盘总是有限的，这一直往里写数据迟早有一天得炸。所以我们还可以给数据加上保留策略，也就是所谓的 retention policy，比如磁盘数据超过一定大小或消息放置超过一定时间就会被清理掉。
+
+    - 8.consumer group（消费者组）
+        - 问题：按现在的消费方式，每次新增的消费者只能跟着最新的消费 Offset 接着消费。如果我想让新增的消费者从某个 Offset 开始消费呢？
+            - 例子：哪怕 B 服务有多个实例，但本质上，它只有一个消费业务方，新增实例一般也是接着之前的 offset 继续消费。假设现在来了个新的业务方，C 服务，它想从头开始消费消息队列里的数据，这时候就不能跟在 B 服务的 offset 后边继续消费了。
+
+        - 解决方法：加入consumer group（消费者组）的概念，B 和 C 服务各自是一个独立的消费者组，不同消费者组维护自己的消费进度，互不打搅。
+            - 消费者组互相独立
+            ![image](./Pictures/mq/mq概念-consumer_group（消费者组）.avif)
+
+    - ZooKeeper：组件太多了，而且每个组件都有自己的数据和状态，所以还需要有个组件去统一维护这些组件的状态信息，于是我们引入 ZooKeeper 组件。它会定期和 broker 通信，获取 整个 kafka 集群的状态，以此判断 某些 broker 是不是跪了，某些消费组消费到哪了。
+        ![image](./Pictures/mq/ZooKeeper.avif)
 
 ## 3大应用场景
 
@@ -233,6 +304,72 @@
 - [java技术爱好者：超详细的RabbitMQ入门，看这篇就够了！](https://developer.aliyun.com/article/769883)
 
 # kafka
+
+![image](./Pictures/mq/kafka.avif)
+
+- kafka 是消息队列，像消息队列投递消息的是生产者，消费消息的是消费者。增加生产者和消费者的实例个数可以提升系统吞吐。多个消费者可以组成一个消费者组，不同消费者组维护自己的消费进度，互不打搅。
+
+- kafka 将消息分为多个 topic
+    - 每个 topic 内部拆分为多个 partition
+    - 每个 partition 又有自己的副本
+    - 不同的 partition 会分布在不同的 broker 上，提升性能的同时，还增加了系统可用性和可扩展性。
+
+## 常见疑问和面试题
+
+### [ByteByteGo：面试官：Kafka 会丢消息吗？](https://mp.weixin.qq.com/s/J6dfpnF7gKhAwa1r7Buigg)
+
+- 许多开发人员普遍认为，Kafka 的设计本身就能保证不会丢失消息。然而，Kafka 架构和配置的细微差别会导致消息的丢失。
+
+- 下图显示了消息在 Kafka 的生命周期中可能丢失的场景。
+
+    ![image](./Pictures/mq/消息在Kafka的生命周期中可能丢失的场景.gif
+
+
+- 生产者（Producer）
+
+    - 当我们调用 producer.send() 发送消息时，消息不会直接发送到代理。
+
+    - 消息发送过程涉及两个线程和一个队列：
+        - 1.应用程序线程
+        - 2.消息累加器
+        - 3.发送线程（I/O 线程）
+    - 我们需要为生产者配置适当的 "acks "和 "retries"，以确保消息被发送到代理。
+
+- 消息代理（Broker）
+
+    - 当代理集群正常运行时，它不应该丢失消息。但是，我们需要了解哪些极端情况可能会导致消息丢失：
+
+        - 1.为了提高 I/O 吞吐量，消息通常会异步刷到磁盘上，因此如果实例在刷新之前宕机，消息就会丢失。
+        - 2.Kafka 集群中的副本需要正确配置，以保持数据的有效副本。数据同步的确定性非常重要。
+
+- 消费者（Consumer）
+
+    - Kafka 提供了不同的提交消息的方式。自动提交可能会在实际处理记录之前确认对记录的处理。当消费者在处理过程中宕机时，有些记录可能永远不会被处理。
+
+    - 一个好的做法是将同步提交和异步提交结合起来，在处理消息的循环中使用异步提交以提高吞吐量，在异常处理中使用同步提交以确保最后的偏移始终被提交。
+
+    - 伪代码：
+    ```
+    try {
+        while (true) {
+        ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+
+        for (ConsumerRecord<String, String> record : records) {
+            // process records one by one
+        }
+
+        consumer.commitAsync();
+        }
+    } catch (Exception e){
+        // exception handling
+    } finally {
+        try {
+            consumer.commitSync();
+        } finally {
+            consumer.close();
+        }
+    }
+    ```
 
 ## 分区（partition）
 

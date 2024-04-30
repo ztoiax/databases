@@ -1,0 +1,3 @@
+- Oracle Concepts 是对 Oracle 最全面的了解，几乎涵盖了所有的基础知识。
+    - [19c](https://docs.oracle.com/en/database/oracle/oracle-database/19/cncpt/database-concepts.pdf)
+    - [23c](https://docs.oracle.com/en/database/oracle/oracle-database/23/cncpt/database-concepts.pdf)

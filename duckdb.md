@@ -4,6 +4,8 @@
 
 ## 架构
 
+- [韩锋频道：“小而美” 的分析库-DuckDB 初探](https://mp.weixin.qq.com/s/bcVsH_BGubEFYtiNnHa09g)
+
 ![image](./Pictures/duckdb/架构.avif)
 
 - DuckDB 数据库可分为多个组件：
@@ -277,7 +279,9 @@
 
 # reference
 
-- [韩锋频道：“小而美” 的分析库-DuckDB 初探](https://mp.weixin.qq.com/s/bcVsH_BGubEFYtiNnHa09g)
+- [《DuckDB 实战》（DuckDB in Action）](https://motherduck.com/duckdb-book-brief/)
+
+- [ DuckDB 的官方文档](https://duckdb.org/duckdb-docs.pdf)
 
 # 第三方工具
 

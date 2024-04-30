@@ -5,8 +5,10 @@
         * [连接数据库](#连接数据库)
         * [常用 SQL 命令](#常用-sql-命令)
         * [其他命令](#其他命令)
+        * [MySQL数据库联盟：五种不输入密码登录MySQL的方法，你知道几种？](#mysql数据库联盟五种不输入密码登录mysql的方法你知道几种)
+        * [如何正确地关闭 MySQL 数据库？99%的 DBA 都是错的！](#如何正确地关闭-mysql-数据库99的-dba-都是错的)
     * [下载数据库进行 SQL 语句 学习](#下载数据库进行-sql-语句-学习)
-    * [DQL(查询)](#dql查询)
+    * [DQL (Data Query Language) 数据查询语言](#dql-data-query-language-数据查询语言)
         * [SELECT](#select)
             * [where: 行(元组)条件判断](#where-行元组条件判断)
             * [Order by (排序)](#order-by-排序)
@@ -37,7 +39,7 @@
             * [FULL OUTER JOIN(全连接)](#full-outer-join全连接)
             * [JOIN算法的explain解析](#join算法的explain解析)
                 * [优化JOIN查询](#优化join查询)
-    * [DML (增删改操作)](#dml-增删改操作)
+    * [DML (Data Manipulation Language) 数据操作语言](#dml-data-manipulation-language-数据操作语言)
         * [CREATE(创建)](#create创建)
             * [数据类型](#数据类型)
             * [基本使用](#基本使用)
@@ -56,16 +58,17 @@
             * [case语句，在UPDATE多条语句时，可以按顺序执行，避免出错](#case语句在update多条语句时可以按顺序执行避免出错)
         * [Delete and TRUNCATE and Drop (删除)](#delete-and-truncate-and-drop-删除)
             * [删除重复的数据](#删除重复的数据)
-    * [VIEW (视图)](#view-视图)
-    * [Function and Stored Procedure (函数 和 存储过程)](#function-and-stored-procedure-函数-和-存储过程)
-        * [Stored Procedure (存储过程)](#stored-procedure-存储过程)
-            * [trigger（触发器）](#trigger触发器)
-                * [实例：下单减库存](#实例下单减库存)
-        * [Function（函数）](#function函数)
-            * [内置函数](#内置函数)
-            * [自定义函数](#自定义函数)
-    * [ALTER（修改表的列字段、存储引擎等）](#alter修改表的列字段存储引擎等)
-        * [ALTER优化](#alter优化)
+    * [DDL (Data Definition Language) 数据定义语言](#ddl-data-definition-language-数据定义语言)
+        * [VIEW (视图)](#view-视图)
+        * [Function and Stored Procedure (函数 和 存储过程)](#function-and-stored-procedure-函数-和-存储过程)
+            * [Stored Procedure (存储过程)](#stored-procedure-存储过程)
+                * [trigger（触发器）](#trigger触发器)
+                    * [实例：下单减库存](#实例下单减库存)
+            * [Function（函数）](#function函数)
+                * [内置函数](#内置函数)
+                * [自定义函数](#自定义函数)
+        * [ALTER（修改表的列字段、存储引擎等）](#alter修改表的列字段存储引擎等)
+            * [ALTER优化](#alter优化)
     * [INDEX(索引)](#index索引)
         * [SQL语法](#sql语法)
         * [聚集索引](#聚集索引)
@@ -77,11 +80,13 @@
         * [Multiple-Column Indexes (多列索引)](#multiple-column-indexes-多列索引)
         * [空间索引（R-Tree 索引）](#空间索引r-tree-索引)
         * [主键设计原则](#主键设计原则)
-    * [DCL](#dcl)
+    * [DCL (Data Control Language) 数据控制语言](#dcl-data-control-language-数据控制语言)
         * [帮助文档](#帮助文档)
-        * [用户权限设置](#用户权限设置)
+        * [GRANT 用户权限设置](#grant-用户权限设置)
             * [设置权限允许远程的ip连接mysql](#设置权限允许远程的ip连接mysql)
         * [配置(varibles)操作](#配置varibles操作)
+    * [TCL（Transaction Control Language）事务控制语言](#tcltransaction-control-language事务控制语言)
+        * [autocommit（自动提交）](#autocommit自动提交)
     * [规范和优化](#规范和优化)
         * [设计规范](#设计规范)
             * [安全规范](#安全规范)
@@ -107,7 +112,6 @@
             * [hint(优化器提示)](#hint优化器提示)
             * [松散索引(loose index scan)](#松散索引loose-index-scan)
             * [慢查询优化](#慢查询优化)
-* [reference](#reference)
 
 <!-- vim-markdown-toc -->
 
@@ -233,6 +237,42 @@ mysqladmin -uroot -pYouPassword shutdown
 mysqld_safe --defaults-file=/etc/my.cnf &
 ```
 
+### [MySQL数据库联盟：五种不输入密码登录MySQL的方法，你知道几种？](https://mp.weixin.qq.com/s/RJr5AmmwDMWF64b4f47Mbg)
+
+### 如何正确地关闭 MySQL 数据库？99%的 DBA 都是错的！
+
+- [InsideMySQL：如何正确地关闭 MySQL 数据库？99%的 DBA 都是错的！](https://mp.weixin.qq.com/s?__biz=MjM5MjIxNDA4NA==&mid=2649743926&idx=1&sn=e79bfb7c2ef814f2652e52fae92d7218&chksm=beb2ff1d89c5760bc98611ee8a6aafe26a4dc1f5cff4e121a98ba1fcde4eabc54a6d276783b0&cur_album_id=1501021509451055104&scene=190#rd)
+
+- 生产环境，正确关闭 MySQL 数据库的方法有且仅有：
+
+    ```sh
+    kill -9 `pidof mysqld`
+    ```
+
+- 以下3条都是同样的命令，也就是所谓的关闭 MySQL 数据库的命令，只是形式略有不同。
+
+    ```sh
+    mysqladmin shutdown
+    service mysqld stop # （或类似命令）
+    kill `pidof mysqld` # 不考虑mysqld_safe
+    ```
+
+    - 这题的底层逻辑是如果在生产环境，MySQL 数据库肯定都是有主从复制的架构，而且大概率是半同步的复制架构。
+    - 这时问题就来了，上述1、2、3正常关闭的 MySQL 命令，会导致 Master 节点不等待半同步 Slave 节点是否收到二进制日志的 ACK 回包，而选择直接停止数据库服务，从而可能导致主从数据不一致！！！
+
+- 因此，从数据库规范角度看，为避免线上数据一致性问题，DBA 关闭数据库使用的命令有且仅有：
+
+    ```sh
+    kill -9 `pidof mysqld`
+    ```
+
+    - 有同学会说，kill -9 是强制关闭命令，只适用于无法正常关闭数据库的场景，一般并不推荐使用。
+        - 的确，kill -9 会立即关闭数据库，脏页没有在关闭时刷新，重启数据库后需要通过重做日志恢复到最新的数据。
+        - 然而，kill -9 命令并不会导致 Master 节点少数据，也不会导致 Slave 节点少数据。
+        - 因此，它才是最安全和正确的命令。
+        - 对数据库而言，数据一致性与可靠性高于一切。
+
+
 ## 下载数据库进行 SQL 语句 学习
 
 ```sql
@@ -251,7 +291,9 @@ cd china_area_mysql
 mysql -uroot -pYouPassward china < cnarea20191031.sql
 ```
 
-## DQL(查询)
+## DQL (Data Query Language) 数据查询语言
+
+- DQL用于从数据库中检索信息，而不进行任何数据更改。
 
 ### SELECT
 
@@ -1543,9 +1585,15 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         ```
 
 
-## DML (增删改操作)
+## DML (Data Manipulation Language) 数据操作语言
 
-- 有的地方把 DML 语句(增删改)和 DQL 语句(查询)统称为 DML 语句
+- `INSERT`：向表中插入新的数据行。
+
+- `UPDATE`：修改表中已存在的数据。
+
+- `DELETE`：从表中删除指定的数据行。
+
+- DML主要用于执行对数据库中数据的操作，例如添加、修改和删除记录等操作，操作的对象是记录。常见的DML语句包括：
 
 ### CREATE(创建)
 
@@ -2598,6 +2646,18 @@ CREATE TABLE new(
 
 #### 分区表
 
+- 问题：
+    - 1.单张表数据量太大，每天会产生 10W 条记录，一年就是 3650W 条记录，
+    - 2.对这张表的查询 95% 都是在某一天或者几天内，过滤区间最大不超过一个月。比如在2019年3月1日、2019年4 月20 日或者是2019年5月1日和2019年5月5日这个时间段内。偶尔会涉及到跨月、跨年查询，但是频率很低。
+    - 3.记录保留10年。也就是单表3.6亿条记录，单表太大，不便于管理，后期如果单表损坏，修复也难。
+    - 4.单表查询性能很差，对历史数据删除性能也很差。
+
+- 解决方法：分区表
+    - 1.查询过滤的数据范围相对比较集中，不是那么分散；要同时考虑过期数据清理性能问题。
+    - 2.考虑把表拆分为10张新表，一张是当前表，剩余9张是历史归档表；当前表存放最近两年的数据，每到年底迁移老旧数据到历史表进行归档，并且对过期历史数据进行清理。
+    - 3.考虑对部分过滤场景使用 MySQL 分区表，非常适合 95% 的查询；可以使用分区置换功能把数据移到历史表。
+    - 4.分区表带来几个好处：一是查询性能提升；二是管理方便，过期数据直接快速清理；三是对应用透明，暂时不需要应用改代码。
+
 ```sql
 CREATE TABLE sales (
     sale_id INT,
@@ -3073,6 +3133,8 @@ SET salary = case
 
 ### Delete and TRUNCATE and Drop (删除)
 
+- TRUNCATE：清空表中的所有数据但保留表结构（与DELETE不同，不记录每条记录的删除操作，效率更高且不触发相关删除触发器）。
+
 | 操作     | DROP                                             | TRUNCATE     | DELETE                        |
 |----------|--------------------------------------------------|--------------|-------------------------------|
 | 删除内容 | 删除整张表数据，表结构以及表的索引、约束和触发器 | 删除全部数据 | 删除部分数据（可带where条件） |
@@ -3191,7 +3253,19 @@ alter table clone drop index id;
 alter table clone drop index name;
 ```
 
-## VIEW (视图)
+## DDL (Data Definition Language) 数据定义语言
+
+- `CREATE`：创建新的表、视图、索引等。
+
+- `ALTER`：修改数据库表结构或其属性，比如增加、修改或删除列。
+
+- `DROP`：删除表、视图、索引等数据库对象。
+
+- `TRUNCATE`：清空表中的所有数据但保留表结构（与DELETE不同，不记录每条记录的删除操作，效率更高且不触发相关删除触发器）。
+
+- DDL用于创建、修改或删除数据库的结构对象，比如表、视图、索引、序列、存储过程等。
+
+### VIEW (视图)
 
 - [深入解析 MySQL 视图 VIEW](https://www.cnblogs.com/geaozhang/p/6792369.html)
 
@@ -3287,7 +3361,7 @@ show table status like '名称'\G;
 ![image](./Pictures/mysql/view.avif)
 ![image](./Pictures/mysql/view1.avif)
 
-## Function and Stored Procedure (函数 和 存储过程)
+### Function and Stored Procedure (函数 和 存储过程)
 
 - [Difference between stored procedure and function in MySQL](https://medium.com/@singh.umesh30/difference-between-stored-procedure-and-function-in-mysql-52f845d70b05)
 
@@ -3301,7 +3375,7 @@ show table status like '名称'\G;
     | 可以不有返回值           | 必须要有返回值            |
     | 能返回多个值             | 只能返回一个值            |
 
-### Stored Procedure (存储过程)
+#### Stored Procedure (存储过程)
 
 **语法:**
 
@@ -3455,7 +3529,7 @@ show table status like '名称'\G;
 
     ![image](./Pictures/mysql/procedure2.avif)
 
-#### trigger（触发器）
+##### trigger（触发器）
 
 - [Coding Big Tree：MySQL数据库（32）：触发器 trigger](https://mp.weixin.qq.com/s/dGh45w_mCBXHIMFSXbCPZg)
 
@@ -3523,7 +3597,7 @@ show table status like '名称'\G;
         AFTER DELETE
         ```
 
-##### 实例：下单减库存
+###### 实例：下单减库存
 
 - 有两张表，一张是商品表，一张是订单表（保留商品ID）每次订单生成，商品表中对应的库存就应该发生变化
 
@@ -3681,7 +3755,7 @@ show table status like '名称'\G;
     ```
 
 
-### Function（函数）
+#### Function（函数）
 
 - [Coding Big Tree：MySQL数据库（30）：内置函数和自定义函数 function](https://mp.weixin.qq.com/s?__biz=MjM5MDIyNjg2OA==&mid=2447911439&idx=1&sn=9741db95f4c0ead000de37187e419455&chksm=b2548ad4852303c235075996d1267e23dc2d2f556cb56e0a816f9abfcccd85b5af3eb4a02d7d&scene=178&cur_album_id=2371394211721216001#rd)
 
@@ -3693,7 +3767,7 @@ show table status like '名称'\G;
 
 - 函数分为两类：系统函数和自定义函数
 
-#### 内置函数
+##### 内置函数
 
 - 字符串函数
 
@@ -3795,7 +3869,7 @@ show table status like '名称'\G;
     select uuid(); // c44a06a2-b8d8-11ec-a53c-504259f9d746
     ```
 
-#### 自定义函数
+##### 自定义函数
 
 **语法:**
 
@@ -3905,7 +3979,7 @@ show table status like '名称'\G;
     +------------+
     ```
 
-## ALTER（修改表的列字段、存储引擎等）
+### ALTER（修改表的列字段、存储引擎等）
 
 **语法:**
 
@@ -3963,7 +4037,7 @@ ALTER TABLE ca DROP index id;
 ALTER TABLE ca ENGINE = MYISAM;
 ```
 
-### ALTER优化
+#### ALTER优化
 
 - mysql大部分修改表结构的操作是:新建一个空表, 将旧表数据插入新表, 再删除旧表
 
@@ -4956,9 +5030,16 @@ SELECT * FROM demo_table WHERE c1 = 5 AND c2 = 10;
             +--------------------+----+
             ```
 
-## DCL
+## DCL (Data Control Language) 数据控制语言
 
-DCL (语句主要是管理数据库权限的时候使用)
+- `GRANT`：授权用户或其他角色访问数据库对象或执行特定操作的权限。
+
+- `REVOKE`：撤销之前通过GRANT语句赋予的权限。
+
+- 在一些数据库管理系统中，事务控制相关的命令（如COMMIT提交事务、ROLLBACK回滚事务）也归入DCL范畴，但在其他地方这些可能被归为TCL（Transaction Control Language）的一部分。
+
+- DCL用来授予或撤销用户对数据库对象的访问权限以及其他特权，以及管理事务处理中的各种控制指令。主要包含以下类型的语句：
+
 
 ### 帮助文档
 
@@ -4972,7 +5053,7 @@ DCL (语句主要是管理数据库权限的时候使用)
 ? SHOW
 ```
 
-### 用户权限设置
+### GRANT 用户权限设置
 
 > ```sql
 > # 创建用户
@@ -5167,6 +5248,98 @@ echo "max_connect_errors=1000" >> /etc/my.cnf
 ```
 
 [mysql 的 sql_mode 合理设置](http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html)
+
+
+## TCL（Transaction Control Language）事务控制语言
+
+- TCL是事务控制语言，主要用来控制事务。例如：BEGIN、COMMIT、ROLLBACK等语句。
+
+| 事务sql语句   | 操作           |
+| ------------- | -------------- |
+| BEGIN         | 开始一个事务   |
+| ROLLBACK      | 事务回滚       |
+| COMMIT        | 事务确认       |
+
+```sql
+# 创建表tz
+create table tz (
+    id int (8),
+    name varchar(50),
+    date DATE
+);
+
+# 开始事务
+begin;
+
+# 插入数据
+insert into tz (id,name,date) values
+(1,'tz','2020-10-24');
+
+# 回滚到开始事务之前(rollback 和 commit 只能选一个)
+rollback;
+# 如果出现waring,表示该表的存储引擎不支持事务(不是innodb)
+Query OK, 0 rows affected, 1 warning (0.00 sec)
+
+# 如果不回滚,使用commit确认这次事务的修改
+commit;
+```
+
+如果有两个会话,一个开启了事务,修改了数据.另一个会话同步数据要执行 `flush table 表名`
+
+```sql
+# 把 clone表 存放在缓冲区里的修改操作写入磁盘
+flush table clone
+```
+
+![image](./Pictures/mysql/flush.avif)
+
+`flush table clone`后, `select` 数据同步
+![image](./Pictures/mysql/flush1.avif)
+
+---
+
+- `SAVEPOINT savepoint_name;` 声明一个事务保存点
+- `ROLLBACK TO savepoint_name;` 回滚到事务保存点,但不会终止该事务
+- `RELEASE SAVEPOINT savepoint_name;` // 删除指定保留点
+
+```sql
+# 创建数据库
+create table tz (
+    id int (8),
+    name varchar(50),
+    date DATE
+);
+
+# 声明一个名叫 abc 的事务保存点
+savepoint abc;
+
+# 插入数据
+insert into tz (id,name,date) values
+(1,'tz','2020-10-24');
+
+# 回滚到 abc 事务保存点
+rollback to abc;
+```
+
+### autocommit（自动提交）
+
+`autocommit = 1` 对表的所有修改将立即生效
+
+`autocommit = 0` 则必须使用 COMMIT 来提交事务,或使用 ROLLBACK 来回滚撤销事务
+
+- 1.如果 InnoDB 表有大量的修改操作,应设置 `autocommit = 0` 因为 `ROLLBACK` 操作会浪费大量的 I/O
+
+    ```ini
+    [mysqld]
+    autocommit = 0
+    ```
+
+    - **注意:**
+
+        - 不要长时间打开事务会话,适当的时候要执行 COMMIT(完成更改)或 ROLLBACK(回滚撤消更改)
+        - ROLLBACK 这是一个相对昂贵的操作 请避免对大量行进行更改,然后回滚这些更改.
+
+- 2.如果只是查询表,没有大量的修改,应设置 `autocommit = 1`
 
 ## 规范和优化
 
@@ -6184,16 +6357,3 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
 
     show status like "%slow%";
     ```
-
-# reference
-
-- [mysqltutorial](https://www.mysqltutorial.org/)
-- [MySQL 入门教程](https://github.com/jaywcjlove/mysql-tutorial)
-- [sql 语句教程](https://www.1keydata.com/cn/sql/)
-- [W3cSchool SQL 教程](https://www.w3school.com.cn/sql/index.asp)
-- [138 张图带你 MySQL 入门](https://mp.weixin.qq.com/s?src=11&timestamp=1603417035&ver=2661&signature=Z-XNfjtR11GhHg29XAiBZ0RAiMHavvRavxB1ccysnXtAKChrVkXo*zx3DKFPSxDESZ9lwRM7C8-*yu1dEGmXwHgv1qe7V-WvwLUUQe7Nz7RUwEuJmLYqVRnOWtONHeL-&new=1)
-
-- [厉害了,3 万字的 MySQL 精华总结 + 面试 100 问！](https://mp.weixin.qq.com/s?src=11&timestamp=1603207279&ver=2656&signature=PlP1Ta3EiPbja*mclBpkiUWyCM93jx7G0DnE4LwwlzEvW-Fd9hxgIGq1*5ctVid5AZTssRaeDRSKRPlOGOXJfLcS4VUlru*NYhh4BrhZU4k91nsfqzJueeX8kEptSmfc&new=1)
-- [mysql 存储过程详细教程](https://www.jianshu.com/p/7b2d74701ccd)
-
-- [一文彻底读懂 MySQL 事务的四大隔离级别](https://mp.weixin.qq.com/s?src=11&timestamp=1605864322&ver=2718&signature=yj-1WmxuB0tL32v9OCfARl9LKeAqALuoFdmMgiJdyKjkgqeFwvGgJT10hOWiPj0Vn3qalU3-5AEsaoiHI8TTg3GL3s8rPmC7rXZkbu22VZcFcV48aa7sPiqw*Y3yAaC5&new=1)

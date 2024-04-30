@@ -55,8 +55,6 @@
             * [hash join(散列连接)](#hash-join散列连接)
     * [HTAP(Hybrid transaction/analytical processing) 混合事务 / 分析处理](#htaphybrid-transactionanalytical-processing-混合事务--分析处理)
         * [列存储](#列存储)
-    * [第三方工具](#第三方工具)
-        * [gui客户端工具](#gui客户端工具)
 
 <!-- vim-markdown-toc -->
 
@@ -705,6 +703,8 @@ WHERE A2 = c2 and A1 = c1
 
 ##### 隔离性等级
 
+- 数据库事务隔离级别的概念最早是在1981年由IBM的Jim Gray等人提出的，他们在论文《The Notions of Consistency and Predicate Locks in a Database System》中定义了四种隔离级别
+
 | 隔离性等级                  | 脏读     | 不可重复读 | 幻读 |
 |-----------------------------|----------|------------|------|
 | 未提交读(read uncommmitted) | 出现     | 出现       | 出现 |
@@ -718,11 +718,16 @@ WHERE A2 = c2 and A1 = c1
 | 已提交读(read committed)    | 只允许读取已提交的的数据，避免了脏读。会出现不可重复读、幻读                                           |
 | 可重复读(repeatable read)   | 当前事务只能读取本事务所做出的修改。但隔离范围不包含插入操作，即事务还是会读到其他事务提交的新增数据。 |
 | 可串行化(serializable)      | 事务串行化执行，而不能并发执行。避免脏读、不可重复读、幻读。但实际很好应用，性能低的问题               |
-| 快照（snapshot）            | 会出现幻读                                                                                             |
 
-- 大部分数据库默认等级为READ COMMITTED（**已提交读**）；mysql为REPEATABLE READ（**可重复读**）
+- Read Committed（**已提交读**）变成了最为常用的事务隔离级别，其他事务隔离级别大多数都基本上不用了。比Read Committed更高的事务隔离级别被前置到应用前端或者中间层来实现了。
 
-- 在REPEATABLE READ隔离级别下，尽管解决了不可重复读，但还是存在幻读的问题。
+    - 更高的事务隔离级别的最著名的例子就是分页查询，在RC隔离级别下，哪怕是在一个事务中，我们在前端分页查询同一个数据时，都会看到“脏数据”，因为这些数据在我们读的时候也会有人同时在修改和写入新的满足条件的数据。
+        - 对于这种方式的处理方法一般来说就是容忍“脏数据”，互联网应用一般都是这样处理的。
+        - 而对于数据一致性要求很高的财务系统，则一般采用在中间层缓存数据或者使用全局临时表缓存数据的方式来确保数据的一致性。
+
+    - 为什么MySQL的默认事务隔离级别不是Read Committed（**已提交读**）而是REPEATABLE READ（**可重复读**）呢？
+        - 这和MySQL数据库的历史有关，MySQL数据库因为早期的BINLOG复制不支持RAW格式的问题而必须选择RR，如果使用RC无法确保复制数据的一致性。
+        - 但是用了RR这种事务隔离级别，又会引起数据库的并发性能受到影响，因此MySQL引入了GAP LOCK这种特殊的锁机制，来降低RR对数据库并发的性能影响。哪怕是引入了GAP LOCK，在RR隔离级别下，对于SELECT … FOR UPDATE的操作，RR隔离级别也会比RC有更多的锁阻塞，因此我们建议MySQL用户如果BINLOG复制使用能够RAW的情况下，还是把默认的事务隔离级别设置为RC。
 
 - 解决幻读问题的手段：mvcc或锁
     - 但是大量的锁会严重影响性能。怎样才能不通过加锁还能解决幻读呢？这就是MVCC要做的事情。
@@ -1640,70 +1645,3 @@ Nested-Loop Join(嵌套循环连接)
     - 更新性能低
 
         - 更新一行, 需要更新每一列
-
-## 第三方工具
-
-- [natural-sql：文本生成sql的llm模型](https://github.com/cfahlgren1/natural-sql)
-
-- [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
-
-- [sql-formatter：sql语句格式化的js库](https://github.com/sql-formatter-org/sql-formatter)
-
-- [Migrate：数据库迁移/变更工具](https://github.com/golang-migrate/migrate)
-
-    - 支持 MySQL、MariaDB、PostgreSQL、SQLite、Neo4j、ClickHouse 等不同类型的数据库。
-
-- [sqlmap: 自动检测和利用 SQL 注入漏洞，获得数据库服务器的权限。](https://github.com/sqlmapproject/sqlmap)
-
-- [SQLGlot：sql转换器，支持20多种如DuckDB, Presto / Trino, Spark / Databricks, Snowflake, and BigQuery.](https://github.com/tobymao/sqlglot)
-    ```py
-    import sqlglot
-
-    # SQL 转 Spark
-    sql = """WITH baz AS (SELECT a, c FROM foo WHERE a = 1) SELECT f.a, b.b, baz.c, CAST("b"."a" AS REAL) d FROM foo f JOIN bar b ON f.a = b.a LEFT JOIN baz ON f.a = baz.a"""
-    print(transpile(sql, write="spark", identify=True, pretty=True)[0])
-    ```
-
-- 画图
-
-    - [dbdiagram：在线创建数据库的实体-关系图的工具](https://dbdiagram.io)
-
-    - [drawdb：数据库实体关系（DBER）在线编辑器，无需注册即可直接在浏览器中使用。它提供了直观、可视化的操作界面，用户通过点击即可构建数据库表和导出建表语句，还可以导入建表语句，实现可视化编辑、错误检查等。支持 MySQL、PostgreSQL、SQLite、MariaDB、SQL Server 共 5 种常用的关系数据库。](https://github.com/drawdb-io/drawdb)
-        - [在线运行](https://drawdb.vercel.app/editor)
-
-- 客户端
-
-    - [harlequin：sql tui](https://github.com/tconbeer/harlequin)
-        ```sh
-        // sqlite
-        harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
-
-        // DuckDB
-        harlequin "path/to/duck.db" "another_duck.db"
-
-        // mysql
-        pip install harlequin-mysql
-        harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
-        ```
-
-    - [Chat with your SQL database 📊. Accurate Text-to-SQL Generation via LLMs using RAG](https://github.com/vanna-ai/vanna)
-
-### gui客户端工具
-
-- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
-
-- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
-
-- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
-
-- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
-
-- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
-
-- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
-
-- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
-
-- [dbgate](https://github.com/dbgate/dbgate) 是一款跨平台数据库管理工具，它适用于 MySQL、PostgreSQL、SQL Server、MongoDB、SQLite 及其他数据库，可在 Windows、Linux、Mac 运行。dbgate 还可以作为 Web 应用程序运行，使用户能够通过浏览器轻松访问和管理数据库。
-
-- [mayfly-go](https://github.com/dromara/mayfly-go)web 版 linux(终端[终端回放] 文件 脚本 进程 计划任务)、数据库（mysql postgres oracle sqlserver 达梦 高斯 sqlite）、redis(单机 哨兵 集群)、mongo 等集工单流程审批于一体的统一管理操作平台

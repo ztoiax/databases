@@ -149,7 +149,7 @@ mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
 
     - 1.先升级部分副本，然后将部分只读流量切上去，也会保留足够的5.7副本，以方便回滚
 
-    - 2.如果只读流量经过8.0的验证，没问题，就调整复制拓扑为下图形式 
+    - 2.如果只读流量经过8.0的验证，没问题，就调整复制拓扑为下图形式
 
         ![image](./Pictures/mysql/mysql升级-github升级过程.avif)
 
@@ -178,6 +178,10 @@ mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
     - 5.如果在8.0的版本下运行了足够长的时间（至少24小时），则把集群内5.7版本的MySQL全删除。
 
 #### [爱可生开源社区：MySQL 5.7 升级到 8.0 可能踩的一个坑](https://mp.weixin.qq.com/s/DLf98FgoE-FbxmETzGnSZw)
+
+### 各大公司mysql架构
+
+#### [解剖“全球最大男性交友网站”，GitHub十五年数据库架构演进](https://mp.weixin.qq.com/s/2FuKZtMdRzDvy-WOeD1eIw)
 
 ## 日志
 
@@ -950,6 +954,10 @@ python binlog2sql/binlog2sql.py -uroot -p -dtest --start-file='bin.000014' --sta
 python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
 # 失败
 ```
+
+#### [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](https://gitee.com/mo-shan/analysis_binlog)
+
+- [爱可生开源社区：技术分享 | MySQL binlog 分析工具 analysis_binlog 的使用介绍](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247492621&idx=1&sn=bb835dffcca8178ecd4a477a09730689&chksm=fc950692cbe28f8443765b4c8e21c3b9fe1aaf29ce63ce68708dac12f6b8105637d436d0f7a8&scene=21#wechat_redirect)
 
 ### redo log (重做日志)
 
@@ -2193,6 +2201,154 @@ alter table t1 tablespace ts1;
 
 #### TRANSACTION (事务)
 
+##### MySQL事务隔离级别究竟应该怎么选择？
+
+- [MySQL数据库联盟：怎样选择MySQL事务隔离级别？](https://mp.weixin.qq.com/s/RdvqjVoLTUbDHK4lWDugMw)
+
+- mysql默认隔离性为REPEATABLE READ（可重复读）
+
+- 建议在RC和RR两个隔离级别中选一种
+    - 如果能接受幻读，需要并发高点，就可以配置成RC
+    - 如果不能接受幻读的情况，就设置成RR隔离级别
+
+- 基本命令
+
+    ```sql
+    -- 查看当前会话的隔离级别
+    SHOW VARIABLES LIKE 'transaction_isolation';
+    -- 查看全局的隔离级别
+    SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
+    -- 查看当前会话和全局的隔离级别
+    SELECT @@GLOBAL.tx_isolation, @@tx_isolation;
+
+    -- 设置当前会话的隔离级别。设置为READ COMMITTED（已提交读）
+    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    -- 设置全局的隔离级别。设置为REPEATABLE READ（可重复读）
+    SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+    ```
+
+- 准备工作。创建测试表、插入测试数据
+
+    ```sql
+    drop procedure if exists insert_t21;
+    delimiter ;;
+    create procedure insert_t21()
+    begin
+
+    drop table if exists t21;
+
+    CREATE TABLE `t21` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `a` int NOT NULL,
+    `b` int NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_c` (`a`)
+    ) ENGINE=InnoDB CHARSET=utf8mb4;
+    insert into t21(a,b) values (1,1),(2,2);
+
+    end;;
+    delimiter ;
+    ```
+
+- Read uncommitted（读未提交，简称：RU）隔离级别的实验
+
+    | 步骤 | session1                                              | session2                                              |
+    |------|-------------------------------------------------------|-------------------------------------------------------|
+    | 1    | call insert_t21();                                    |                                                       |
+    | 2    | set session transaction_isolation='READ-UNCOMMITTED'; | set session transaction_isolation='READ-UNCOMMITTED'; |
+    | 3    | begin;                                                | begin;                                                |
+    | 4    | select * from t21 where a=1;                          |                                                       |
+    | 5    |                                                       | insert into t21(a,b) values (1,3);                    |
+    | 6    | select * from t21 where a=1;                          |                                                       |
+    | 7    | commit;                                               | commit;                                               |
+
+    - 上面的实验中，第 5 步中 session2 写入了一条 a、b 值分别为 1、3 的记录，在第 6 步中，session2 中的事务还没提交，但是 session1 就能看到 session2 写入的数据，出现了脏读现象。
+
+- Read Committed （读已提交，简称：RC）隔离级别的实验：
+
+    | ID | session1                                            | session2                                            |
+    |----|-----------------------------------------------------|-----------------------------------------------------|
+    | 1  | call insert_t21 ();                                 |                                                     |
+    | 2  | set session transaction_isolation='READ-COMMITTED'; | set session transaction_isolation='READ-COMMITTED'; |
+    | 3  | begin;                                              | begin;                                              |
+    | 4  | select * from t21 where a=1;                        |                                                     |
+    | 5  |                                                     | insert into t21(a,b) values (1,3);                  |
+    | 6  | select * from t21 where a=1;                        |                                                     |
+    | 7  |                                                     | commit;                                             |
+    | 8  | select * from t21 where a=1;                        |                                                     |
+    | 9  | commit;                                             |                                                     |
+
+    - session2 写入了新数据未提交的情况下，session1 无法查看到新记录，等到 session2 提交之后，session1 才能看到第 5 步 session2 写入的数据。
+
+    - 但是存在一个问题就是在session1这个事务里面，按相同的查询条件重新读取以前检索过的数据，却发现其他事务插入了满足其查询条件的新数据。也就是出现了幻读。
+
+- Repeatable Read （可重复读，简称：RR）
+
+    | ID | session1                                             | session2                                             |
+    |----|------------------------------------------------------|------------------------------------------------------|
+    | 1  | call insert_t21 ();                                  |                                                      |
+    | 2  | set session transaction_isolation='REPEATABLE-READ'; | set session transaction_isolation='REPEATABLE-READ'; |
+    | 3  | begin;                                               | begin;                                               |
+    | 4  | select * from t21 where a=1;                         |                                                      |
+    | 5  |                                                      | insert into t21(a,b) values (1,3);                   |
+    | 6  | select * from t21 where a=1;                         |                                                      |
+    | 7  |                                                      | commit;                                              |
+    | 8  | select * from t21 where a=1;                         |                                                      |
+    | 9  | commit;                                              |                                                      |
+    | 10 | select * from t21 where a=1;                         |                                                      |
+        - session2 写入了新数据未提交的情况下，session1 无法查看到新记录，等到 session2 提交但是 session1 还未提交时，session1 还是不能看到新记录，需要等 session1 事务提交之后，才能查看到第 5 步 session2 写入的新数据。
+
+    - 也就是RR隔离级别下，在同一个事务里面，前后两条一样的语句，读取的数据是一样的。
+
+- Serializable（串行）
+
+    | ID | session1                                          | session2                                          |
+    |----|---------------------------------------------------|---------------------------------------------------|
+    | 1  | call insert_t21 ();                               |                                                   |
+    | 2  | set session transaction_isolation='SERIALIZABLE'; | set session transaction_isolation='SERIALIZABLE'; |
+    | 3  | begin;                                            | begin;                                            |
+    | 4  | select * from t21 where a=1;                      |                                                   |
+    | 5  |                                                   | insert into t21(a,b) values (1,3);（等待）        |
+    | 6  | select * from t21 where a=1;                      |                                                   |
+    | 7  | commit;                                           | session1 提交后，第 5 步中的写入操作执行成功      |
+    | 8  |                                                   | commit;                                           |
+    | 9  | select * from t21 where a=1;                      |                                                   |
+
+    - 当 session1 中有事务查询 a=1 这行记录时，在 session2 就不能插入 a=1 的记录，进入等待。必须等 session1 提交后，session2 才能执行成功。也就是让事务串行进行。
+
+###### 结合业务场景，使用不同的事务隔离
+
+- 隔离级别越高，并发性能就越低。
+
+- 其实 MySQL 的并发事务调优和 Java 的多线程编程调优非常类似，都是可以通过减小锁粒度和减少锁的持有时间进行调优。在 MySQL 的并发事务调优中，我们尽量在可以使用低事务隔离级别的业务场景中，避免使用高事务隔离级别。
+
+    - 在功能业务开发时，开发人员往往会为了追求开发速度，习惯使用默认的参数设置来实现业务功能。例如，在 service 方法中，你可能习惯默认使用 transaction，很少再手动变更事务隔离级别。但要知道，transaction 默认是 RR 事务隔离级别，在某些业务场景下，可能并不合适。因此，我们还是要结合具体的业务场景，进行考虑。
+
+- 那换到业务场景中，我们如何判断用哪种隔离级别更合适呢？我们可以通过两个简单的业务来说下其中的选择方法。
+
+    - 1.我们在修改用户最后登录时间的业务场景中，这里对查询用户的登录时间没有特别严格的准确性要求，而修改用户登录信息只有用户自己登录时才会修改，不存在一个事务提交的信息被覆盖的可能。所以我们允许该业务使用最低隔离级别。
+
+    - 2.而如果是账户中的余额或积分的消费，就存在多个客户端同时消费一个账户的情况，此时我们应该选择 RR 级别来保证一旦有一个客户端在对账户进行消费，其他客户端就不可能对该账户同时进行消费了。
+
+- 是否遇到过以下 SQL 异常呢？在抢购系统的日志中，在活动区间，我们经常可以看到这种异常日志：`MySQLQueryInterruptedException: Query execution was interrupted`
+
+    - 由于在抢购提交订单中开启了事务，在高并发时对一条记录进行更新的情况下，当多个事务同时对一条记录进行更新时，极端情况下，一个更新操作进去排队系统后，可能会一直拿不到锁，最后因超时被系统打断踢出。
+
+    - 在两种不同的执行顺序下，其结果都是一样的，但在事务性能方面却不一样：
+
+        | 执行顺序1                    | 执行顺序2                    |
+        |------------------------------|------------------------------|
+        | 1.开启事务                   | 1.开启事务                   |
+        | 2.查询库存、判断库存是否满足 | 2.查询库存、判断库存是否满足 |
+        | 3.新建订单                   | 3.扣除库存                   |
+        | 4.扣除库存                   | 4.新建订单                   |
+        | 5.提交或回滚                 | 5.提交或回滚                 |
+
+        - 这是因为，虽然这些操作在同一个事务，但锁的申请在不同时间，只有当其他操作都执行完，才会释放所有锁。因为扣除库存是更新操作，属于行锁，这将会影响到其他操作该数据的事务，所以我们应该尽量避免长时间地持有该锁，尽快释放该锁。
+
+        - 又因为先新建订单和先扣除库存都不会影响业务，所以我们可以将扣除库存操作放到最后，也就是使用执行顺序 1，以此尽量减小锁的持有时间。
+
 ##### 事务详解
 
 - [爱可生开源社区：第 01 期 [事务] 事务的起源：事务池和管理器的初始化](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513012&idx=1&sn=8f9c1355822d8e1865ea854da8e8c66f&chksm=fc95512bcbe2d83d6b4afad772e607600ee7fd98a8faa4364d33fb68e0763a71ce28c059a993&scene=21#wechat_redirect)
@@ -2345,96 +2501,7 @@ alter table t1 tablespace ts1;
         - 2.第一条 SQL 语句是 update 或 delete。
             - 具体过程等同于上面的读事务变成读写事务
 
-##### 基本使用
-
-| 事务sql语句   | 操作           |
-| ------------- | -------------- |
-| BEGIN         | 开始一个事务   |
-| ROLLBACK      | 事务回滚       |
-| COMMIT        | 事务确认       |
-
-```sql
-# 创建表tz
-create table tz (
-    id int (8),
-    name varchar(50),
-    date DATE
-);
-
-# 开始事务
-begin;
-
-# 插入数据
-insert into tz (id,name,date) values
-(1,'tz','2020-10-24');
-
-# 回滚到开始事务之前(rollback 和 commit 只能选一个)
-rollback;
-# 如果出现waring,表示该表的存储引擎不支持事务(不是innodb)
-Query OK, 0 rows affected, 1 warning (0.00 sec)
-
-# 如果不回滚,使用commit确认这次事务的修改
-commit;
-```
-
-如果有两个会话,一个开启了事务,修改了数据.另一个会话同步数据要执行 `flush table 表名`
-
-```sql
-# 把 clone表 存放在缓冲区里的修改操作写入磁盘
-flush table clone
-```
-
-![image](./Pictures/mysql/flush.avif)
-
-`flush table clone`后, `select` 数据同步
-![image](./Pictures/mysql/flush1.avif)
-
----
-
-- `SAVEPOINT savepoint_name;` 声明一个事务保存点
-- `ROLLBACK TO savepoint_name;` 回滚到事务保存点,但不会终止该事务
-- `RELEASE SAVEPOINT savepoint_name;` // 删除指定保留点
-
-```sql
-# 创建数据库
-create table tz (
-    id int (8),
-    name varchar(50),
-    date DATE
-);
-
-# 声明一个名叫 abc 的事务保存点
-savepoint abc;
-
-# 插入数据
-insert into tz (id,name,date) values
-(1,'tz','2020-10-24');
-
-# 回滚到 abc 事务保存点
-rollback to abc;
-```
-
-##### autocommit（自动提交）
-
-`autocommit = 1` 对表的所有修改将立即生效
-
-`autocommit = 0` 则必须使用 COMMIT 来提交事务,或使用 ROLLBACK 来回滚撤销事务
-
-- 1.如果 InnoDB 表有大量的修改操作,应设置 `autocommit = 0` 因为 `ROLLBACK` 操作会浪费大量的 I/O
-
-    ```ini
-    [mysqld]
-    autocommit = 0
-    ```
-
-    - **注意:**
-
-        - 不要长时间打开事务会话,适当的时候要执行 COMMIT(完成更改)或 ROLLBACK(回滚撤消更改)
-        - ROLLBACK 这是一个相对昂贵的操作 请避免对大量行进行更改,然后回滚这些更改.
-
-- 2.如果只是查询表,没有大量的修改,应设置 `autocommit = 1`
-
-##### [爱可生开源社区：MySQL 核心模块揭秘 | 13 期 | 回滚到 savepoint](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247514601&idx=1&sn=4b8ff384ce70af1fc8edf983a7881ef6&chksm=fc955b76cbe2d2603f8393fe24ac674684702a054e467fe3e037a3b4b81e7c7a1593e9b81596&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+###### [爱可生开源社区：MySQL 核心模块揭秘 | 13 期 | 回滚到 savepoint](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247514601&idx=1&sn=4b8ff384ce70af1fc8edf983a7881ef6&chksm=fc955b76cbe2d2603f8393fe24ac674684702a054e467fe3e037a3b4b81e7c7a1593e9b81596&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
 
 - 准备工作
     ```sql
@@ -2525,123 +2592,6 @@ rollback to abc;
             - 删除 savept3 之后，m_savepoints 链表如下图所示：
 
             ![image](./Pictures/mysql/事务-savepoints1.avif)
-
-##### [事务隔离性](https://mariadb.com/kb/en/set-transaction/)
-
-- mysql默认隔离性为REPEATABLE READ（可重复读）
-
-- 基本命令
-
-    ```sql
-    -- 查看当前会话的隔离级别
-    SHOW VARIABLES LIKE 'transaction_isolation';
-    -- 查看全局的隔离级别
-    SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
-    -- 查看当前会话和全局的隔离级别
-    SELECT @@GLOBAL.tx_isolation, @@tx_isolation;
-
-    -- 设置当前会话的隔离级别。设置为READ COMMITTED（已提交读）
-    SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-    -- 设置全局的隔离级别。设置为REPEATABLE READ（可重复读）
-    SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
-    ```
-
-- 创建测试表，并插入数据:
-
-    ```sql
-    drop table if exists test;
-
-    CREATE TABLE test(
-        id int (8),
-        name varchar(50),
-        date DATE
-    );
-
-    insert into test (id,name,date) values
-    (1,'tz1','2020-10-24'),
-    (10,'tz2','2020-10-24'),
-    (100,'tz3','2020-10-24');
-
-    commit;
-    ```
-
-###### read uncommitted(未提交读)，也叫dirty read (脏读)
-
-> 事务A能读到事务B修改了但未提交的数据
-
-- 开启事务 a:
-
-    ```sql
-    # 设置事务a read uncommitted
-    set session transaction isolation level read uncommitted;
-    begin;
-    select * from test;
-    ```
-
-- 开启事务 b,并修改数据,不需要提交:
-
-    ```sql
-    begin;
-    select *from test;
-
-    update test
-    set id = 20
-    where id = 10;
-    ```
-
-- 事务 a 就能读取到b未提交修改的数据:
-
-    ```sql
-    select * from test;
-    ```
-
-    - 右边为事务 a
-    - 左边为事务 b
-    ![image](./Pictures/mysql/uncommitted.gif)
-
-- 注意:如果事务 b,没有 `commit` 就退出.那么事务 b 的修改将失效
-
-    ![image](./Pictures/mysql/uncommitted1.gif)
-
-###### read committed(已提交读) , phantom read (幻读):
-
-> 事务A只能读到事务B修改并提交的数据
-
-- 开启事务 a:
-
-    ```sql
-    # 设置事务a read committed
-    set session transaction isolation level read committed;
-
-    # 开启事务
-    begin;
-    select * from test;
-    ```
-
-- 开启事务 b,并修改数据后,提交:
-
-    ```sql
-    begin;
-    select *from test;
-
-    update test
-    set id = 20
-    where id = 10;
-
-    # 区别于 read uncommitted
-    commit;
-    ```
-
-- 事务 a 就能读取:
-
-    ```sql
-    select * from test;
-    ```
-
-    - 右边为事务 a
-    - 左边为事务 b
-    ![image](./Pictures/mysql/committed.gif)
 
 ###### MVCC(多版本并发控制)
 
@@ -2873,38 +2823,6 @@ rollback to abc;
         - 3.将字段b的值修改为4，事务ID的值修改为3；
         - 4.回滚字段写入回滚指针的地址；
         - 5.提交事务释放排他锁。
-
-##### 结合业务场景，使用不同的事务隔离
-
-- 隔离级别越高，并发性能就越低。
-
-- 其实 MySQL 的并发事务调优和 Java 的多线程编程调优非常类似，都是可以通过减小锁粒度和减少锁的持有时间进行调优。在 MySQL 的并发事务调优中，我们尽量在可以使用低事务隔离级别的业务场景中，避免使用高事务隔离级别。
-
-    - 在功能业务开发时，开发人员往往会为了追求开发速度，习惯使用默认的参数设置来实现业务功能。例如，在 service 方法中，你可能习惯默认使用 transaction，很少再手动变更事务隔离级别。但要知道，transaction 默认是 RR 事务隔离级别，在某些业务场景下，可能并不合适。因此，我们还是要结合具体的业务场景，进行考虑。
-
-- 那换到业务场景中，我们如何判断用哪种隔离级别更合适呢？我们可以通过两个简单的业务来说下其中的选择方法。
-
-    - 1.我们在修改用户最后登录时间的业务场景中，这里对查询用户的登录时间没有特别严格的准确性要求，而修改用户登录信息只有用户自己登录时才会修改，不存在一个事务提交的信息被覆盖的可能。所以我们允许该业务使用最低隔离级别。
-
-    - 2.而如果是账户中的余额或积分的消费，就存在多个客户端同时消费一个账户的情况，此时我们应该选择 RR 级别来保证一旦有一个客户端在对账户进行消费，其他客户端就不可能对该账户同时进行消费了。
-
-- 是否遇到过以下 SQL 异常呢？在抢购系统的日志中，在活动区间，我们经常可以看到这种异常日志：`MySQLQueryInterruptedException: Query execution was interrupted`
-
-    - 由于在抢购提交订单中开启了事务，在高并发时对一条记录进行更新的情况下，当多个事务同时对一条记录进行更新时，极端情况下，一个更新操作进去排队系统后，可能会一直拿不到锁，最后因超时被系统打断踢出。
-
-    - 在两种不同的执行顺序下，其结果都是一样的，但在事务性能方面却不一样：
-
-        | 执行顺序1                    | 执行顺序2                    |
-        |------------------------------|------------------------------|
-        | 1.开启事务                   | 1.开启事务                   |
-        | 2.查询库存、判断库存是否满足 | 2.查询库存、判断库存是否满足 |
-        | 3.新建订单                   | 3.扣除库存                   |
-        | 4.扣除库存                   | 4.新建订单                   |
-        | 5.提交或回滚                 | 5.提交或回滚                 |
-
-        - 这是因为，虽然这些操作在同一个事务，但锁的申请在不同时间，只有当其他操作都执行完，才会释放所有锁。因为扣除库存是更新操作，属于行锁，这将会影响到其他操作该数据的事务，所以我们应该尽量避免长时间地持有该锁，尽快释放该锁。
-
-        - 又因为先新建订单和先扣除库存都不会影响业务，所以我们可以将扣除库存操作放到最后，也就是使用执行顺序 1，以此尽量减小锁的持有时间。
 
 #### 锁
 
@@ -3204,6 +3122,8 @@ rollback to abc;
         - 当有大量插入、更新和删除操作，应该适当增加这个值。
 
         - 如果Change Buffer消耗了过多的Buffer Pool的内存空间，可以降低这个值。
+
+### [MyRocks:lsm存储引擎](http://myrocks.io/docs/getting-started/)
 
 ### frm文件解析利器mysqlfrm
 
@@ -5080,6 +5000,1254 @@ func printColumn(columns []*pbe.Column) {
 
 - 按上述修改Canal配置后，重启Canal服务即可。
 
+## 大表变更
+
+### onlineddl变更工具
+
+#### OnlineDDL
+
+![image](./Pictures/mysql/OnlineDDL速查表.avif)
+
+- MySQL 5.6 开始支持 Online DDL ，添加[唯一]索引虽然不需要重建表，也不阻塞 DML ，但是大表场景下还是不会直接使用 Alter Table 进行添加，而是使用第三方工具进行操作，比较常见的就属 pt-osc 和 gh-ost 了。
+
+#### [gh-ost：](https://github.com/github/gh-ost)
+
+- [爱可生开源社区：技术分享 | gh-ost 在线 ddl 变更工具](https://mp.weixin.qq.com/s?src=11&timestamp=1714036602&ver=5222&signature=dCZnHB7jTYnBSJKoCfbsz4TVUxfiGi7ALay5lG4KPOPGXVPzhJ5v-mrYPykrPAaFcr4FeeTgPIiGUXE*emwdPcyfsTnhB7g8GnmmVMvkJsWIwslf18wOXFRc1oCn-U1K&new=1)
+
+- 作为 MySQL DBA，相信我们大家都会对大表变更（大于10G 以上的）比较头疼，尤其是某些 DDL 会锁表，影响业务可持续性。目前通用的方案使用 Percona 公司开源的 pt-osc 工具解决导致锁表的操作，还有一款 github 基于 go 语言开发的 gh-ost。本文主要介绍 gh-ost 使用方法，其工作原理放到下一篇文章介绍。
+
+- 与 pt-osc 的对比
+    - 从功能，稳定性和性能上来看，两种工具各有千秋
+        - 虽然在高并发写的情况下，gh-ost 应用 binlog 会出现性能较低不如 pt-osc 的情况。
+        - 不过 gh-ost 更灵活，支持我们根据实际情况动态调整。
+
+- gh-ost 介绍
+
+    - gh-ost 作为一个伪装的备库，可以从主库/备库上拉取 binlog，过滤之后重新应用到主库上去，相当于主库上的增量操作通过 binlog 又应用回主库本身，不过是应用在幽灵表上。
+
+    - 其大致的工作过程：
+
+        ![image](./Pictures/mysql/gh-ost流程.avif)
+
+        - 1.gh-ost 首先连接到主库上，根据 alter 语句创建幽灵表，
+        - 2.然后作为一个备库连接到其中一个真正的备库或者主库上(根据具体的参数来定)，一边在主库上拷贝已有的数据到幽灵表，一边从备库上拉取增量数据的 binlog，然后不断的把 binlog 应用回主库。
+        - 3.等待全部数据同步完成，进行 cut-over 幽灵表和原表切换。图中 cut-over 是最后一步，锁住主库的源表，等待 binlog 应用完毕，然后替换 gh-ost 表为源表。gh-ost 在执行中，会在原本的 binlog event 里面增加以下 hint 和心跳包，用来控制整个流程的进度，检测状态等。
+
+        - 当然 gh-ost 也会做很多前置的校验检查，比如 binlog_format ，表的主键和唯一键，是否有外键等等
+
+    - 架构优点：
+        - 整个流程异步执行，对于源表的增量数据操作没有额外的开销，高峰期变更业务对性能影响小。
+        - 降低写压力，触发器操作都在一个事务内，gh-ost 应用 binlog 是另外一个连接在做。
+        - 可停止，binlog 有位点记录，如果变更过程发现主库性能受影响，可以立刻停止拉binlog，停止应用 binlog，稳定之后继续应用。
+        - 可测试，gh-ost 提供了测试功能，可以连接到一个备库上直接做 Online DDL，在备库上观察变更结果是否正确，再对主库操作，心里更有底。不过不推荐在备库直接操作。
+
+- gh-ost 操作模式
+
+    ![image](./Pictures/mysql/gh-ost操作模式.avif)
+
+    - 1.连接到从库，在主库做迁移
+        - 这是 gh-ost 默认的工作方式。gh-ost 将会检查从库状态，找到集群结构中的主库并连接，接下来进行迁移操作：
+        - 1.行数据在主库上读写
+        - 2.读取从库的二进制日志，将变更应用到主库
+        - 3.在从库收集表格式，字段&索引，行数等信息
+        - 4.在从库上读取内部的变更事件（如心跳事件）
+        - 5.在主库切换表
+
+        - 如果你的主库的日志格式是 SBR，工具也可以正常工作。但从库必须启用二级制日志( `log_bin`, `log_slave_updates`) 并且设置 `binlog_format=ROW` 。
+
+    - 2.连接到主库
+
+        - 直接连接到主库构造 slave，在主库上进行 copy 数据和应用 binlog，通过指定 --allow-on-master 参数即可。当然主库的 binlog 模式必须是 row模式。
+
+    - 3.在从库迁移/测试
+
+        - 该模式会在从库执行迁移操作。gh-ost 会简单的连接到主库，此后所有的操作都在从库执行，不会对主库进行任何的改动。整个操作过程中，gh-ost 将控制速度保证从库可以及时的进行数据同步
+        - --migrate-on-replica 表示 gh-ost 会直接在从库上进行迁移操作。即使在复制运行阶段也可以进行表的切换操作。
+        - --test-on-replica 表示 迁移操作只是为了测试在切换之前复制会停止，然后会进行切换操作，然后在切换回来，你的原始表最终还是原始表。两个表都会保存下来，复制操作是停止的。你可以对这两个表进行一致性检查等测试操作。
+
+- gh-ost的 cut over
+
+    - gh-ost利用了MySQL的一个特性，就是原子性的rename请求，在所有被blocked的请求中，优先级永远是最高的。
+    - gh-ost基于此设计了该方案：一个连接对原表加锁，另启一个连接尝试rename操作，此时会被阻塞住，当释放lock的时候，rename会首先被执行，其他被阻塞的请求会继续应用到新表。
+
+##### 基本使用
+
+- 重要参数说明
+
+    ```sh
+    gh-ost --help
+
+    -allow-master-master:是否允许gh-ost运行在双主复制架构中，一般与-assume-master-host参数一起使用
+
+    -allow-nullable-unique-key:允许gh-ost在数据迁移依赖的唯一键可以为NULL，默认为不允许为NULL的唯一键。如果数据迁移(migrate)依赖的唯一键允许NULL值，则可能造成数据不正确，请谨慎使用。
+
+    -allow-on-master:允许gh-ost直接运行在主库上。默认gh-ost连接的从库。
+
+    -alter string:DDL语句
+
+    -assume-master-host string:为gh-ost指定一个主库，格式为”ip:port”或者”hostname:port”。在这主主架构里比较有用，或则在gh-ost发现不到主的时候有用。
+
+    -assume-rbr:确认gh-ost连接的数据库实例的binlog_format=ROW的情况下，可以指定-assume-rbr，这样可以禁止从库上运行stop slave,start slave,执行gh-ost用户也不需要SUPER权限。
+
+    -chunk-size int:在每次迭代中处理的行数量(允许范围：100-100000)，默认值为1000。
+
+    -concurrent-rowcount:该参数如果为True(默认值)，则进行row-copy之后，估算统计行数(使用explain select count(*)方式)，并调整ETA时间，否则，gh-ost首先预估统计行数，然后开始row-copy。
+
+    -conf string:gh-ost的配置文件路径。
+
+    -critical-load string:一系列逗号分隔的status-name=values组成，当MySQL中status超过对应的values，gh-ost将会退出。-critical-load Threads_connected=20,Connections=1500，指的是当MySQL中的状态值Threads_connected>20,Connections>1500的时候，gh-ost将会由于该数据库严重负载而停止并退出。
+
+    -critical-load-hibernate-seconds int :负载达到critical-load时，gh-ost在指定的时间内进入休眠状态。它不会读/写任何来自任何服务器的任何内容。
+
+    -critical-load-interval-millis int:当值为0时，当达到-critical-load，gh-ost立即退出。当值不为0时，当达到-critical-load，gh-ost会在-critical-load-interval-millis秒数后，再次进行检查，再次检查依旧达到-critical-load，gh-ost将会退出。
+
+    -cut-over string:选择cut-over类型:
+
+    atomic/two-step，atomic(默认)类型的cut-over是github的算法，two-step采用的是facebook-OSC的算法。
+
+    -cut-over-exponential-backoff
+
+    -cut-over-lock-timeout-seconds int:gh-ost在cut-over阶段最大的锁等待时间，当锁超时时，gh-ost的cut-over将重试。(默认值：3)
+
+    -database string:数据库名称。
+
+    -default-retries int:各种操作在panick前重试次数。(默认为60)
+
+    -dml-batch-size int:在单个事务中应用DML事件的批量大小（范围1-100）（默认值为10）
+
+    -exact-rowcount:准确统计表行数(使用select count(*)的方式)，得到更准确的预估时间。
+
+    -execute:实际执行alter&migrate表，默认为noop，不执行，仅仅做测试并退出，如果想要ALTER TABLE语句真正落实到数据库中去，需要明确指定-execute
+
+    -exponential-backoff-max-interval int
+
+    -force-named-cut-over:如果为true，则'unpostpone | cut-over'交互式命令必须命名迁移的表
+
+    -heartbeat-interval-millis int:gh-ost心跳频率值，默认为500
+
+    -initially-drop-ghost-table:gh-ost操作之前，检查并删除已经存在的ghost表。该参数不建议使用，请手动处理原来存在的ghost表。默认不启用该参数，gh-ost直接退出操作。
+
+    -initially-drop-old-table:gh-ost操作之前，检查并删除已经存在的旧表。该参数不建议使用，请手动处理原来存在的ghost表。默认不启用该参数，gh-ost直接退出操作。
+
+    -initially-drop-socket-file:gh-ost强制删除已经存在的socket文件。该参数不建议使用，可能会删除一个正在运行的gh-ost程序，导致DDL失败。
+
+    -max-lag-millis int:主从复制最大延迟时间，当主从复制延迟时间超过该值后，gh-ost将采取节流(throttle)措施，默认值：1500s。
+
+    -max-load string:逗号分隔状态名称=阈值，如：'Threads_running=100,Threads_connected=500'. When status exceeds threshold, app throttles writes
+
+    -migrate-on-replica:gh-ost的数据迁移(migrate)运行在从库上，而不是主库上。
+
+    -nice-ratio float:每次chunk时间段的休眠时间，范围[0.0…100.0]。0：每个chunk时间段不休眠，即一个chunk接着一个chunk执行；1：每row-copy 1毫秒，则另外休眠1毫秒；0.7：每row-copy 10毫秒，则另外休眠7毫秒。
+
+    -ok-to-drop-table:gh-ost操作结束后，删除旧表，默认状态是不删除旧表，会存在_tablename_del表。
+
+    -panic-flag-file string:当这个文件被创建，gh-ost将会立即退出。
+
+    -password string :MySQL密码
+
+    -port int ：MySQL端口，最好用从库
+
+    -postpone-cut-over-flag-file string：当这个文件存在的时候，gh-ost的cut-over阶段将会被推迟，数据仍然在复制，直到该文件被删除。
+
+    -skip-foreign-key-checks:确定你的表上没有外键时，设置为'true'，并且希望跳过gh-ost验证的时间-skip-renamed-columns ALTER
+
+    -switch-to-rbr:让gh-ost自动将从库的binlog_format转换为ROW格式。
+
+    -table string:表名
+
+    -throttle-additional-flag-file string:当该文件被创建后，gh-ost操作立即停止。该参数可以用在多个gh-ost同时操作的时候，创建一个文件，让所有的gh-ost操作停止，或者删除这个文件，让所有的gh-ost操作恢复。
+
+    -throttle-control-replicas string:列出所有需要被检查主从复制延迟的从库。
+
+    -throttle-flag-file string:当该文件被创建后，gh-ost操作立即停止。该参数适合控制单个gh-ost操作。-throttle-additional-flag-file string适合控制多个gh-ost操作。
+
+    -throttle-query string:节流查询。每秒钟执行一次。当返回值=0时不需要节流，当返回值>0时，需要执行节流操作。该查询会在数据迁移(migrated)服务器上操作，所以请确保该查询是轻量级的。
+
+    -timestamp-old-table:在旧表名中使用时间戳。这会使旧表名称具有唯一且无冲突的交叉迁移。
+
+    -user string :MYSQL用户
+    ```
+
+- 执行 ddl。测试例子对 test.b 重建表 alter table b engine=innodb；
+    ```sh
+    gh-ost \
+    --max-load=Threads_running=20 \
+    --critical-load=Threads_running=50 \
+    --critical-load-interval-millis=5000 \
+    --chunk-size=1000 \
+    --user="tz" \
+    --password="" \
+    --host='127.0.0.1' \
+    --port=3306 \
+    --database="test" \
+    --table="json_test" \
+    --verbose \
+    --alter="engine=innodb" \
+    --assume-rbr \
+    --cut-over=default \
+    --cut-over-lock-timeout-seconds=1 \
+    --dml-batch-size=10 \
+    --allow-on-master \
+    --concurrent-rowcount \
+    --default-retries=10 \
+    --heartbeat-interval-millis=2000 \
+    --panic-flag-file=/tmp/ghost.panic.flag \
+    --postpone-cut-over-flag-file=/tmp/ghost.postpone.flag \
+    --timestamp-old-table \
+    --execute 2>&1 | tee  /tmp/rebuild_t1.log
+    ```
+
+    - 操作过程中会生成两个中间状态的表 _b_ghc, _b_gho，其中 _b_ghc 是记录 gh-ost 执行过程的表，其记录类似如下：
+
+        - _b_gho 是目标表，也即应用 ddl 语句的幽灵表。
+
+            > 特别说明，上面的命令其实是在我们的生产线上直接使用的。一般我们针对几百 G 的大表做归档删除数据之后要重建表，以便减少表空间大小。重建完，进行 cut-over 切换幽灵表和原表时，默认不删除幽灵表。因为直接删除上百 G 会对磁盘 IO 有一定的影响.
+            > 其他的请各位同行根据自己的情况去调整合适的参数，注意以下两个参数。
+
+            ```sh
+            --ok-to-drop-table:gh-ost操作结束后，删除旧表，默认状态是不删除旧表，会存在_tablename_del表。
+            --timestamp-old-table 最终rename的时候表名会加上时间戳后缀，每次执行的时候都会生成一个新的表名。
+            ```
+
+- gh-ost 的特性
+
+    > gh-ost 拥有众多特性，比如：轻量级、可暂停、可动态控制、可审计、可测试等等，我们可以通过操作特定的文件对正在执行的 gh-ost 命令进行动态调整。
+
+    - 暂停/恢复
+        - 我们可以通过创建/删除 throttle-additional-flag-file 指定的文件 /tmp/gh-ost.throttle 控制 gh-ost 对 binlog 应用。
+
+    - 限流
+        - gh-ost 可以通过 unix socket 文件或者 TCP 端口（可配置）的方式来监听请求，DBA 可以在命令运行后更改相应的参数，参考下面的例子：
+
+        - 打开限流
+
+            ```sh
+            echo throttle | socat - /tmp/gh-ost.test.b.sock
+            ```
+            - _b_ghc 中会多一条记录
+            ```sh
+            331 | 2019-08-31 23:23:00 | throttle at 1567264980930907070 | done throttling
+            ```
+
+        - 关闭限流
+            ```
+            no-throttle | socat - /tmp/gh-ost.test.b.sock
+            ```
+            - _b_ghc 中会多一条记录
+
+            ```
+            347 | 2019-08-31 23:24:09 | throttle at 1567265049830789079 | commanded by user
+            ```
+
+    - 改变执行参数：chunk-size= 1024, max-lag-millis=100, max-load=Thread_running=23 这些参数都可以在运行时动态调整。
+        ```sh
+        echo chunk-size=1024 | socat - /tmp/gh-ost.test.b.sock
+        echo max-lag-millis=100 | socat - /tmp/gh-ost.test.b.sock
+        echo max-load=Thread_running=23 | socat - /tmp/gh-ost.test.b.sock
+        ```
+
+    - 终止运行
+
+        - 注意停止 gh-ost 操作会有遗留表 xxx_ghc，xxx_gho还有 socket 文件，管理 cut-over 的文件，如果你需要执行两次请务必检查指定目录是否存在这些文件，并且清理掉文件和表。
+
+        - 我们通过来过创建 panic-flag-file 指定的文件，立即终止正在执行的 gh-ostmin
+
+            - 创建文件
+                ```sh
+                /tmp/ghost.panic.flag
+                ```
+            - gh-ost log提示
+                ```sh
+                2019-08-31 22:50:52.701 FATAL Found panic-file /tmp/ghost.panic.flag. Aborting without cleanup
+                ```
+
+##### [爱可生开源社区：社区投稿 | gh-ost 原理剖析](https://mp.weixin.qq.com/s?src=11&timestamp=1714036602&ver=5222&signature=dCZnHB7jTYnBSJKoCfbsz4TVUxfiGi7ALay5lG4KPONZ2nq5w0rs-OPUSJTnwH2VeVoqOZsnl7400dQaAIQ9Ob6BFEytB*ROFO0Z7bjOPP0cgZPFh*iPtvq46ZPZYmSz&new=1)
+
+- 原理：
+
+    - 本例基于在主库上执行 DDL 记录的核心过程。核心代码在 github.com/github/gh-ost/go/logic/migrator.go 的 Migrate()
+
+    - 结论：纵观 gh-ost 的执行过程，查看源码算法设计，尤其是 cut-over 设计思路之精妙，原子操作，任何异常都不会对业务有严重影响。欢迎已经使用过的朋友分享各自遇到的问题，也欢迎还未使用过该工具的朋友大胆尝试。
+
+- 1.检查数据库实例的基础信息
+    ```sql
+    a 测试db是否可连通,
+    b 权限验证
+      show grants for current_user()
+    c 获取binlog相关信息,包括row格式和修改binlog格式后的重启replicate
+      select @@global.log_bin, @@global.binlog_format
+      select @@global.binlog_row_image
+    d 原表存储引擎是否是innodb,检查表相关的外键,是否有触发器,行数预估等操作，需要注意的是行数预估有两种方式  一个是通过explain 读执行计划 另外一个是select count(*) from table ,遇到几百G的大表，后者一定非常慢。
+    explain select /* gh-ost */ * from `test`.`b` where 1=1
+    ```
+
+- 2.模拟 slave，获取当前的位点信息，创建 binlog streamer 监听 binlog
+    ```sql
+    2019-09-08T22:01:20.944172+08:00    17760 Query show /* gh-ost readCurrentBinlogCoordinates */ master status
+    2019-09-08T22:01:20.947238+08:00    17762 Connect   root@127.0.0.1 on  using TCP/IP
+    2019-09-08T22:01:20.947349+08:00    17762 Query SHOW GLOBAL VARIABLES LIKE 'BINLOG_CHECKSUM'
+    2019-09-08T22:01:20.947909+08:00    17762 Query SET @master_binlog_checksum='NONE'
+    2019-09-08T22:01:20.948065+08:00    17762 Binlog Dump   Log: 'mysql-bin.000005'  Pos: 795282
+    ```
+
+- 3.创建 日志记录表 xx_ghc 和影子表 xx_gho 并且执行 alter 语句将影子表变更为目标表结构。如下日志记录了该过程，gh-ost 会将核心步骤记录到 _b_ghc 中。
+
+    ```sql
+    2019-09-08T22:01:20.954866+08:00    17760 Query create /* gh-ost */ table `test`.`_b_ghc` (
+                id bigint auto_increment,
+                last_update timestamp not null DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                hint varchar(64) charset ascii not null,
+                value varchar(4096) charset ascii not null,
+                primary key(id),
+                unique key hint_uidx(hint)
+            ) auto_increment=256
+    2019-09-08T22:01:20.957550+08:00    17760 Query create /* gh-ost */ table `test`.`_b_gho` like `test`.`b`
+    2019-09-08T22:01:20.960110+08:00    17760 Query alter /* gh-ost */ table `test`.`_b_gho` engine=innodb
+    2019-09-08T22:01:20.966740+08:00    17760 Query
+       insert /* gh-ost */ into `test`.`_b_ghc`(id, hint, value)values (NULLIF(2, 0), 'state', 'GhostTableMigrated') on duplicate key update last_update=NOW(),value=VALUES(value)
+    ```
+
+- 4.`insert into xx_gho select * from xx` 拷贝数据
+
+    - 获取当前的最大主键和最小主键，然后根据命令行传参 chunk 获取数据 insert 到影子表里面
+
+    ```sql
+    获取最小主键 select `id` from `test`.`b` order by `id` asc limit 1;
+    获取最大主键 soelect `id` from `test`.`b` order by `id` desc limit 1;
+    获取第一个 chunk:
+    select  /* gh-ost `test`.`b` iteration:0 */ `id` from `test`.`b` where ((`id` > _binary'1') or ((`id` = _binary'1'))) and ((`id` < _binary'21') or ((`id` = _binary'21'))) order by `id` asc limit 1 offset 999;
+
+    循环插入到目标表:
+    insert /* gh-ost `test`.`b` */ ignore into `test`.`_b_gho` (`id`, `sid`, `name`, `score`, `x`) (select `id`, `sid`, `name`, `score`, `x` from `test`.`b` force index (`PRIMARY`)  where (((`id` > _binary'1') or ((`id` = _binary'1'))) and ((`id` < _binary'21') or ((`id` = _binary'21')))) lock in share mode;
+
+    循环到最大的id，之后依赖binlog 增量同步
+    ```
+
+    - 需要注意的是
+        > rowcopy 过程中是对原表加上 lock in share mode，防止数据在 copy 的过程中被修改。这点对后续理解整体的数据迁移非常重要。因为 gh-ost 在 copy 的过程中不会修改这部分数据记录。对于解析 binlog 获得的 INSERT，UPDATE，DELETE 事件我们只需要分析 copy 数据之前 log before copy 和 copy 数据之后 log after copy。整体的数据迁移会在后面做详细分析。
+
+- 5.增量应用 binlog 迁移数据
+
+    > 核心代码在 gh-ost/go/sql/builder.go 中，这里主要做 DML 转换的解释，当然还有其他函数做辅助工作，比如数据库，表名校验 以及语法完整性校验。
+
+    - 解析到 delete 语句对应转换为 delete 语句
+        ```go
+        func BuildDMLDeleteQuery(databaseName, tableName string, tableColumns, uniqueKeyColumns *ColumnList, args []interface{}) (result string, uniqueKeyArgs []interface{}, err error) {
+           ....省略代码...
+            result = fmt.Sprintf(`
+                    delete /* gh-ost %s.%s */
+                        from
+                            %s.%s
+                        where
+                            %s
+                `, databaseName, tableName,
+                databaseName, tableName,
+                equalsComparison,
+            )
+            return result, uniqueKeyArgs, nil
+        }
+        ```
+
+    - 解析到 insert 语句对应转换为 replace into 语句
+
+        ```go
+        func BuildDMLInsertQuery(databaseName, tableName string, tableColumns, sharedColumns, mappedSharedColumns *ColumnList, args []interface{}) (result string, sharedArgs []interface{}, err error) {
+           ....省略代码...
+            result = fmt.Sprintf(`
+                    replace /* gh-ost %s.%s */ into
+                        %s.%s
+                            (%s)
+                        values
+                            (%s)
+                `, databaseName, tableName,
+                databaseName, tableName,
+                strings.Join(mappedSharedColumnNames, ", "),
+                strings.Join(preparedValues, ", "),
+            )
+            return result, sharedArgs, nil
+        }
+        ```
+
+    - 解析到 update 语句 对应转换为语句
+
+        ```go
+        func BuildDMLUpdateQuery(databaseName, tableName string, tableColumns, sharedColumns, mappedSharedColumns, uniqueKeyColumns *ColumnList, valueArgs, whereArgs []interface{}) (result string, sharedArgs, uniqueKeyArgs []interface{}, err error) {
+           ....省略代码...
+            result = fmt.Sprintf(`
+                     update /* gh-ost %s.%s */
+                             %s.%s
+                        set
+                            %s
+                        where
+                             %s
+                 `, databaseName, tableName,
+                databaseName, tableName,
+                setClause,
+                equalsComparison,
+            )
+            return result, sharedArgs, uniqueKeyArgs, nil
+        }
+        ```
+
+    - 数据迁移的数据一致性分析
+
+    - gh-ost 做 DDL 变更期间对原表和影子表的操作有三种：对原表的 row copy （我们用 A 操作代替），业务对原表的 DML 操作(B)，对影子表的 apply binlog(C)。而且 binlog 是基于 DML 操作产生的，因此对影子表的 apply binlog 一定在 对原表的 DML 之后，共有如下几种顺序：
+        ![image](./Pictures/mysql/go-ost影子表.avif)
+
+    - 通过上面的几种组合操作的分析，我们可以看到数据最终是一致的。尤其是当copy 结束之后，只剩下apply binlog，情况更简单。
+
+- 6.copy 完数据之后进行原始表和影子表 cut-over 切换
+
+    - gh-ost 的切换是原子性切换，基本是通过两个会话的操作来完成。作者写了三篇文章解释 cut-over 操作的思路和切换算法。详细的思路请移步到下面的链接。
+        > http://code.openark.org/blog/mysql/solving-the-non-atomic-table-swap-take-iii-making-it-atomic
+        > http://code.openark.org/blog/mysql/solving-the-non-atomic-table-swap-take-ii
+        > http://code.openark.org/blog/mysql/solving-the-facebook-osc-non-atomic-table-swap-problem
+
+- 这里将第三篇文章描述核心切换逻辑摘录出来。其原理是基于 MySQL 内部机制：被 lock table 阻塞之后，执行 rename 的优先级高于 DML，也即先执行 rename table ，然后执行 DML。假设 gh-ost 操作的会话是 c10 和 c20，其他业务的 DML 请求的会话是 c1-c9，c11-c19，c21-c29。
+
+    ```sql
+    1 会话 c1..c9: 对b表正常执行DML操作。
+
+    2 会话 c10 : 创建_b_del 防止提前rename 表，导致数据丢失。
+          create /* gh-ost */ table `test`.`_b_del` (
+                id int auto_increment primary key
+            ) engine=InnoDB comment='ghost-cut-over-sentry'
+
+    3 会话 c10 执行LOCK TABLES b WRITE, `_b_del` WRITE。
+
+    4 会话c11-c19 新进来的dml或者select请求，但是会因为表b上有锁而等待。
+
+    5 会话c20:设置锁等待时间并执行rename
+
+        set session lock_wait_timeout:=1
+        rename /* gh-ost */ table `test`.`b` to `test`.`_b_20190908220120_del`, `test`.`_b_gho` to `test`.`b`
+      c20 的操作因为c10锁表而等待。
+
+    6 c21-c29 对于表 b 新进来的请求因为lock table和rename table 而等待。
+
+    7 会话c10 通过sql 检查会话c20 在执行rename操作并且在等待mdl锁。
+
+    select id
+                from information_schema.processlist
+                where
+                    id != connection_id()
+                    and 17765 in (0, id)
+                    and state like concat('%', 'metadata lock', '%')
+                    and info  like concat('%', 'rename', '%')
+
+    8 c10 基于步骤7 执行drop table `_b_del` ,删除命令执行完，b表依然不能写。所有的dml请求都被阻塞。
+
+    9 c10 执行UNLOCK TABLES; 此时c20的rename命令第一个被执行。而其他会话c1-c9,c11-c19,c21-c29的请求可以操作新的表b。
+    ```
+
+    - 划重点（敲黑板）
+        - 1.创建 _b_del 表是为了防止 cut-over 提前执行，导致数据丢失。
+        - 2.同一个会话先执行 write lock 之后还是可以 drop 表的。
+        - 3.无论 rename table 和 DML 操作谁先执行，被阻塞后 rename table 总是优先于 DML 被执行。大家可以一边自己执行 gh-ost ，一边开启 general log 查看具体的操作过程。
+
+        ```sql
+        2019-09-08T22:01:24.086734    17765   create /* gh-ost */ table `test`.`_b_20190908220120_del` (
+                    id int auto_increment primary key
+                ) engine=InnoDB comment='ghost-cut-over-sentry'
+        2019-09-08T22:01:24.091869    17760 Query lock /* gh-ost */ tables `test`.`b` write, `test`.`_b_20190908220120_del` write
+        2019-09-08T22:01:24.188687    17765   START TRANSACTION
+        2019-09-08T22:01:24.188817    17765   select connection_id()
+        2019-09-08T22:01:24.188931    17765   set session lock_wait_timeout:=1
+        2019-09-08T22:01:24.189046    17765   rename /* gh-ost */ table `test`.`b` to `test`.`_b_20190908220120_del`, `test`.`_b_gho` to `test`.`b`
+        2019-09-08T22:01:24.192293+08:00    17766 Connect   root@127.0.0.1 on test using TCP/IP
+        2019-09-08T22:01:24.192409    17766   SELECT @@max_allowed_packet
+        2019-09-08T22:01:24.192487    17766   SET autocommit=true
+        2019-09-08T22:01:24.192578    17766   SET NAMES utf8mb4
+        2019-09-08T22:01:24.192693    17766   select id
+                    from information_schema.processlist
+                    where
+                        id != connection_id()
+                        and 17765 in (0, id)
+                        and state like concat('%', 'metadata lock', '%')
+                        and info  like concat('%', 'rename', '%')
+        2019-09-08T22:01:24.193050    17766 Query select is_used_lock('gh-ost.17760.lock')
+        2019-09-08T22:01:24.193194    17760 Query drop /* gh-ost */ table if exists `test`.`_b_20190908220120_del`
+        2019-09-08T22:01:24.194858    17760 Query unlock tables
+        2019-09-08T22:01:24.194965    17760 Query ROLLBACK
+        2019-09-08T22:01:24.197563    17765 Query ROLLBACK
+        2019-09-08T22:01:24.197594    17766 Query show /* gh-ost */ table status from `test` like '_b_20190908220120_del'
+        2019-09-08T22:01:24.198082    17766 Quit
+        2019-09-08T22:01:24.298382    17760 Query drop /* gh-ost */ table if exists `test`.`_b_ghc`
+        ```
+
+- 如果 cut-over 过程的各个环节执行失败会发生什么？
+
+    - 其实除了安全，什么都不会发生。
+
+    ```sql
+    如果c10的create `_b_del` 失败，gh-ost 程序退出。
+    如果c10的加锁语句失败，gh-ost 程序退出，因为表还未被锁定，dml请求可以正常进行。
+    如果c10在c20执行rename之前出现异常
+     A. c10持有的锁被释放，查询c1-c9，c11-c19的请求可以立即在b执行。
+     B. 因为`_b_del`表存在,c20的rename table b to  `_b_del`会失败。
+     C. 整个操作都失败了，但没有什么可怕的事情发生，有些查询被阻止了一段时间，我们需要重试。
+    如果c10在c20执行rename被阻塞时失败退出,与上述类似，锁释放，则c20执行rename操作因为——b_old表存在而失败，所有请求恢复正常。
+    如果c20异常失败，gh-ost会捕获不到rename，会话c10继续运行，释放lock，所有请求恢复正常。
+    如果c10和c20都失败了，没问题：lock被清除，rename锁被清除。c1-c9，c11-c19，c21-c29可以在b上正常执行。
+    ```
+
+    - 整个过程对应用程序的影响
+        - 应用程序对表的写操作被阻止，直到交换影子表成功或直到操作失败。如果成功，则应用程序继续在新表上进行操作。如果切换失败，应用程序继续继续在原表上进行操作。
+
+    - 对复制的影响
+        - slave 因为 binlog 文件中不会复制 lock 语句，只能应用 rename 语句进行原子操作，对复制无损。
+
+- 7.处理收尾工作
+
+    - 最后一部分操作其实和具体参数有一定关系。最重要必不可少的是
+        > 关闭 binlogsyncer 连接
+        > 至于中间表，其实和参数有关 --initially-drop-ghost-table --initially-drop-old-table
+
+##### [InsideMySQL：gh-ost 翻车！使用后导致数据丢失！](https://mp.weixin.qq.com/s/u7vKst7iB-eo-VY7hmag5g)
+
+- gh-ost 通过二进制日志（binlog）记录 DDL 变更过程中的修改，而 pt-osc 通过触发器记录修改变化。
+    - 显然，触发器开销更大，且 5.7 版本之前一张表只能有一个类型的触发器，因此使用 pt-osc 的限制也更多些。
+
+    - 因此，使用工具 gh-ost 来进行在线表结构变更操作几乎可以认为是目前 MySQL 的一种标准变更规范。
+
+- 然而，gh-ost 翻车了！
+
+    - 在我们的生产环境中，使用 gh-ost 进行表结构变更后，导致了1条数据的丢失！
+
+    - 在金融业务中，数据丢失是绝对不容许发生的场景
+
+    - 我们的工程师同学经过周末连番的源码研究与测试，最终定位这的确是 gh-ost 代码 bug。
+    - 这意味着之前所有通过 gh-ost 进行 MySQL 数据库变更的操作，都有可能触发数据丢失。
+
+- 复盘
+
+    ![image](./Pictures/mysql/gh-ost流程.avif)
+
+    - 从源码实现的角度看，gh-ost 经历以下几个关键函数步骤：
+        - 1.addDMLEventsListener：添加对于二进制日志的过滤采集（指定表的二进制日志过滤）
+        - 2.ReadMigrationRangeValues：获取对应表唯一索引的max、min值
+        - 3.onBeforeRowCopy：将捕获的二进制日志应用到表 *_gho
+        - 4.iterateChunks：根据 min、max 值，批量插入数据到表 *_gho
+        - 5.rename & drop 新旧表
+
+    - 但是，存在一种可能性，addDMLEventListner后，对应的二进制日志“丢失”了！
+        - 这种情况发生的原因可能是因为 MySQL 数据库启用了 after_sync 模式的半同步复制。
+        - 怎么理解呢？可以通过下面的时序图来看：
+            ![image](./Pictures/mysql/gh-ost丢失数据复盘时序图.avif)
+
+            - 从上图可以看到，在某些场景下，可能发生 gh-ost 开始捕获 DML 操作后的二进制日志，但是之前的二进制事务并没有提交！
+            - 在上图的案例中，步骤1 addDMLEventsListener 将会捕获记录5以后发生的日志。
+            - 然而，在步骤2 ReadMigrationRangeValues 中，获取 min、max的值将会是1、4。
+                - 这是因为由于 after_sync 半同步模式，记录5对应的事务还未提交（如网络原因，或从机宕机等场景），记录5对于 gh-ost 中的函数 ReadMigrationRangeValues  是不可见的。
+            - 因此，步骤3、4只会插入记录1-4，以及回放记录5之后的所有日志，但会丢失记录5。
+
+    - 修复：
+        - 既然知道了原因，那么修复就变得非常简单了。只需要在获取 min、max的边界值的时候通过一致性读取即可：
+
+            ```sql
+            SELECT MIN(UK),MAX(UK) FROM xxx
+            LOCK IN SHARE MODE;
+            ```
+
+        - 通过 `LOCK IN SHARE MODE`，即便发生上述 after_sync 半同步等待问题，则在函数 ReadMigrationRangeValues 执行过程中，需要等待上述事务提交才能完成边界值的获取。
+        - 这时，边界值就会变为1、5，从而不会导致数据的丢失。
+
+- 总结：
+    - 从上述复盘看，gh-ost 数据丢失的可能性是比较大的，而且并不只是一条记录的丢失。
+    - 理论上可以是最后一组提交事务的数量，且每个事务可能影响的记录也不止一条。
+    - 反观工具 pt-osc，其通过触发器捕获增量日志，因此不存在该问题。
+
+    - 另一方面，从这个案例中可以看到一致性共享读取的使用场景。FOR UPDATE 的一致性排他读取大家都了解，但 `LOCK IN SHARE MODE` 何时使用呢？这个场景给了你很好的答案。
+
+        - 最后，在金融场景不能仅仅相信数据库的一致性检查。在上述场景下，主从数据核对检查依然是一致的，没有数据丢失。
+
+        - 所以，金融场景一定还要有业务层的数据核对，通过逻辑核对，确保数据库中的数据是没有任何物理丢失。
+
+#### pt-osc（pt-online-schema-change）
+
+- [官方文档](https://docs.percona.com/percona-toolkit/pt-online-schema-change.html)
+
+#### gh-ost和pt-osc 的对比测试
+
+- [初试GH-OST（转）](https://www.cnblogs.com/zping/p/8876148.html)
+
+- gh-ost 通过二进制日志（binlog）记录 DDL 变更过程中的修改，而 pt-osc 通过触发器记录修改变化。
+    - 显然，触发器开销更大，且 5.7 版本之前一张表只能有一个类型的触发器，因此使用 pt-osc 的限制也更多些。
+
+- 原理
+
+    - PT-OSC
+        - 1.创建一个和要执行 alter 操作的表一样的新的空表结构(是alter之前的结构)
+        - 2.在新表执行alter table 语句
+        - 3.在原表中创建触发器3个触发器分别对应insert,update,delete操作
+        - 4.以一定块大小从原表拷贝数据到临时表，拷贝过程中通过原表上的触发器在原表进行的写操作都会更新到新建的临时表
+        - 5.Rename 原表到old表中，在把临时表Rename为原表
+        - 6.如果有参考该表的外键，根据alter-foreign-keys-method参数的值，检测外键相关的表，做相应设置的处理
+        - 7.默认最后将旧原表删除
+
+    - GH-OST
+        - 1.在变更的服务器上 创建 ghost table( _tbname_gho like tbname)
+        - 2.更改 _tbname_gho 结构为新表结构
+        - 3.作为mysql的slave连接mysql server，并记录新增binlog event
+        - 4.交替执行: 应用新增events到 ghost table 和 复制老表的记录到 ghost table
+        - 5.table重命名(ghost table 替代 老表)
+
+        - 其中有2种常用用法：
+            - 1.连接从库，变更主库 - 默认方式，slave需要开启log-slave-update
+            - 2.连接主库，变更主库 - 必须ROW格式，带上参数--allow-on-master"
+
+- 使用限制
+
+    - PT-OSC
+        - 1.原表必须要有主键或者唯一索引（不含NULL）
+        - 2.原表上不能有触发器存在
+        - 3.使用前需保证有足够的磁盘容量，因为复制原表需要一倍的空间
+        - 4.在阿里RDS 上使用需要增加参数no-version-check
+
+    - GH-OST
+        - 1.原表必须要有主键或者唯一索引（不含NULL）
+        - 2.不支持外键
+        - 3.不支持触发器
+        - 4.不支持虚拟列
+        - 5.不支持 5.7 point类型的列
+        - 6. 5.7 JSON列不能是主键
+        - 7.不能存在另外一个table名字一样，只是大小写有区别
+        - 8.不支持多源复制
+        - 9.不支持M-M 双写
+        - 10.不支持FEDERATED engine
+
+- 重要参数说明
+
+    - PT-OSC
+        - --max-load，默认threads_running=25,可以指定多个指标来限速,每个chunk拷贝完会检查，超过阀值会暂停复制。如果不指定该参数，工具会检查当前运行值并增加20%
+        - --critical-load,默认为threads_running=50,如果不指定，则工具检查当前运行值并当运行到200%是退出工具运行
+        - --max-lag，默认1s，如果发现延迟大于该值，则暂停复制数据。
+        - --check-interval,配合max-lag使用，检查从库超过延时后，该工具睡眠多久
+        - --recursion-method，指定从库的发现机制,processlist,dsn,none 等
+        - --chunk-time,默认0.5秒，拷贝数据行的时候为了保证0.5秒内拷贝完一个chunk，动态调整下一次chunk-size的大小
+        - --[no]check-replication-filters，如果工具检查到服务器选项中有任何复制相关的筛选，工具会报错退出，默认为yes
+        - --chunk-size，指定块大小，默认1000行。
+
+    - GH-OST
+        - --max-load=Threads_running=25 表面如果在执行gh-ost的过程中出现Threads_running=25则暂停gh-ost的执行
+        - --critical-load=Threads_running=60 表明执行过程中出现Threads_running达到60则终止gh-ost的执行
+        - --chunk-size=1000 设置每次从原表copy到 ghost table的行数
+        - --ok-to-drop-table 执行完之后删除原表
+        - --allow-on-master 直连主库执行
+
+- 优点
+
+    - PT-OSC
+        - 1.执行速度快，业界使用比较广泛，较稳定
+
+    - GH-OST
+        - 1.读binlog可以放在从库执行，减少主库的压力
+        - 2.不需要创建触发器，对原表没有改动
+
+- 风险点
+
+    - PT-OSC
+        - 1.需要创建触发器，对原表有改动
+        - 2.涉及主键的更改需要review
+
+    - GH-OST
+        - 1.当系统负载极高时，gh-ost有可能无法跟上binlog日志的处理（未测试过该场景）
+        - 2.限制比较多，见上文
+        - 3.涉及主键的更改需要review
+
+- 运行命令实例
+
+    - PT-OSC
+        ```sh
+        pt-online-schema-change --user=db_monitor --password=xxx --host=127.0.0.1 --port=xxx --alter "add COLUMN c2 varchar (120) not null default ''" D=sbtest,t=sbtest1 --no-check-replication-filters --alter-foreign-keys-method=auto --recursion-method=none --print --execute
+        ```
+
+    - GH-OST
+        ```sh
+        gh-ost --assume-master-host=ip:port --master-user=db_monitor --master-password=xxx --user=db_monitor --password=yyy --host=10.xxx --port=port  --alter="ADD COLUMN c2 varchar(120)"   --database=sbtest --table="sbtest1" -execute --initially-drop-old-table --initially-drop-socket-file --initially-drop-ghost-table
+        ```
+
+- 性能测试对比
+
+    - 1.测试场景：16core CPU，2G buffer pool的测试实例，5.5的MySQL版本异步主从，2kw行记录，4.8GB 测试表大小
+
+    - 2.测试结果（不限速），复制延时用zabbix 监控seconds behind master 的值
+        ![image](./Pictures/mysql/gh-ost和pt-osc的性能测试对比.avif)
+        ![image](./Pictures/mysql/gh-ost和pt-osc的性能测试对比1.avif)
+
+### [爱可生开源社区：技术分享 | MySQL 大表添加唯一索引的总结](https://mp.weixin.qq.com/s/A7on81_QVz3-JEQB1426cA)
+
+- 在数据库的运维工作中经常会遇到业务的改表需求，这可能是 DBA 比较头疼的需求，其中添加唯一索引可能又是最头疼的需求之一了。
+
+- MySQL 5.6 开始支持 Online DDL ，添加[唯一]索引虽然不需要重建表，也不阻塞 DML ，但是大表场景下还是不会直接使用 Alter Table 进行添加，而是使用第三方工具进行操作，比较常见的就属 pt-osc 和 gh-ost 了。
+
+- 本文对 ONLINE DDL 讨论的也是基于 MySQL 5.6 及以后的版本。
+
+- 添加唯一索引ONLINE DDL 、pt-osc 和 gh-ost 三种方案：
+
+- 1.ONLINE DDL
+
+    - 首先我们看一下官方对添加索引的介绍：
+
+    | Operation                            | In Place | Rebuilds Table | Permits Concurrent DML | Only Modifies Metadata |
+    |--------------------------------------|----------|----------------|------------------------|------------------------|
+    | Creating or adding a secondary index | Yes      | No             | Yes                    | No                     |
+
+    > 唯一索引属于特殊的二级索引，将引用官方介绍添加二级索引的内容做例子。
+
+    - 可以看到 ONLINE DDL 采用 In Place 算法创建索引，添加索引是不阻塞 DML ，大致流程如下：
+
+        - 同步全量数据。遍历主键索引，将对应的字段（多字段）值，写到新索引。
+        - 同步增量数据。遍历期间将修改记录保存到 Row Log ，等待主键索引遍历完毕后回放 Row Log 。
+        > 也不是完全不阻塞 DML ，在Prepare 和 Commit 阶段需要获取表的 MDL 锁，但Execute 阶段开始前就已经释放了 MDL 锁，所以不会阻塞 DML 。在没有大查询的情况下，持锁时间很短，基本可以忽略不计，所以强烈建议改表操作时避免出现大查询。
+
+    - 由此可见，表记录大小影响着加索引的耗时。如果是大表，将严重影响从库的同步延迟。好处就是能发现重复数据，不会丢数据。
+
+- 2.pt-osc
+
+    - 创建一张与原表结构一致的新表，然后添加唯一索引。
+    - 同步全量数据。遍历原表，通过【INSERT IGNORE INTO】将数据拷贝到新表。
+    - 同步增量数据。通过触发器同步增量数据。
+
+
+    | 触发器        | 映射的SQL语句                |
+    |---------------|------------------------------|
+    | INSERT 触发器 | REPLACE INTO                 |
+    | UPDATE 触发器 | DELETE IGNORE + REPLACE INTO |
+    | DELETE 触发器 | DELETE IGNORE                |
+
+    - 由此可见，这个方式不会校验数据的重复值，遇到重复的数据后，如果是同步全量数据就直接忽略，如果是同步增量数据就覆盖。
+
+    - 这个工具暂时也没有相关辅助功能保证不丢数据或者在丢数据的场景下终止添加唯一索引操作。
+
+    > pt-osc 有个参数【--check-unique-key-change】可以禁止使用该工具添加唯一索引，如果不使用这个参数就表示允许使用 pt-osc 进行添加索引，当遇到有重复值的场景，好好谋划一下怎么跑路吧。
+
+- 3.gh-ost
+    - 创建一张与原表结构一致的新表，然后添加唯一索引。
+    - 同步全量数据。遍历原表，通过【INSERT IGNORE INTO】将数据拷贝到新表。
+    - 同步增量数据。通过应用原表 DML 产生的 binlog 同步增量数据。
+
+    | binlog语句 | 映射的SQL语句 |
+    |------------|---------------|
+    | INSERT     | REPLACE INTO  |
+    | UPDATE     | UPDATE        |
+    | DELETE     | DELETE        |
+
+    - 由此可见，这个方式也不会校验数据的重复值，遇到重复的数据后，如果是同步全量数据就直接忽略，如果是同步增量数据就覆盖。
+
+    - 值得一提的是，这个工具可以通过 hook 功能进行辅助，以此保证在丢数据的场景下可以直接终止添加唯一索引操作。hook 功能后文会着重介绍。
+
+- 小总结
+
+    - 由上述介绍可知，各方案都有优缺点
+
+    | 方案       | 是否丢数据                                     | 建议                               |
+    |------------|------------------------------------------------|------------------------------------|
+    | ONLINE DDL | 不丢数据                                       | 适合小表，及对从库延迟没要求的场景 |
+    | pt-osc     | 可能丢数据，无辅助功能可以避免丢数据的场景     | 不适合添加唯一索引                 |
+    | gh-ost     | 可能丢数据，有辅助功能可以避免部分丢数据的场景 | 适合添加唯一索引                   |
+
+    - 如果业务能接受从库长时间延迟，也推荐 ONLINE DDL 的方案。
+
+#### 风险介绍
+
+- 使用第三方改表工具添加唯一索引存在丢数据的风险，总结起来大致可以分如下三种：
+
+- 1.新加字段，并对该字段添加唯一索引。
+
+    | id | name | age |
+    |----|------|-----|
+    | 1  | 张三 | 22  |
+    | 2  | 李四 | 19  |
+    | 3  | 张三 | 20  |
+
+    ```sql
+    alter table t add addr varchar(20) not null default '北京',add unique key uk_addr(addr); #注意这里是不允许为空
+    ```
+
+    - 如果这时候使用gh-ost执行上述需求，最后只会剩下一条记录，变成下面这样。
+
+        | id | name | age | addr |
+        |----|------|-----|------|
+        | 1  | 张三 | 22  | 北京 |
+
+- 2.原表存在重复值，如下数据表。
+
+    | id | name | age | addr |
+    |----|------|-----|------|
+    | 1  | 张三 | 22  | 北京 |
+    | 2  | 李四 | 19  | 广州 |
+    | 3  | 张三 | 20  | 深圳 |
+
+    ```sql
+    alter table t add unique key uk_name(name);
+    ```
+
+    - 如果这时候使用 gh-ost 执行上述需求，id=3 这行记录就会被丢弃，变成下面这样。
+
+        | id | name | age | addr |
+        |----|------|-----|------|
+        | 1  | 张三 | 22  | 北京 |
+        | 2  | 李四 | 19  | 广州 |
+
+- 3.改表过程中新写（包含更新）的数据出现重复值。
+
+    | id | name | age | addr |
+    |----|------|-----|------|
+    | 1  | 张三 | 22  | 北京 |
+    | 2  | 李四 | 19  | 广州 |
+    | 3  | 王五 | 20  | 深圳 |
+
+    ```sh
+    alter table t add unique key uk_name(name);
+    ```
+
+    - 如果这时候使用 gh-ost 执行上述需求，在拷贝原表数据期间，业务端新增一条如下面 INSERT 语句的记录。
+        ```sql
+        insert into t(name,age,addr) values('张三',22,'北京');
+        ```
+
+        - 这时候，id=1这行记录就会被新增的记录覆盖，变成下面这样
+
+            | id | name | age | addr |
+            |----|------|-----|------|
+            | 2  | 李四 | 19  | 广州 |
+            | 3  | 王五 | 20  | 深圳 |
+            | 4  | 张三 | 22  | 北京 |
+
+- 风险规避
+
+- 新加字段，并对该字段添加唯一索引的风险规避
+
+    - 针对这类场景，规避方式可以禁止【添加唯一索引与其他改表动作】同时使用。最终，将风险转移到了上述的第二种场景（原表存在重复值）。
+
+    - 如果是工单系统，在前端审核业务提交的 SQL 是否只有添加唯一索引操作，不满足条件的 SQL 工单不允许提交。
+
+- 原表存在重复值的风险规避
+    - 针对这类场景，规避方式可以采用 hook 功能辅助添加唯一索引，在改表前先校验待添加唯一索引的字段的数据唯一性。
+
+- 改表过程中新写（包含更新）的数据出现重复值的风险规避
+    - 针对这类场景，规避方式可以采用 hook 功能添加唯一索引，在全量拷完切表前校验待添加唯一索引的字段的数据唯一性。
+
+#### 添加唯一索引的测试
+
+- gh-ost 支持 hook 功能。简单来理解，hook 是 gh-ost 工具跟外部脚本的交互接口。使用起来也很方便，根据要求命名脚本名且添加执行权限即可。
+
+    - [gh-ost hook官方文档](https://github.com/github/gh-ost/blob/f334dbde5ebbe85589363d369ee530e3aa1c36bc/doc/hooks.md)
+
+    - [hook 实现逻辑请参考](https://github.com/github/gh-ost/blob/master/go/logic/hooks.go)
+
+- hook 使用样例
+
+    - 这个样例是网上找的，可能很多小伙伴都在用。
+
+    - 1.创建 hook 目录
+        ```
+        mkdir /tmp/hook
+        cd /tmp/hook
+        ```
+
+    - 2.改表前执行的 hook 脚本 `vim gh-ost-on-rowcount-complete-hook`
+        ```sh
+        #!/bin/bash
+
+        echo "$(date '+%F %T') rowcount-complete schema:$GH_OST_DATABASE_NAME.$GH_OST_TABLE_NAME before_row:$GH_OST_ESTIMATED_ROWS"
+        echo "$GH_OST_ESTIMATED_ROWS" > /tmp/$GH_OST_DATABASE_NAME.$GH_OST_TABLE_NAME.txt
+        ```
+
+    - 3.全量拷贝完成后执行的 hook 脚本 `vim gh-ost-on-row-copy-complete-hook`
+        ```sh
+        #!/bin/bash
+
+        echo "时间: $(date '+%F %T') 库表: $GH_OST_DATABASE_NAME.$GH_OST_TABLE_NAME 预计总行数: $GH_OST_ESTIMATED_ROWS 拷贝总行数: $GH_OST_COPIED_ROWS"
+
+        if [[ `cat /tmp/$GH_OST_DATABASE_NAME.$GH_OST_TABLE_NAME.txt` -gt $GH_OST_COPIED_ROWS ]];then
+          echo '拷贝总行数不匹配，修改失败，退出.'
+          sleep 5
+          exit -1
+        fi
+        ```
+
+    - 4.添加对应权限
+
+        ```sh
+        chmod +x /tmp/hook/*
+        ```
+
+    - 5. 使用 在 gh-ost 命令添加如下参数即可。
+
+        ```sh
+        --hooks-path=/tmp/hook
+        ```
+
+- 这个 hook 的工作流程大概如下：
+    - 改表前先执行【gh-ost-on-rowcount-complete-hook】脚本获取当前表的记录数【GH_OST_ESTIMATED_ROWS】，并保存到【GH_OST_DATABASE_NAME.GH_OST_TABLE_NAME.txt】文件
+    - 原表全量数据拷贝完成后执行【gh-ost-on-row-copy-complete-hook】脚本，获取实际拷贝的记录数【GH_OST_COPIED_ROWS】，然后和【GH_OST_DATABASE_NAME.GH_OST_TABLE_NAME.txt】文件存的值做比较，如果实际拷贝的记录数小，就视为丢数据了，然后就终止改表操作。反之就视为没有丢数据，可以完成改表。
+
+- 其实这个 hook 是存在风险的：
+
+    - 第一，如果改表过程中原表有删除操作，那么实际拷贝的行数势必会比【GH_OST_DATABASE_NAME.GH_OST_TABLE_NAME.txt】文件保存的值小，所以会导致改表失败。这种场景对我们来说体验十分不友好，只要改表过程中目标表存在【DELETE】操作，就会导致添加唯一索引操作失败。
+
+    > 关于这个问题，之前跟这个 hook 用例的原作者沟通过，他是知晓这个问题的，并表示他们的业务逻辑是没有删除【DELETE】操作，所以不会有影响。
+
+    - 第二，如果改表过程中，新加一条与原表的记录重复的数据，那么这个操作不会影响【GH_OST_COPIED_ROWS】的值，最终会改表成功，但是实际会丢失数据。
+
+
+- 有小伙伴可能会疑问，上述【gh-ost-on-row-copy-complete-hook】脚本中，为什么不用【GH_OST_ESTIMATED_ROWS】的值与【GH_OST_COPIED_ROWS】比较？
+
+    - 首先我们看一下【GH_OST_ESTIMATED_ROWS】的值是怎么来的。
+        ```
+        GH_OST_ESTIMATED_ROWS := atomic.LoadInt64(&this.migrationContext.RowsEstimate) + atomic.LoadInt64(&this.migrationContext.RowsDeltaEstimate)
+        ```
+
+    - 可以看到【GH_OST_ESTIMATED_ROWS】是预估值，只要原表在改表过程中有 DML 操作，该值就会变化，所以不能用来和【GH_OST_COPIED_ROWS】作比较。
+
+#### 加强版 hook 样例
+
+- 上面的 hook 样例虽然存在一定的不足，但是也给我提供了一个思路，知道有这么个辅助功能可以规避添加唯一索引引发丢数据的风险。
+
+- 受这个启发，并查阅了官方文档后，我整理了个加强版的 hook 脚本，只需要一个脚本就能避免上述存在的几种问题。
+
+- 按说应该是两个脚本，且代码一致即可。
+
+    - 改表前先校验一次原表是否存在待添加唯一索引的字段的数据是否是唯一的，如果不满足唯一性就直接退出添加唯一索引。
+    - 切表前再校验一次，但是我们环境是在代码里面做了校验，在业务提交工单后直接先判断唯一性，然后再处理后续的逻辑，所以第一个校验就省略了（改表工单代码代替hook校验）。
+
+- `vim gh-ost-on-before-cut-over`
+
+    - 这表示在切表前需要执行的 hook 脚本，即：切表前检查一下唯一索引字段的数据是否有重复值，这样避免改表过程中新增的数据跟原来的有重复。
+
+    - 该脚本非通用版，仅供参考。
+
+    ```sh
+    #!/bin/bash
+    work_dir="/opt/soft/zzonlineddl"                                  #工作目录
+    . ${work_dir}/function/log/f_logging.sh                           #日志模块
+    if [ -f "${work_dir}/conf/zzonlineddl.conf" ]
+    then
+        . ${work_dir}/conf/zzonlineddl.conf                           #改表项目的配置文件
+    fi
+
+    log_addr='${BASH_SOURCE}:${FUNCNAME}:${LINENO}' #eval echo ${log_addr}
+
+    #针对该改表任务生成的配置文件
+    #里面保存的是这个改表任务的目标库的从库连接信息【mysql_comm】变量的值
+    #还有数据唯一性的校验SQL【mysql_sql】变量的值
+    hook_conf="${work_dir}/hook/conf/--mysql_port--_${GH_OST_DATABASE_NAME}.${GH_OST_TABLE_NAME}"
+
+    . ${hook_conf}
+
+    function f_main()
+    {
+        count_info="$(${mysql_comm} -NBe "${mysql_sql}")"
+        count_total="$(awk -F: '{print $NF}' <<< "${count_info}")"
+
+        f_logging "$(eval echo ${log_addr}):INFO" "库表: ${GH_OST_DATABASE_NAME}.${GH_OST_TABLE_NAME} 原表预计总行数: ${GH_OST_ESTIMATED_ROWS}, 实际拷贝总行数: ${GH_OST_COPIED_ROWS}"
+
+        if [ -z "${count_total}" ]
+        then
+            f_logging "$(eval echo ${log_addr}):ERROR" "唯一索引字段数据唯一性检查异常, 终止改表操作"
+            exit -1
+        fi
+
+        mark=""
+
+        for count in $(echo "${count_info}"|tr ":" " ")
+        do
+            if [ -n "${count}" ] && [ "${count}x" == "${count_total}x" ]
+            then
+                [ "${mark}x" == "x" ] && mark="true"
+            else
+                mark="false"
+            fi
+        done
+
+        if [ "${mark}x" == "truex" ]
+        then
+            f_logging "$(eval echo ${log_addr}):INFO" "唯一索引字段数据唯一性正常, 允许切表"
+        else
+            f_logging "$(eval echo ${log_addr}):ERROR" "唯一索引字段数据唯一性检测到可能丢失数据, 终止改表操作"
+            exit -1
+        fi
+        exit 0
+    }
+
+    f_main
+    ```
+
+- hook_conf 变量的值是这样的，由改表平台根据业务的 SQL 语句自动生成。
+    ```sql
+    mysql_comm='mysql -h xxxx -P xxxx -u xxxx -pxxxx db_name'   #这里是从库的地址
+    mysql_sql="select concat(count(distinct rshost,a_time),':',count(*)) from db.table"
+    ```
+
+- 其中检查唯一性的 SQL 可以使用如下的命令生成，仅供参考。
+    ```sql
+    alter="alter table t add unique key uk_name(name,name2),add unique key uk_age(age);"
+    echo "${alter}"|awk 'BEGIN{ FS="(" ; RS=")";print "select concat(" }
+        NF>1 { print "count(distinct "$NF"),'\'':'\''," }
+        END{print "count(*)) from t;"}'|tr -d '\n'
+    ```
+
+    - 执行上面的命令会根据业务提交的添加唯一索引的 SQL 得到一条检查字段数据唯一性的 SQL 。
+        ```sql
+        select concat(count(distinct name,name2),':',count(distinct age),':',count(*)) from t;
+        ```
+
+- 需要注意的是，这个加强版的 hook 也不能100%保证一定不会丢数据，有两种极端情况还是会丢数据。
+    - 第一，如果是大表，在执行【gh-ost-on-before-cut-over】脚本过程中（大表执行这个脚本时间较长），新增的记录跟原来数据有重复，这个就没法规避了。
+
+    - 第二，在改表过程中，如果业务新增一条与原数据重复的记录，然后又删除，这种场景也会导致丢数据。
+
+        | id | name | age | addr |
+        |----|------|-----|------|
+        | 1  | 张三 | 22  | 北京 |
+        | 2  | 李四 | 19  | 广州 |
+        | 3  | 王五 | 20  | 深圳 |
+
+        - 现在对 name 字段添加唯一索引。假如现在正在使用 gh-ost 进行添加唯一索引，这时候业务做了下面几个操作：
+
+        - 1.新增一条记录
+            ```sql
+            insert into t(name,age,addr) values('张三',22,'北京');
+            ```
+
+            - 这时候原表的数据就会变成像下面这样。
+
+                | id | name | age | addr |
+                |----|------|-----|------|
+                | 1  | 张三 | 22  | 北京 |
+                | 2  | 李四 | 19  | 广州 |
+                | 3  | 王五 | 20  | 深圳 |
+                | 4  | 张三 | 22  | 北京 |
+
+            - 这时候新表的数据就会变成像下面这样。
+                - id=1 和 id=4 是两条重复的记录，所以 id=1 会被覆盖掉。
+
+                | id | name | age | addr |
+                |----|------|-----|------|
+                | 2  | 李四 | 19  | 广州 |
+                | 3  | 王五 | 20  | 深圳 |
+                | 4  | 张三 | 22  | 北京 |
+
+        - 2.删除新增的记录
+
+            - 业务新增记录后意识到这条数据是重复的，所以又删除新增这条记录。
+                ```sql
+                delete from t where id = 4;
+                ```
+
+            - 这时候原表的数据就会变成像下面这样。
+
+                | id | name | age | addr |
+                |----|------|-----|------|
+                | 1  | 张三 | 22  | 北京 |
+                | 2  | 李四 | 19  | 广州 |
+                | 3  | 王五 | 20  | 深圳 |
+
+            - 这时候新表的数据就会变成像下面这样。
+                - 可以发现，这时候如果发生切表，原表 id=1 的记录将会丢失，而且这种场景 hook 的脚本没法发现，它检查原表的 name 字段的数据唯一性是正常的。
+
+                | id | name | age | addr |
+                |----|------|-----|------|
+                | 2  | 李四 | 19  | 广州 |
+                | 3  | 王五 | 20  | 深圳 |
+
+    - 针对上述两种极端场景，发生的概率应该是极低的，目前我也没想到什么方案解决这两个场景。
+
+        - gh-ost 官方文档上说 --test-on-replica 参数可以确保不会丢失数据，这个参数的做法是在切表前停掉从库的复制，然后在从库上校验数据。
+
+            ```sql
+            gh-ost comes with built-in support for testing via --test-on-replica:
+            it allows you to run a migration on a replica, such that at the end of the migration gh-ost would stop the replica, swap tables, reverse the swap, and leave you with both tables in place and in sync, replication stopped.
+            This allows you to examine and compare the two tables at your leisure.
+            ```
+
+            - 很明显，这个方式还是没法解决在实际切表那一刻保证数据不会丢，就是说切表和校验之间一定是存在时间差，这个时间差内出现新写入重复数据是没法发现的，而且大表的这个时间差只会更大。
+
+            - 另外停掉从库的复制很可能也存在风险，很多业务场景是依赖从库进行读请求的，所以要慎用这个功能。
+
+#### 总结
+
+- 如果业务能接受，可以不使用唯一索引。将添加唯一索引的需求改成添加普通二级索引，这样就可以避免加索引导致数据丢失。
+
+    - 存储引擎读写磁盘，是以页为最小单位进行。唯一索引较于普通二级索引，在性能上并没有多大优势。相反，可能还不如普通二级索引。
+
+        - 在读请求上，唯一索引和普通二级索引的性能差异几乎可以忽略不计了。
+        - 在写请求上，普通二级索引可以使用到【Change Buffer】，而唯一索引没法用到【Change Buffer】，所以唯一索引会差于普通二级索引。
+
+- 一定要加唯一索引的话，可以跟业务沟通确认是否能接受从库长时间延迟。如果能接受长时间延迟，可以优先使用 ONLINE DDL 进行添加唯一索引（小表直接用 ONLINE DDL即可）。
+
+- 如果使用第三方工具添加唯一索引，要优先使用 gh-ost（配上hook），添加之前一定要先检查待加唯一索引字段的唯一性，避免因为原表存在重复值而导致丢数据。
+
+- 强烈建议不要马上删除【old】表，万一碰到极端场景导致丢数据了，还可以通过【old】表补救一下。
+
+    - pt-osc 建议添加【--no-drop-old-table】参数
+    - gh-ost 不建议添加【--ok-to-drop-table】参数
+
+### [爱可生开源社区：技术分享 | MySQL级联复制下进行大表的字段扩容](https://mp.weixin.qq.com/s/2PxV8K6FLC9ryMfXDfmtyQ)
+
+- 背景：某客户的业务中有一张约4亿行的表，因为业务扩展，表中open_id varchar(50) 需要扩容到 varchar(500)。变更期间尽量减少对主库的影响(最好是不要有任何影响->最终争取了4个小时的窗口期)。
+
+- 库表信息
+    - 环境：Mysql 8.0.22 1主1从 基于Gtid复制
+    - 此表的ibd 文件280G + count长时间无返回 + 使用备库看了一下确认行数>4亿
+
+    ```sql
+    -- 查看：
+    -- Rows 的值不准，有时误差有2倍
+    show table status from dbname like 'tablename'\G
+
+    -- 看下此表的数据量
+    SELECT a.table_schema,a.table_name,concat(round(sum(DATA_LENGTH/1024/1024)+sum(INDEX_LENGTH/1024/1024),2) ,'MB')total_size,concat(round(sum(DATA_LENGTH/1024/1024),2),'MB') AS data_size,concat(round(sum(INDEX_LENGTH/1024/1024),2),'MB') AS index_size FROM information_schema.TABLES a WHERE a.table_schema = 'dbname' AND a.table_name = 'tablename';
+    ```
+
+- 下文中的 M 表示主库，S1 为从1 ，S2 为从2
+
+- 方案选择
+
+    | 方式      | 优点                          | 缺点                                           | 可行性                     |
+    |-----------|-------------------------------|------------------------------------------------|----------------------------|
+    | OnlineDDL | 原生，使用中间临时表          | ALGORITHM=COPY时，会阻塞DML，推荐版本>MySQL5.7 | 5星                        |
+    | Gh-ost    | 使用binlog+回放线程代替触发器 | 第三方工具，根据不同的参数导致执行时间较长     | 4星                        |
+    | Pt-osc    | 版本兼容性好                  | 使用触发器保持主副表一致                       | 第三方工具，且使用限制较多 | 3星 |
+    | M-S1-S2   | 时间可预估                    | 级联复制，人工操作                             | 1星                        |
+
+
+    - 为什么我们没有选择前3种方案？
+
+        - 根据实际情况评估，本次业务侧的需求是此表24h都有业务流量，且不接受超过4小时的业务不可用时间。
+
+        - 1.OnlineDDL的方式，ALGORITHM=COPY时，期间会阻塞DML(只读)，最后主副表rename操作时(不可读写)，直到DDL完成(其中需要的时间不确定)。
+        - 2.Gh-ost的方式，推荐的模式为连接从库，在主库转换，此模式对主库影响最小，可通过参数设置流控。致命的缺点是此工具的变更时间太长，4亿的表，测试环境使用了70个小时。最后我们还需要下发切换命令及手动删除中间表*_del。如果是1主2从还是比较推荐这种方式的，因为还有一个从库可以保障数据安全。
+            - Pt-osc 和Gh-ost都属于第三方，Pt-osc 对大表的操作和OnlineDDL有一个共同的缺点就是失败回滚的代价很大。
+        - 3.如果是低版本如MySQL<5.7可以使用，理论上OnlineDDL是在MySQL5.6.7开始支持，刚开始支持的不是很好，可适当取舍。
+
+        - 最后我们选择了，DBA最喜爱(xin ku)的一种方式，在M-S1-S2级联复制下进行。
+
+- 如何进行操作
+    - 1.新建一个S1的从库，构建M-S1-S2级联复制
+    - 2.使用OnlineDDL在S2上进行字段扩容 (优点是期间M-S1的主从不受影响)
+    - 3.扩容完成后，等待延迟同步M-S1-S2 (降低S2与M的数据差异，并进行数据验证)
+    - 4.移除S1，建立M-S2的主从关系(使S2继续同步M的数据)
+    - 5.备份S2恢复S1，建立M-S2-S1级联复制
+    - 6.应用停服，等待主从数据一致(优点是差异数据量的同步时间很短)
+    - 7.最终S2成为主库，S1为从库(应用需要修改前端连接信息)
+    - 8.应用进行回归验证
+
+- 以上内容看上去很复杂，本质上就是备份恢复。读者可将其做为备选方案。分享一下具体步骤窝？
+
+    - 环境装备:开启Gtid,注意M,S1 binlog保存时长,磁盘剩余空间大于待变更表的2倍
+
+        ```sql
+        show global variables like 'binlog_expire_logs_seconds'; # 默认604800
+        set global binlog_expire_logs_seconds=1209600; # 主库和级联主库都需要设置
+        ```
+
+    - 1.搭建 1主2从的级联复制，M -> S1 -> S2 ，安装MySQL注意本次环境lower_case_table_names = 0
+    - 2.在S2 上做字段扩容。 预估 10个小时
+
+        ```sql
+        -- `参数设置:`
+        set global slave_type_conversions='ALL_NON_LOSSY'; # 防止复制报错SQL_Errno: 13146，属于字段类型长度不一致无法回放
+        set global interactive_timeout=144000;set global wait_timeout =144000;
+        `磁盘IO参数设置:`
+        set global innodb_buffer_pool_size=32*1024*1024*1024;# 增加buffer_pool 防止Error1206The total number of locks exceeds the lock table size 资源不足
+        set global sync_binlog=20000;set global innodb_flush_log_at_trx_commit=2;
+        set global innodb_io_capacity=600000;set global innodb_io_capacity_max=1200000; # innodb_io_capacity需要设置两次
+        show variables like '%innodb_io%'; # 验证以上设置
+        screen 下执行:
+        time mysql -S /data/mysql/3306/data/mysqld.sock -p'' dbname -NBe "ALTER TABLE tablename MODIFY COLUMN open_id VARCHAR(500) NULL DEFAULT NULL COMMENT 'Id' COLLATE 'utf8mb4_bin';"
+
+        -- 查看DDL进度:
+        SELECT EVENT_NAME, WORK_COMPLETED, WORK_ESTIMATED  FROM performance_schema.events_stages_current;
+        ```
+
+    - 3.扩容完成后，等待延迟同步M-S1-S2
+
+        - 数据同步至主从一致,对比主从Gtid
+
+    - 4.移除S1,建立M-S2的主从关系
+        ```sql
+        --S1 (可选)
+        stop slave;
+        reset slave all;
+        systemctl stop mysql_3306
+
+        -- S2
+        stop slave;
+        reset slave all;
+        -- MASTER_HOST='M主机IP'
+        CHANGE MASTER TO
+          MASTER_HOST='',
+          MASTER_USER='',
+          MASTER_PASSWORD=',
+          MASTER_PORT=3306,
+          MASTER_AUTO_POSITION=1,
+          MASTER_CONNECT_RETRY=10;
+        start slave; (flush privileges;# 验证数据可正常同步)
+        ```
+
+    - 5.备份S2恢复S1，建立M-S2-S1级联复制
+
+        - 物理备份S2,重做S2->S1 级联主从
+
+        ```sql
+        rm -rf binlog/*
+        rm -rf redolog/*
+        xtrabackup --defaults-file=/data/mysql/3306/my.cnf.3306 --move-back --target-dir=/data/actionsky/xtrabackup_recovery/data
+        chown -R mysql. data/
+        chown -R mysql. binlog/*
+        chown -R mysql. redolog/*
+        systemctl start mysql_3306
+        set global gtid_purged='';
+        reset slave all;
+        # MASTER_HOST='S2主机IP'  ,已扩容变更完的主机
+        CHANGE MASTER TO
+          MASTER_HOST='',
+          MASTER_USER='',
+          MASTER_PASSWORD='',
+          MASTER_PORT=3306,
+          MASTER_AUTO_POSITION=1,
+          MASTER_CONNECT_RETRY=10;
+        `MySQL8.0版本需要在上面语句中添加 GET_MASTER_PUBLIC_KEY=1; #防止 Last_IO_Errno: 2061 message: Authentication plugin 'caching_sha2_password' reported error: Authentication requires secure connection.`
+        start slave;
+        ```
+
+    - 6.应用停服，等待主从数据一致
+        - 主库停服+可设置read_only+flush privileges，对比主从Gtid
+
+    - 7.最终S2成为主库，S1为从库
+        - 应用更改配置连接新主库。
+
+        ```sql
+        -- S2上:
+        stop slave;reset slave all;
+        set global read_only=0;set global super_read_only=0;
+        `show master status\G 观察是否有新事务写入`
+        ```
+
+        ```sql
+        -- 收尾：还原第2步的参数设置。
+        set global interactive_timeout=28800;set global wait_timeout =28800;
+        set global innodb_buffer_pool_size=8*1024*1024*1024;
+        set global slave_type_conversions='';
+        set global sync_binlog=1;set global innodb_flush_log_at_trx_commit=1;
+        set global innodb_io_capacity=2000;set global innodb_io_capacity_max=4000;
+        ```
+
+- 补充场景: 基于磁盘IO能力的测试
+
+    - 直接在主库上修改，且无流量的情况下：
+        - 场景1，磁盘是NVME的物理机，4亿数据大约需要5个小时(磁盘性能1G/s)。
+        - 场景2，磁盘是机械盘的虚拟机，此数据量大约需要40个小时(磁盘性能100M/s)。
+
+- 总结
+    - 使用级联，对于业务侧来说，时间成本主要在应用更改连接和回归验证。如果从库无流量，不需要等待业务低峰。
+    - OnlineDDL可通过修改参数，提高效率，其中双一参数会影响数据安全，推荐业务低峰期操作。
+    - Gh-ost 适合变更时间宽裕的场景，业务低峰期操作，可调整参数加快进度，自定义切换的时间。
+    - 以上方式均不推荐多个DDL同时进行，即并行DDL。
+    - 大表操作和大数据量操作，需要我们贴合场景找到合适的变更方案，不需要最优，需要合适。
 
 ## 字符集（character set）
 
@@ -5689,13 +6857,33 @@ REPAIR TABLE table_name;
 ALTER TABLE table_name ENGINE=INNODB;
 ```
 
-### [MySQL 主从 AUTO_INCREMENT 不一致问题分析](https://mp.weixin.qq.com/s/iQuPMPv4gD6udQub6C0h_A)
-
 ### [knowclub：在MySQL集群中，如何从几百万个抓包中找到一个异常的包？](https://mp.weixin.qq.com/s/C04qADbcfZP9e7RQDbz-Kg)
 
 ### 崩溃
 
 #### [一树一溪：MySQL 崩溃恢复过程分析](https://mp.weixin.qq.com/s/PV6aXtwiMLMeMUBWhZxdvw)
+
+#### [爱可生开源社区：故障分析 | 一则 INSERT UPDATE 触发 MySQL Crash 的案例](https://mp.weixin.qq.com/s/MchCUZ13D1A6vB-gcHdunQ)
+
+- 某业务 MySQL 实例（MySQL 5.7.20 社区版）发生 Crash，现需要对其具体原因进行分析。
+    - 根据堆栈打印的信息可以得知，当时 Crash 的时间点 MySQL 正在执行 INSERT 操作，且操作涉及 BLOB 数据类型的数据，在源码执行到 copy_blob_value 函数时触发 Crash。
+
+- 触发条件
+    - 使用 INSERT ... ON DUPLICATE 语句操作 BLOB 数据类型的列。
+
+- 处理方法
+    - MySQL 5.7.22 修复该 BUG。
+    - 不使用 INSERT ... ON DUPLICATE 语句操作 BLOB 数据类型的列。
+
+### 连接中断
+
+#### [爱可生开源社区：故障分析 | TCP 缓存超负荷导致的 MySQL 连接中断](https://mp.weixin.qq.com/s/DLvBk8KXN_xDecHURaa_WQ)
+
+### 主从复制问题
+
+#### [MySQL 主从 AUTO_INCREMENT 不一致问题分析](https://mp.weixin.qq.com/s/iQuPMPv4gD6udQub6C0h_A)
+
+#### [MySQL:主从binlog超过4G导致报错](https://mp.weixin.qq.com/s/5AhY0p0pCpzMveEB4_etSA)
 
 ## 极限值测试
 
@@ -5810,6 +6998,10 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
     sysbench --test=fileio --file-total-size=100G cleanup
     ```
 
+### [iibench-mysql：基于 Java 的 MySQL/Percona/MariaDB 索引进行插入性能测试工具](https://github.com/tmcallaghan/iibench-mysql)
+
+### [tpcc-mysql：Percona开发的TPC-C测试工具](https://github.com/Percona-Lab/tpcc-mysql)
+
 ## 第三方工具
 
 - [awesome-mysql](http://shlomi-noach.github.io/awesome-mysql/)
@@ -5914,5 +7106,3 @@ sudo ./sys_parser -uroot -p -d dictionary sakila/actor
 ### [osqueryi](https://github.com/osquery/osquery)
 
 ### [mytop](https://github.com/jzawodn/mytop)
-
-### [MyRocks:lsm存储引擎](http://myrocks.io/docs/getting-started/)
