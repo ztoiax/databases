@@ -1,5 +1,56 @@
 # mysql
 
+## 版本
+
+![image](./Pictures/mysql/mysql各版本生命周期.avif)
+
+- MySQL 的发布模型分为两个主要路径：
+    - 长期支持版（LTS，Long-Term Support）
+    - 创新版（Innovation）。
+    - 所有 LTS 和创新版本都包含错误和安全修复，并被视为生产级质量。
+
+    ![image](./Pictures/mysql/mysql发布模型.avif)
+
+- 什么情况适合 LTS 版？
+    - 需要稳定的功能和更长的支持期。
+    - 除了第一个 LTS 版本删除了一些功能，其他版本仅包含必要的修复，不在删除功能。
+    - LTS 版本遵循 Oracle 终身支持政策（5 年主要支持和 3 年延长支持）。
+
+- 什么情况适合创新版？
+    - 想了解最新功能、改进。适合快节奏开发环境中的开发和 DBA，具有更高水平的自动化测试和现代持续集成技术，可实现更快的升级周期。
+    - 除新功能外，随着代码重构、删除不推荐功能以及修改 MySQL 使其更符合 SQL 标准（在 LTS 版本中不会发生）。
+    - 支持至下一个创新版。
+
+- LTS 版本内的升级和降级
+
+    > 在 LTS 版本内，功能保持不变，数据格式也不会改变。
+
+    - 因此：
+
+        - 就地升级和降级是可能的。与 MySQL 8.0.x 版本（< 8.0.34）相比，这是一个改进，因为降级是不可能的，并且不建议跳过版本进行升级。
+        - InnoDB CLONE 在 LTS 版本内都支持升级和降级。
+    - 完全过渡到这一点还需要一些工作，这将在 8.0.34 之后的版本中完成。
+
+    - 可以从一个 LTS 版本迁移到下一个 LTS 版本，而无需执行多个中间创新版本的升级步骤。
+    - 可以通过就地升级、MySQL Shell 导出和导入以及 MySQL 异步复制进行升级。
+    - 仅为了回滚正在进行的升级，可以通过 MySQL Shell 导出和导入以及 MySQL 复制进行降级。
+
+
+- 创新版本之间的升级和降级
+    - 支持从一个创新版本或 LTS 版本就地升级到未来的创新版本，直到下一个 LTS 版本。复制和导出导入也可以实现。
+    - 降级将需要逻辑导出和导入。这与 MySQL 8.0.x（< 8.0.34）类似。
+
+- 使用MySQL异步复制进行升级和降级
+
+    - 在业务关键环境中，升级通常使用 MySQL 异步复制完成，其中新版本环境被设置为当前版本的从库。这允许近零停机时间的升级。
+
+    - 可以从 LTS 版本或创新版本异步复制到：
+
+        - 下一个 LTS 版本。
+        - 任何未来的创新版本，直到下一个 LTS 版本（LTS 8.4 → LTS 9.7，但不是 LTS 8.4 → LTS 10.7）。
+
+    - 如果在提升新版本后出现任何问题，支持回到前一个版本非常重要。因此，MySQL 异步复制将能够复制到前一个版本。此支持仅用于回滚目的，其中尚未使用新功能，不应视为持续生产部署的一部分。
+
 ## 安装 MySql
 
 - MySQL主要包含四个部分的程序，分别为：服务器程序、安装程序、实用工具程序，及客户端程序。
@@ -29,7 +80,7 @@
             [adminuser]
             user=root
             password = mysqlroot
-            host = 127.0.0.1           
+            host = 127.0.0.1
             ```
         ```sh
         # 创建登录路径时，使用如下命令：
@@ -785,13 +836,14 @@ pugre master logs before '2020-10-25 00:00:00'
 pugre master logs before current_date - interval 1 day;
 ```
 
-#### mysqlbinlog 日志分析
+#### 第三方binlog工具
+##### mysqlbinlog 日志分析
 
 ```sh
 mysqlbinlog /var/lib/mysql/bin.000001
 ```
 
-##### [--flashback 还原被添加、删除、修改的数据](https://mariadb.com/kb/en/flashback/)
+###### [--flashback 还原被添加、删除、修改的数据](https://mariadb.com/kb/en/flashback/)
 
 日志格式必须设置为:
 
@@ -892,7 +944,7 @@ sudo mysql -uroot -p china < /tmp/flashback.sql
 
 ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
-#### [binlog2sql](https://github.com/danfengcao/binlog2sql)
+##### [binlog2sql](https://github.com/danfengcao/binlog2sql)
 
 ```sql
 drop table if exists test;
@@ -955,9 +1007,15 @@ python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.0
 # 失败
 ```
 
-#### [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](https://gitee.com/mo-shan/analysis_binlog)
+##### [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](https://gitee.com/mo-shan/analysis_binlog)
 
 - [爱可生开源社区：技术分享 | MySQL binlog 分析工具 analysis_binlog 的使用介绍](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247492621&idx=1&sn=bb835dffcca8178ecd4a477a09730689&chksm=fc950692cbe28f8443765b4c8e21c3b9fe1aaf29ce63ce68708dac12f6b8105637d436d0f7a8&scene=21#wechat_redirect)
+
+##### [reverse_sql](https://github.com/hcymysql/reverse_sql)
+
+reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的工具。它可以将二进制日志文件中记录的数据库更改操作（如插入、更新、删除）转换为反向的 SQL 语句，以便进行数据恢复。其运行模式需二进制日志设置为 ROW 格式。
+
+- [DBA实战：mysql reverse_sql数据闪回工具](https://mp.weixin.qq.com/s/c06rQ26l1yNAE-ifU4Jz4g)
 
 ### redo log (重做日志)
 
@@ -1146,6 +1204,21 @@ python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.0
 
 - [详情请看。一树一溪：Undo 日志用什么存储结构支持无锁并发写入？](https://mp.weixin.qq.com/s/pzVMnsOPpAqxbttaTuwWnQ)
 
+### 其他日志工具
+
+#### [mysqlsla：分析日志](https://github.com/daniel-nichter/hackmysql.com/tree/master/mysqlsla)
+
+mysqlsla 来自于 hackmysql.com，此网站的软件 2015 就不再维护了
+
+```sh
+# Usege
+
+mysqlsla --log-type slow /var/log/mysql/mysql_slow.log
+mysqlsla --log-type general /var/log/mysql/mysql_general.log
+mysqlsla --log-type error /var/log/mysql/mysql_error.log
+```
+
+
 ## 性能优化
 
 - 如果无法测量就无法优化, 测量需要分析大量的数据, 大多数系统无法完整的测量, 而且测量的结果也可能是错误的
@@ -1176,39 +1249,7 @@ show profile
 mysql -e 'show processlist\G' | grep -i "state:" | sort | uniq -c | sort -rn
 ```
 
-### [pt-query-digest(percona-toolkit)](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
-
-```sh
-pt-query-digest /var/log/mysql/mysql_slow.log
-```
-
-### mysqldumpslow
-
-```sh
-# 取出使用最多的10条慢查询
-mysqldumpslow -s c -t 10 /var/log/mysql/mysql_slow.log
-
-# 取出查询时间最慢的3条慢查询
-mysqldumpslow -s t -t 3 /var/log/mysql/mysql_slow.log
-
-# 得到按照时间排序的前10条里面含有左连接的查询语句
-mysqldumpslow -s t -t 10 -g “left join” /var/log/mysql/mysql_slow.log
-
-# 按照扫描行数最多的
-mysqldumpslow -s r -t 10 -g 'left join' /var/log/mysqld/mysql_slow.log
-```
-
-### [mysqlsla](https://github.com/daniel-nichter/hackmysql.com/tree/master/mysqlsla)
-
-mysqlsla 来自于 hackmysql.com，此网站的软件 2015 就不再维护了
-
-```sh
-# Usege
-
-mysqlsla --log-type slow /var/log/mysql/mysql_slow.log
-mysqlsla --log-type general /var/log/mysql/mysql_general.log
-mysqlsla --log-type error /var/log/mysql/mysql_error.log
-```
+## 监控相关
 
 ### informantion_schema数据库
 
@@ -1241,39 +1282,52 @@ show tables like '%INNODB_SYS%';
 
     ```sql
     select * from INNODB_SYS_TABLES;
+                                         ->
+    +----------+----------------------------+------+--------+-------+------------+---------------+------------+
+    | TABLE_ID | NAME                       | FLAG | N_COLS | SPACE | ROW_FORMAT | ZIP_PAGE_SIZE | SPACE_TYPE |
+    +----------+----------------------------+------+--------+-------+------------+---------------+------------+
+    | 11       | SYS_FOREIGN                | 0    | 7      | 0     | Redundant  | 0             | System     |
+    | 12       | SYS_FOREIGN_COLS           | 0    | 7      | 0     | Redundant  | 0             | System     |
+    | 13       | SYS_VIRTUAL                | 0    | 6      | 0     | Redundant  | 0             | System     |
+    | 38       | china/cnarea_2019          | 33   | 15     | 28    | Dynamic    | 0             | Single     |
+    | 94       | china/tz                   | 33   | 6      | 84    | Dynamic    | 0             | Single     |
+    | 17       | mysql/gtid_slave_pos       | 33   | 7      | 7     | Dynamic    | 0             | Single     |
+    | 15       | mysql/innodb_index_stats   | 33   | 11     | 5     | Dynamic    | 0             | Single     |
+    | 14       | mysql/innodb_table_stats   | 33   | 9      | 4     | Dynamic    | 0             | Single     |
+    | 16       | mysql/transaction_registry | 33   | 8      | 6     | Dynamic    | 0             | Single     |
+    | 56       | test/a                     | 33   | 5      | 46    | Dynamic    | 0             | Single     |
+    | 59       | test/b                     | 33   | 5      | 49    | Dynamic    | 0
     ```
 
-    ![image](./Pictures/mysql/dictionary3.avif)
+- InnoDB Buffer Pool 存储储数据和索引,减少磁盘 I/O,是一种特殊的 mitpoint LRU 算法
+    - [查看 INNODB_BUFFER 表](https://mariadb.com/kb/en/information-schema-innodb_buffer_pool_stats-table/)
 
-**InnoDB Buffer Pool** 储数据和索引,减少磁盘 I/O,是一种特殊的 mitpoint LRU 算法
-[查看 INNODB_BUFFER 表](https://mariadb.com/kb/en/information-schema-innodb_buffer_pool_stats-table/)
+    ```sql
+    select * from INNODB_BUFFER
+    # 或者 隔几秒就会有变化
+    show global status like '%buffer%';
 
-```sql
-select * from INNODB_BUFFER
-# 或者 隔几秒就会有变化
-show global status like '%buffer%';
+    # innodb 页是16k
 
-# innodb 页是16k
+    # 一共 8057页
+    POOL_SIZE: 8057
 
-# 一共 8057页
-POOL_SIZE: 8057
+    # 空闲页
+    FREE_BUFFERS: 6024
 
-# 空闲页
-FREE_BUFFERS: 6024
+    # 已使用页
+    DATABASE_PAGES: 2033
+    ```
 
-# 已使用页
-DATABASE_PAGES: 2033
-```
+    ![image](./Pictures/mysql/dictionary5.avif)
 
-![image](./Pictures/mysql/dictionary5.avif)
+    **innodb_buffer_pool_size** 越大,初始化时间就越长
 
-**innodb_buffer_pool_size** 越大,初始化时间就越长
+    ```sql
+    show variables like 'innodb%buffer%';
+    ```
 
-```sql
-show variables like 'innodb%buffer%';
-```
-
-![image](./Pictures/mysql/dictionary6.avif)
+    ![image](./Pictures/mysql/dictionary6.avif)
 
 ### performance_schema数据库
 
@@ -1346,7 +1400,7 @@ show variables like 'innodb%buffer%';
     ```
 
     ```sql
-    // 在mysql的5.7版本中默认开启。我是MariaDB默认关闭
+    --  在mysql的5.7版本中默认开启。我是MariaDB默认关闭
     SHOW VARIABLES LIKE 'performance_schema';
     +--------------------+-------+
     | Variable_name | Value |
@@ -1354,38 +1408,38 @@ show variables like 'innodb%buffer%';
     | performance_schema | ON    |
     +--------------------+-------+
 
-    // 切换数据库
+    --  切换数据库
     use performance_schema;
 
-    // 查看表
+    --  查看表
     show tables;
 
-    // 查看表结构
+    --  查看表结构
     show create table setup_consumers;
     ```
 
 - performance_schema表的分类
 
     ```sql
-    //语句事件记录表，这些表记录了语句事件信息，当前语句事件表events_statements_current、历史语句事件表events_statements_history和长语句历史事件表events_statements_history_long、以及聚合后的摘要表summary，其中，summary表还可以根据帐号(account)，主机(host)，程序(program)，线程(thread)，用户(user)和全局(global)再进行细分)
+    -- 语句事件记录表，这些表记录了语句事件信息，当前语句事件表events_statements_current、历史语句事件表events_statements_history和长语句历史事件表events_statements_history_long、以及聚合后的摘要表summary，其中，summary表还可以根据帐号(account)，主机(host)，程序(program)，线程(thread)，用户(user)和全局(global)再进行细分)
     show tables like '%statement%';
 
-    //等待事件记录表，与语句事件类型的相关记录表类似：
+    -- 等待事件记录表，与语句事件类型的相关记录表类似：
     show tables like '%wait%';
 
-    //阶段事件记录表，记录语句执行的阶段事件的表
+    -- 阶段事件记录表，记录语句执行的阶段事件的表
     show tables like '%stage%';
 
-    //事务事件记录表，记录事务相关的事件的表
+    -- 事务事件记录表，记录事务相关的事件的表
     show tables like '%transaction%';
 
-    //监控文件系统层调用的表
+    -- 监控文件系统层调用的表
     show tables like '%file%';
 
-    //监视内存使用的表
+    -- 监视内存使用的表
     show tables like '%memory%';
 
-    //动态对performance_schema进行配置的配置表
+    -- 动态对performance_schema进行配置的配置表
     show tables like '%setup%';
     ```
 
@@ -1393,15 +1447,15 @@ show variables like 'innodb%buffer%';
     - instruments: 生产者，用于采集mysql中各种各样的操作产生的事件信息，对应配置表中的配置项我们可以称为监控采集配置项。
     - consumers:消费者，对应的消费者表用于存储来自instruments采集的数据，对应配置表中的配置项我们可以称为消费存储配置项。
     ```sql
-    //默认不会收集所有的事件，可能你需要检测的事件并没有打开，需要进行设置，可以使用如下两个语句打开对应的instruments和consumers（行计数可能会因MySQL版本而异)。
+    -- 默认不会收集所有的事件，可能你需要检测的事件并没有打开，需要进行设置，可以使用如下两个语句打开对应的instruments和consumers（行计数可能会因MySQL版本而异)。
 
-    //打开等待事件的采集器配置项开关，需要修改setup_instruments配置表中对应的采集器配置项
+    -- 打开等待事件的采集器配置项开关，需要修改setup_instruments配置表中对应的采集器配置项
     UPDATE setup_instruments SET ENABLED = 'YES', TIMED = 'YES'where name like 'wait%';
 
-    //打开等待事件的保存表配置开关，修改setup_consumers配置表中对应的配置项
+    -- 打开等待事件的保存表配置开关，修改setup_consumers配置表中对应的配置项
     UPDATE setup_consumers SET ENABLED = 'YES'where name like '%wait%';
 
-    //当配置完成之后可以查看当前server正在做什么，可以通过查询events_waits_current表来得知，该表中每个线程只包含一行数据，用于显示每个线程的最新监视事件
+    -- 当配置完成之后可以查看当前server正在做什么，可以通过查询events_waits_current表来得知，该表中每个线程只包含一行数据，用于显示每个线程的最新监视事件
     select * from events_waits_current\G
     *************************** 1. row ***************************
                 THREAD_ID: 11
@@ -1437,14 +1491,14 @@ show variables like 'innodb%buffer%';
 
 - 一些表
     ```sql
-    //_history表中记录每个线程应该执行完成的事件信息，但每个线程的事件信息只会记录10条，再多就会被覆盖，*_history_long表中记录所有线程的事件信息，但总记录数量是10000，超过就会被覆盖掉
+    -- _history表中记录每个线程应该执行完成的事件信息，但每个线程的事件信息只会记录10条，再多就会被覆盖，*_history_long表中记录所有线程的事件信息，但总记录数量是10000，超过就会被覆盖掉
     select thread_id,event_id,event_name,timer_wait from events_waits_history order by thread_id limit 21;
 
-    // summary表提供所有事件的汇总信息，该组中的表以不同的方式汇总事件数据（如：按用户，按主机，按线程等等）。例如：要查看哪些instruments占用最多的时间，可以通过对events_waits_summary_global_by_event_name表的COUNT_STAR或SUM_TIMER_WAIT列进行查询（这两列是对事件的记录数执行COUNT（*）、事件记录的TIMER_WAIT列执行SUM（TIMER_WAIT）统计而来）
+    -- summary表提供所有事件的汇总信息，该组中的表以不同的方式汇总事件数据（如：按用户，按主机，按线程等等）。例如：要查看哪些instruments占用最多的时间，可以通过对events_waits_summary_global_by_event_name表的COUNT_STAR或SUM_TIMER_WAIT列进行查询（这两列是对事件的记录数执行COUNT（*）、事件记录的TIMER_WAIT列执行SUM（TIMER_WAIT）统计而来）
     SELECT EVENT_NAME,COUNT_STAR FROM events_waits_summary_global_by_event_name  ORDER BY COUNT_STAR DESC LIMIT 10;
 
 
-    //instance表记录了哪些类型的对象会被检测。这些对象在被server使用时，在该表中将会产生一条事件记录，例如，file_instances表列出了文件I/O操作及其关联文件名
+    -- instance表记录了哪些类型的对象会被检测。这些对象在被server使用时，在该表中将会产生一条事件记录，例如，file_instances表列出了文件I/O操作及其关联文件名
     select * from file_instances limit 20;
     ```
 
@@ -1532,33 +1586,33 @@ show variables like 'innodb%buffer%';
 
 - performance_schema实践操作
     ```sql
-    //1、哪类的SQL执行最多？
+    -- 1、哪类的SQL执行最多？
     SELECT DIGEST_TEXT,COUNT_STAR,FIRST_SEEN,LAST_SEEN FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //2、哪类SQL的平均响应时间最多？
+    -- 2、哪类SQL的平均响应时间最多？
     SELECT DIGEST_TEXT,AVG_TIMER_WAIT FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //3、哪类SQL排序记录数最多？
+    -- 3、哪类SQL排序记录数最多？
     SELECT DIGEST_TEXT,SUM_SORT_ROWS FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //4、哪类SQL扫描记录数最多？
+    -- 4、哪类SQL扫描记录数最多？
     SELECT DIGEST_TEXT,SUM_ROWS_EXAMINED FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //5、哪类SQL使用临时表最多？
+    -- 5、哪类SQL使用临时表最多？
     SELECT DIGEST_TEXT,SUM_CREATED_TMP_TABLES,SUM_CREATED_TMP_DISK_TABLES FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //6、哪类SQL返回结果集最多？
+    -- 6、哪类SQL返回结果集最多？
     SELECT DIGEST_TEXT,SUM_ROWS_SENT FROM events_statements_summary_by_digest ORDER BY COUNT_STAR DESC
-    //7、哪个表物理IO最多？
+    -- 7、哪个表物理IO最多？
     SELECT file_name,event_name,SUM_NUMBER_OF_BYTES_READ,SUM_NUMBER_OF_BYTES_WRITE FROM file_summary_by_instance ORDER BY SUM_NUMBER_OF_BYTES_READ + SUM_NUMBER_OF_BYTES_WRITE DESC
-    //8、哪个表逻辑IO最多？
+    -- 8、哪个表逻辑IO最多？
     SELECT object_name,COUNT_READ,COUNT_WRITE,COUNT_FETCH,SUM_TIMER_WAIT FROM table_io_waits_summary_by_table ORDER BY sum_timer_wait DESC
-    //9、哪个索引访问最多？
+    -- 9、哪个索引访问最多？
     SELECT OBJECT_NAME,INDEX_NAME,COUNT_FETCH,COUNT_INSERT,COUNT_UPDATE,COUNT_DELETE FROM table_io_waits_summary_by_index_usage ORDER BY SUM_TIMER_WAIT DESC
-    //10、哪个索引从来没有用过？
+    -- 10、哪个索引从来没有用过？
     SELECT OBJECT_SCHEMA,OBJECT_NAME,INDEX_NAME FROM table_io_waits_summary_by_index_usage WHERE INDEX_NAME IS NOT NULL AND COUNT_STAR = 0 AND OBJECT_SCHEMA <> 'mysql' ORDER BY OBJECT_SCHEMA,OBJECT_NAME;
-    //11、哪个等待事件消耗时间最多？
+    -- 11、哪个等待事件消耗时间最多？
     SELECT EVENT_NAME,COUNT_STAR,SUM_TIMER_WAIT,AVG_TIMER_WAIT FROM events_waits_summary_global_by_event_name WHERE event_name != 'idle' ORDER BY SUM_TIMER_WAIT DESC
-    //12-1、剖析某条SQL的执行情况，包括statement信息，stege信息，wait信息
+    -- 12-1、剖析某条SQL的执行情况，包括statement信息，stege信息，wait信息
     SELECT EVENT_ID,sql_text FROM events_statements_history WHERE sql_text LIKE '%count(*)%';
-    //12-2、查看每个阶段的时间消耗
+    -- 12-2、查看每个阶段的时间消耗
     SELECT event_id,EVENT_NAME,SOURCE,TIMER_END - TIMER_START FROM events_stages_history_long WHERE NESTING_EVENT_ID = 1553;
-    //12-3、查看每个阶段的锁等待情况
+    -- 12-3、查看每个阶段的锁等待情况
     SELECT event_id,event_name,source,timer_wait,object_name,index_name,operation,nesting_event_id FROM events_waits_history_longWHERE nesting_event_id = 1553;
     ```
 
@@ -3125,7 +3179,29 @@ alter table t1 tablespace ts1;
 
 ### [MyRocks:lsm存储引擎](http://myrocks.io/docs/getting-started/)
 
-### frm文件解析利器mysqlfrm
+### 查看锁和事务
+
+```sql
+-- 查询正在执行的进程
+SELECT * FROM information_schema.PROCESSLIST where length(info) >0
+
+-- 查询是否锁表
+show OPEN TABLES where In_use > 0;
+
+-- 查看正在锁的事务
+SELECT * FROM INFORMATION_SCHEMA.INNODB_LOCKS;
+
+-- 查看等待锁的事务
+SELECT * FROM INFORMATION_SCHEMA.INNODB_LOCK_WAITS;
+
+-- 查询正在执行的事务：
+SELECT * FROM information_schema.INNODB_TRX
+
+-- 删除事务线程
+kill (trx_mysql_thread_id)
+```
+
+### mysqlfrm：frm文件解析利器
 
 - 可以解析innodb和Myisam的.frm文件，转换为CREATE TABLE语句
 
@@ -4619,398 +4695,128 @@ yum install -y percona-xtrabackup
     mysqlbackup --backup-dir=temp-backup-dir --backup-image=image-file --incremental copy-backup-and-apply-log
     ```
 
-## ETL数据迁移
-
-- ETL是数据抽取（Extract）、转换（Transform）、加载（Load ）的简写，它是将OLTP系统中的数据经过抽取，并将不同数据源的数据进行转换、整合，得出一致性的数据，然后加载到数据仓库中。简而言之ETL是完成从 OLTP系统到OLAP系统的过程
-
-- 数据仓库的架构
-    - 星型架构中间为事实表，四周为维度表， 类似星星
-    - 雪花型架构中间为事实表，两边的维度表可以再有其关联子表，而在星型中只允许一张表作为维度表与事实表关联，雪花型一维度可以有多张表，而星型 不可以。
-    - 考虑到效率时，星型聚合快，效率高，不过雪花型结构明确，便于与OLTP系统交互。
-
-- ETL和SQL的区别与联系
-
-    - ETL的优点：
-        - 比如我有两个数据源，一个是数据库的表，另外一个是excel数据，而我需要合并这两个数据，通常这种东西在SQL语句中比较难实现。但是ETL却有很多现成的组件和驱动，几个组件就搞定了。
-        - 比如跨服务器，并且服务器之间不能建立连接的数据源，比如我们公司系统分为一期和二期，存放的数据库是不同的，数据结构也不相同，数据库之间也不能建立连接，这种情况下，ETL就显得尤为重要和突出。
-
-    - SQL的优点：效率高的多
-
-### ETL构建企业级数据仓库五步法的流程
-
-- 1.确定主题
-    - 即 确定数据分析或前端展现的某一方面的分析主题，例如我们分析某年某月某一地区的啤酒销售情况，就是一个主题。主题要体现某一方面的各分析角度（维度）和统 计数值型数据（量度），确定主题时要综合考虑，一个主题在数据仓库中即为一个数据集市，数据集市体现了某一方面的信息，多个数据集市构成了数据仓库。
-
-- 2.确定量度
-    - 在 确定了主题以后，我们将考虑要分析的技术指标，诸如年销售额此类，一般为数值型数据，或者将该数据汇总，或者将该数据取次数，独立次数或取最大最小值 等，这样的数据称之为量度。量度是要统计的指标，必须事先选择恰当，基于不同的量度可以进行复杂关键性能指标（KPI）等的计算。
-
-- 3.确定事实数据粒度
-    - 在 确定了量度之后我们要考虑到该量度的汇总情况和不同维度下量度的聚合情况，考虑到量度的聚合程度不同，我们将采用“最小粒度原则”，即将量度的粒度设置 到最小，例如我们将按照时间对销售额进行汇总，目前的数据最小记录到天，即数据库中记录了每天的交易额，那么我们不能在ETL时将数据进行按月或年汇总， 需要保持到天，以便于后续对天进行分析。而且我们不必担心数据量和数据没有提前汇总带来的问题，因为在后续的建立CUBE时已经将数据提前汇总了。
-
-- 4.确定维度
-
-    - 维 度是要分析的各个角度，例如我们希望按照时间，或者按照地区，或者按照产品进行分析，那么这里的时间、地区、产品就是相应的维度，基于不同的维度我们可 以看到各量度的汇总情况，我们可以基于所有的维度进行交叉分析。这里我们首先要确定维度的层次（Hierarchy）和级别（Level），维度的层次是指该维度的所有级别，包括各级别的属性；维度的级别是指该维度下的成员，例如当建立地区维度时我们将地区维度作为一 个级别，层次为省、市、县三层，考虑到维度表要包含尽量多的信息，所以建立维度时要符合“矮胖原则”，即维度表要尽量宽，尽量包含所有的描述性信息，而不 是统计性的数据信息。
-
-    - 还有一种常见的情况，就是父子型维度，该维度一般用于非叶子节点含有成员等情况，例如公司员工 的维度，在统计员工的工资时，部 门主管的工资不能等于下属成员工资的简单相加，必须对该主管的工资单独统计，然后该主管部门的工资等于下属员工工资加部门主管的工资，那么在建立员工维度 时，我们需要将员工维度建立成父子型维度，这样在统计时，主管的工资会自动加上，避免了都是叶子节点才有数据的情况。
-
-    - 另外，在建立维度表时要充 分使用代理键，代理键是数值型的ID号码，好处是代理键唯一标识了每一维度成员信息，便于区分，更重要的是在聚合时由于数值型匹 配，JOIN效率高，便于聚合，而且代理键对缓慢变化维度有更重要的意义，它起到了标识历史数据与新数据的作用，在原数据主键相同的情况下，代理键起到了 对新数据与历史数据非常重要的标识作用。
-
-    - 有时我们也会遇到维度缓慢变化的情况，比如增加了新的产品，或者产品的ID号码修改了，或者产品增加了一个新的属性，此时某一维度的成员会随着新的数据的加入而增加新的维度成员，这样我们要考虑到缓慢变化维度的处理，对于缓慢变化维度，有三种情况：
-
-        - 1.缓慢变化维度第一种类型：历史数据需要修改。这样新来的数据要改写历史数据，这时我们要使用UPDATE，例如产品的ID号码为123，后来发现ID 号码错误了，需要改写成456，那么在修改好的新数据插入时，维度表中原来的ID号码会相应改为456，这样在维度加载时要使用第一种类型，做法是完全更 改。
-
-        - 2.缓慢变化维度第二种类型：历史数据保留，新增数据也要保留。这时要将原数据更新，将新数据插入，需要使用UPDATE / INSERT，比如某一员工2005年在A部门，2006年时他调到了B部门。那么在统计2005年的数据时就应该将该员工定位到A部门；而在统计 2006年数据时就应该定位到B部门，然后再有新的数据插入时，将按照新部门（B部门）进行处理，这样我们的做法是将该维度成员列表加入标识列，将历史的 数据标识为“过期”，将目前的数据标识为“当前的”。另一种方法是将该维度打上时间戳，即将历史数据生效的时间段作为它的一个属性，在与原始表匹配生成事 实表时将按照时间段进行关联，这样的好处是该维度成员生效时间明确。
-
-        - 3.缓慢变化维度第三种类型：新增数据维度成员改变了属性。例如某一维度成 员新加入了一列，该列在历史数据中不能基于它浏览，而在目前数据和将来数据中可 以按照它浏览，那么此时我们需要改变维度表属性，即加入新的列，那么我们将使用存储过程或程序生成新的维度属性，在后续的数据中将基于新的属性进行查看。
-
-- 5.创建事实表
-
-    - 在确定好事实数据和维度后，我们将考虑加载事实表。
-
-    - 在公司的大量数据堆积如山时，我们想看看里面究竟是什么，结果发现里面是一笔笔生产记录，一笔笔交易记录… 那么这些记录是我们将要建立的事实表的原始数据，即关于某一主题的事实记录表。
-
-    - 我 们的做法是将原始表与维度表进行关联，生成事实表。注意在关联时有为空的数据时（数据源脏），需要使用外连接，连接后我们将 各维度的代理键取出放于事实表中，事实表除了各维度代理键外，还有各量度数据，这将来自原始表，事实表中将存在维度代理键和各量度，而不应该存在描述性信 息，即符合“瘦高原则”，即要求事实表数据条数尽量多（粒度最小），而描述性信息尽量少。
-
-    - 如果考虑到扩展，可以将事实表加一唯一标识列，以为了以后扩展将该事实作为雪花型维度，不过不需要时一般建议不用这样做。
-
-    - 事 实数据表是数据仓库的核心，需要精心维护，在JOIN后将得到事实数据表，一般记录条数都比较大，我们需要为其设置复合主键和索引，以为了数据的完整性和 基于数据仓库的查询性能优化，事实数据表与维度表一起放于数据仓库中，如果前端需要连接数据仓库进行查询，我们还需要建立一些相关的中间汇总表或物化视图，以方便查询。
-
-### ETL工具
-
-- [数仓与大数据：数据仓库ETL工具全解](https://mp.weixin.qq.com/s/JTE3K6VfiYEAOSyYgN-KPA)
-
-#### [kettle](https://github.com/pentaho/pentaho-kettle)
-
-- [Kettle实战100篇博文](https://github.com/xiaoymin/KettleInAction100)
-
-- [kettle-scheduler：一款简单易用的Kettle调度监控平台](https://github.com/zhaxiaodong9860/kettle-scheduler)
-
-#### [canal](https://github.com/alibaba/canal)
-
-- [李文周：Canal介绍和使用指南](https://mp.weixin.qq.com/s/9jDlMssry-_UWzSm1R-Ypg)
-
-- Canal 是阿里开源的一款 MySQL 数据库增量日志解析工具，提供增量数据订阅和消费。使用Canal能够实现异步更新数据，配合MQ使用可在很多业务场景下发挥巨大作用。
-    ![image](./Pictures/mysql/canal.avif)
-
-- MySQL主备复制原理
-    - MySQL master 将数据变更写入二进制日志( binary log, 其中记录叫做二进制日志事件binary log events，可以通过 show binlog events 进行查看)
-    - MySQL slave 将 master 的 binary log events 拷贝到它的中继日志(relay log)
-    - MySQL slave 重放 relay log 中事件，将数据变更反映它自己的数据
-
-- Canal 工作原理
-    - Canal 模拟 MySQL slave 的交互协议，伪装自己为 MySQL slave ，向 MySQL master 发送 dump 协议
-    - MySQL master 收到 dump 请求，开始推送 binary log 给 slave (即 Canal )
-    - Canal 解析 binary log 对象(原始为 byte 流)
-
-[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
-
-##### 安装
-
-- [canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
-
-- 1.需要先开启MySQL的 Binlog 写入功能。`my.cnf`配置
-    ```ini
-    [mysqld]
-    log-bin=mysql-bin # 开启 binlog
-    binlog-format=ROW # 选择 ROW 模式
-    server_id=1 # 配置 MySQL replaction 需要定义，不要和 canal 的 slaveId 重复
-    ```
-
-    - 重启mysql
-
-    - 验证
-        ```sql
-        -- 查看是否开启了binlog
-        show variables like 'log_bin';
-        +---------------+-------+
-        | Variable_name | Value |
-        +---------------+-------+
-        | log_bin       | ON    |
-        +---------------+-------+
-
-        -- 查看是否为row格式
-        show variables like 'binlog_format';
-        +---------------+-------+
-        | Variable_name | Value |
-        +---------------+-------+
-        | binlog_format | ROW   |
-        +---------------+-------+
-        ```
-
-- 2.添加授权
-    ```sql
-    -- 下面的命令是先创建一个名为canal的账号，密码为canal。再对其进行授权，如果已有账户可直接 grant。
-    CREATE USER canal IDENTIFIED BY 'canal';
-    GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
-    -- GRANT ALL PRIVILEGES ON *.* TO 'canal'@'%' ;
-    FLUSH PRIVILEGES;
-    ```
-
-- 3.安装canal
-
-    - 在[release页面](https://github.com/alibaba/canal/releases) 下载
-
-    ```sh
-    # 这里的版本为1.0.17
-    curl -LO https://github.com/alibaba/canal/releases/download/canal-1.1.7/canal.deployer-1.1.7.tar.gz
-
-    # 解压缩
-    x canal.deployer-1.1.7.tar.gz
-
-    # 一共5个目录
-    cd canal.deployer-1.1.7
-    ll
-    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I bin/
-    drwxr-xr-x 5 - tz tz 20 Apr 17:31 -I conf/
-    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I lib/
-    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I logs/
-    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I plugin/
-    ```
-
-- 4.修改配置文件`canal.deployer-1.1.7/conf/example/instance.properties`
-
-    - 将canal.instance.master.address修改为你的MySQL地址。
-    - 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
-    - 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
-
-    ```
-    canal.instance.master.address=127.0.0.1:3306
-    canal.instance.tsdb.dbUsername=canal
-    canal.instance.tsdb.dbPassword=canal
-    ```
-- 启动
-
-    ```sh
-    sh bin/startup.sh
-    ```
-
-- 查看server日志
-    ```sh
-    cat logs/canal/canal_stdout.log
-    ```
-
-- 关闭
-    ```sh
-    sh bin/stop.sh
-    ```
-
-##### docker安装
-
-```sh
-# 拉取canal
-docker pull canal/canal-server:latest
-
-# 启动容器
-docker run -d --name canal-server -p 11111:11111 canal/canal-server
-
-# 进入容器
-docker exec -it canal-server /bin/bash
-
-# 修改配置
-# 将canal.instance.master.address修改为你的MySQL地址。
-# 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
-# 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
-vi canal-server/conf/example/instance.properties
-
-# 重启容器
-docker container restart canal-server
-```
-
-- 启动Canal Server之后，我们可以使用Canal客户端连接Canal进行消费，本文以Go客户端canal-go为例，演示如何从canal-server消费数据。
-
-```go
-package main
-
-import (
- "fmt"
- "time"
-
- pbe "github.com/withlin/canal-go/protocol/entry"
-
- "github.com/golang/protobuf/proto"
- "github.com/withlin/canal-go/client"
-)
-
-// canal-go client demo
-
-func main() {
- // 连接canal-server
- connector := client.NewSimpleCanalConnector(
-  "127.0.0.1", 11111, "", "", "example", 60000, 60*60*1000)
- err := connector.Connect()
- if err != nil {
-  panic(err)
- }
-
- // mysql 数据解析关注的表，Perl正则表达式.
- err = connector.Subscribe(".*\\..*")
- if err != nil {
-  fmt.Printf("connector.Subscribe failed, err:%v\n", err)
-  panic(err)
- }
-
- // 消费消息
- for {
-  message, err := connector.Get(100, nil, nil)
-  if err != nil {
-   fmt.Printf("connector.Get failed, err:%v\n", err)
-   continue
-  }
-  batchId := message.Id
-  if batchId == -1 || len(message.Entries) <= 0 {
-   time.Sleep(time.Second)
-   fmt.Println("===暂无数据===")
-   continue
-  }
-  printEntry(message.Entries)
- }
-}
-
-func printEntry(entries []pbe.Entry) {
- for _, entry := range entries {
-  // 忽略事务开启和事务关闭类型
-  if entry.GetEntryType() == pbe.EntryType_TRANSACTIONBEGIN || entry.GetEntryType() == pbe.EntryType_TRANSACTIONEND {
-   continue
-  }
-  // RowChange对象，包含了一行数据变化的所有特征
-  rowChange := new(pbe.RowChange)
-  // protobuf解析
-  err := proto.Unmarshal(entry.GetStoreValue(), rowChange)
-  if err != nil {
-   fmt.Printf("proto.Unmarshal failed, err:%v\n", err)
-  }
-  if rowChange == nil {
-   continue
-  }
-  // 获取并打印Header信息
-  header := entry.GetHeader()
-  fmt.Printf("binlog[%s : %d],name[%s,%s], eventType: %s\n",
-   header.GetLogfileName(),
-   header.GetLogfileOffset(),
-   header.GetSchemaName(),
-   header.GetTableName(),
-   header.GetEventType(),
-  )
-  //判断是否为DDL语句
-  if rowChange.GetIsDdl() {
-   fmt.Printf("isDdl:true, sql:%v\n", rowChange.GetSql())
-  }
-
-  // 获取操作类型：insert/update/delete等
-  eventType := rowChange.GetEventType()
-  for _, rowData := range rowChange.GetRowDatas() {
-   if eventType == pbe.EventType_DELETE {
-    printColumn(rowData.GetBeforeColumns())
-   } else if eventType == pbe.EventType_INSERT || eventType == pbe.EventType_UPDATE {
-    printColumn(rowData.GetAfterColumns())
-   } else {
-    fmt.Println("---before---")
-    printColumn(rowData.GetBeforeColumns())
-    fmt.Println("---after---")
-    printColumn(rowData.GetAfterColumns())
-   }
-  }
- }
-}
-
-func printColumn(columns []*pbe.Column) {
- for _, col := range columns {
-  fmt.Printf("%s:%s  update=%v\n", col.GetName(), col.GetValue(), col.GetUpdated())
- }
-}
-```
-
-##### 配置kafka
-
-- Canal 1.1.1版本之后，默认支持将Canal Server接收到的binlog数据直接投递到MQ，目前默认支持的MQ系统有Kafka、RocketMQ、RabbitMQ、PulsarMQ。
-
-- 加入mq配置`canal.deployer-1.1.7/conf/example/instance.properties`
-    ```
-    # mq config
-    # 设置默认的topic
-    canal.mq.topic=example
-    # 针对库名或者表名发送动态topic
-    #canal.mq.dynamicTopic=mytest,.*,mytest.user,mytest\\..*,.*\\..*
-    canal.mq.partition=0
-    # hash partition config
-    #canal.mq.partitionsNum=3
-    #库名.表名: 唯一主键，多个表之间用逗号分隔
-    #canal.mq.partitionHash=mytest.person:id,mytest.role:id
-    ```
-
-    - `canal.mq.dynamicTopic`配置说明。
-
-        - Canal 1.1.3版本之后, 支持配置格式为：schema 或 schema.table，多个配置之间使用逗号或分号分隔。
-
-            - 例子1：test\\.test 指定匹配的单表，发送到以test_test为名字的topic上
-            - 例子2：.*\\..* 匹配所有表，则每个表都会发送到各自表名的topic上
-            - 例子3：test 指定匹配对应的库，一个库的所有表都会发送到库名的topic上
-            - 例子4：test\\..* 指定匹配的表达式，针对匹配的表会发送到各自表名的topic上
-            - 例子5：test,test1\\.test1，指定多个表达式，会将test库的表都发送到test的topic上，test1\\.test1的表发送到对应的test1_test1 topic上，其余的表发送到默认的canal.mq.topic值
-
-        - 为满足更大的灵活性，Canal还允许对匹配条件的规则指定发送的topic名字，配置格式：topicName:schema 或 topicName:schema.table。
-
-            - 例子1: test:test\\.test 指定匹配的单表，发送到以test为名字的topic上
-            - 例子2: test:.*\\..* 匹配所有表，因为有指定topic，则每个表都会发送到test的topic下
-            - 例子3: test:test 指定匹配对应的库，一个库的所有表都会发送到test的topic下
-            - 例子4：testA:test\\..* 指定匹配的表达式，针对匹配的表会发送到testA的topic下
-            - 例子5：test0:test,test1:test1\\.test1，指定多个表达式，会将test库的表都发送到test0的topic下，test1\\.test1的表发送到对应的test1的topic下，其余的表发送到默认的canal.mq.topic值
-
-- 修改canal 配置文件 `canal.deployer-1.1.7/conf/canal.properties`
-
-    ```
-    # ...
-    # 可选项: tcp(默认), kafka,RocketMQ,rabbitmq,pulsarmq
-    canal.serverMode = kafka
-    # ...
-
-    # 是否为flat json格式对象
-    canal.mq.flatMessage = true
-    # Canal的batch size, 默认50K, 由于kafka最大消息体限制请勿超过1M(900K以下)
-    canal.mq.canalBatchSize = 50
-    # Canal get数据的超时时间, 单位: 毫秒, 空为不限超时
-    canal.mq.canalGetTimeout = 100
-    canal.mq.accessChannel = local
-
-    ...
-
-    ##################################################
-    #########                    Kafka                   #############
-    ##################################################
-    # 此处配置修改为你的Kafka环境地址
-    kafka.bootstrap.servers = 127.0.0.1:9092
-    kafka.acks = all
-    kafka.compression.type = none
-    kafka.batch.size = 16384
-    kafka.linger.ms = 1
-    kafka.max.request.size = 1048576
-    kafka.buffer.memory = 33554432
-    kafka.max.in.flight.requests.per.connection = 1
-    kafka.retries = 0
-
-    kafka.kerberos.enable = false
-    kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
-    kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
-
-    # sasl demo
-    # kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
-    # kafka.sasl.mechanism = SCRAM-SHA-512
-    # kafka.security.protocol = SASL_PLAINTEXT
-    ```
-
-- 按上述修改Canal配置后，重启Canal服务即可。
-
-## 大表变更
-
-### onlineddl变更工具
-
-#### OnlineDDL
+## OnlineDDL
 
 ![image](./Pictures/mysql/OnlineDDL速查表.avif)
 
-- MySQL 5.6 开始支持 Online DDL ，添加[唯一]索引虽然不需要重建表，也不阻塞 DML ，但是大表场景下还是不会直接使用 Alter Table 进行添加，而是使用第三方工具进行操作，比较常见的就属 pt-osc 和 gh-ost 了。
+- MySQL的online ddl操作是在5.6版本引入的，在不同的版本下，有不同的执行过程：
 
-#### [gh-ost：](https://github.com/github/gh-ost)
+    - 在MySQL5.5版本前，我们是使用表copy的方式来进行alter table操作的，需要借助一个临时表将全部数据拷贝，然后进行rename操作，这个过程中，是需要锁表的，原表只能读不能写。而且需要消耗一倍的空间。
+
+    - MySQL5.5版本下引入了表inplace的方式进行该操作，该操作不需要拷贝旧表的数据，但是依旧会锁住原表。仅支持添加、删除索引两种ddl，其他操作还是根据5.5版本之前的copy的方法进行的。
+
+    - MySQL5.6版本下开始支持online-ddl的操作，该方法和上面两种最大的不同是在执行DDL的时候，不会锁原表，原表不仅可以读，还可以写，当然，需要注意的是，该特性仅支持部分DDL操作。我们可以在DDL操作的最后面，通过执行algorithm的方法指定它的执行算法
+
+        - algorithm=inplace，可以避免重建表带来的IO和CPU消耗，保证ddl期间依然有良好的性能和并发；
+        - algorithm=copy，需要拷贝原始表，所以不允许并发DML写操作；这个参数可以添加在alter table语句的最后面，类似官方文档中的那样：
+
+        ```sql
+        ALTER TABLE tbl_name ADD COLUMN column_name column_definition, ALGORITHM=INPLACE, LOCK=NONE;
+        ```
+
+    - 在MySQL5.7中，沿用了5.6中的online-ddl的方法，但是稍有不同，从官方文档上看，5.7和5.6中的区别在于5.7中支持的alter table的操作类型更多了。
+
+       - 在MySQL官网上，我们可以看到，online-ddl分为了很多种类，如下：
+
+            | online-ddl |
+            |------------|
+            | 索引操作   |
+            | 主键操作   |
+            | 列操作     |
+            | 外键操作   |
+            | 表操作     |
+            | 表空间操作 |
+            | 分区操作   |
+
+       - 不同的操作类型中，又包含了不同的操作，例如列操作中包含了生成列、删除列、修改列属性、修改列名称等等、不同的情况下是否需要重建表、是否支持并发、是否会加锁、以及并发是如何处理的，情况都不太一样
+
+- 但是大表场景下还是不会直接使用 Alter Table 进行添加，而是使用第三方工具进行操作，比较常见的就属 pt-osc 和 gh-ost 了。
+
+### OnlineDDL变更工具
+
+#### 直接alter table
+
+- 在线变更的过程并不能保证完全没有问题，如果在变更的过程中，原表又发生了alter table的DDL操作，或者出现大事务的回滚操作，那么结果是不确定的，所以，最好的方法还是在业务的低峰期去做比较合适。
+
+##### 不适合的场景
+
+- 早上刚来，有个业务需求，是要变更一张表的表结构，我登陆到服务器上看了看之前的变结构，大概信息如下：
+
+    - 表数据量：690w左右，
+    - 表字段数量：40个，
+    - 包含索引个数：6个，
+    - 表空间ibd文件：3G左右
+
+- 看到这个信息，我询问业务方这个表里面的数据是冷数据还是热数据，还有没有线上使用，得到的回复是一直在使用。直观上来讲，这个已经不能直接使用alter table的方法来变更表结构了，如果非要这么做，那就请提前准备好故障报告再做。哈哈
+
+- 为了验证我的直观上的猜想，我把数据导入到了测试环境上，然后测试了一下性能，谁知道，这个导入就花费了好长时间，来看我的测试结果：
+
+    ```sh
+    # 3G大小的表空间ibd文件，导入mysql数据库，时间大概80min
+    time /usr/local/mysql/bin/mysql -udba_admin -p -h127.0.0.1 -P4308 -D db_name < /data/mysql/db_name_1028.sql
+
+    real    80m31.491s
+    user    0m39.040s
+    sys     0m3.851s
+    ```
+
+    - 这个结果我看着也很意外，测试MySQL实例的buffer_pool大小是1024M，3个G的数据导入了80min，感觉有点不正常，分析下原因，这个可能是因为表本身包含的索引很多，有6个索引，在进行insert操作的时候，需要重建索引，因此导致花费的时间非常长。
+        - 这是一个优化点，可以在导入之前先把索引给去掉，然后导入数据，导入数据完成之后再创建索引，这样会起到一定的效果。
+
+    - 导入完成之后，我们在测试环境上直接使用alter table的操作进行处理， 这里说说alter操作对表造成的影响，在MySQL5.6之前，在alter这个时间段里面，表是被加了锁的(写锁)，加写锁时其他用户只能select表不能update、insert表。表数据量越大，耗时越长。
+
+- mysql在线ddl(加字段、加索引等修改表结构之类的操作）过程如下：
+    - 1.对表加锁(表此时只读)
+    - 2.复制原表物理结构
+    - 3.修改表的物理结构
+    - 4.把原表数据导入中间表中，数据同步完后，锁定中间表，并删除原表
+    - 5.rename中间表为原表
+    - 6.刷新数据字典，并释放锁
+
+- 在测试环境上进行了测试，得到的测试结果如下：
+
+    ```sql
+    mysql >>select count(*) from table_name;
+    +----------+
+    | count(*) |
+    +----------+
+    |  6899928 |
+    +----------+
+    1 row in set (2.21 sec)
+
+    mysql >>ALTER TABLE `table_name` ADD `field_type` smallint(4) unsigned NOT NULL DEFAULT '0' ;
+    Query OK, 6899928 rows affected (3 min 27.44 sec)
+    Records: 6899928  Duplicates: 0  Warnings: 0
+
+    `#在另外一个窗口查看连接`
+    mysql--dba_admin@127.0.0.1:(none) 13:36:38>>show processlist;
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+------------------------------------------------------------------------------------------------------+
+    | Id  | User      | Host            | db          | Command | Time | State             | Info                                                                                                 |
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+------------------------------------------------------------------------------------------------------+
+    | 227 | dba_admin | 127.0.0.1:51627 | db_name | Query | 13 | copy to tmp table | ALTER TABLE `table_name` ADD `field_type` smallint(4) unsigned NOT NULL DEFAULT '0' |
+    | 255 | dba_admin | 127.0.0.1:52565 | NULL    | Query | 0  | NULL              | show processlist                                                                    |
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+------------------------------------------------------------------------------------------------------+
+
+    mysql >>ALTER TABLE `table_name` drop column `field_type`;
+    Query OK, 6899928 rows affected (3 min 24.72 sec)
+    Records: 6899928  Duplicates: 0  Warnings: 0
+
+    `#在另外一个窗口查看连接`
+    mysql >>show processlist;
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+-----------------------------------------------+
+    | Id  | User      | Host            | db          | Command | Time | State             | Info                                          |
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+-----------------------------------------------+
+    | 227 | dba_admin | 127.0.0.1:51627 | db_name     | Query   |   14 | copy to tmp table | ALTER TABLE `table_name` drop column field_type |
+    | 255 | dba_admin | 127.0.0.1:52565 | NULL        | Query   |    0 | NULL              | show processlist                              |
+    +-----+-----------+-----------------+-------------+---------+------+-------------------+-----------------------------------------------+
+    2 rows in set (0.00 sec)
+    ```
+
+    - 可以看到，直接进行alter table add的操作，会导致锁表3min24s左右，这对线上业务的影响是非常大的，而直接进行alter table drop的操作也是一样，会造成线上的服务不可用。
+
+    - 值得注意的一点是，在进行alter table的过程中，可以看到show processlist的state字段提示是“copy to tmp table”,也就是alter table操作会将当前的表拷贝到一个临时的表结构中，有个数据中转的过程。
+
+#### [gh-ost](https://github.com/github/gh-ost)
 
 - [爱可生开源社区：技术分享 | gh-ost 在线 ddl 变更工具](https://mp.weixin.qq.com/s?src=11&timestamp=1714036602&ver=5222&signature=dCZnHB7jTYnBSJKoCfbsz4TVUxfiGi7ALay5lG4KPOPGXVPzhJ5v-mrYPykrPAaFcr4FeeTgPIiGUXE*emwdPcyfsTnhB7g8GnmmVMvkJsWIwslf18wOXFRc1oCn-U1K&new=1)
 
@@ -5565,9 +5371,747 @@ func printColumn(columns []*pbe.Column) {
 
 #### pt-osc（pt-online-schema-change）
 
+pt-online-schema-change并不能缩短表变更的时间，它只是会减少表变更过程中对线上带来的影响，让本来会锁表的操作变成平滑的操作，业务没有感知。
+
 - [官方文档](https://docs.percona.com/percona-toolkit/pt-online-schema-change.html)
 
-#### gh-ost和pt-osc 的对比测试
+- [爱可生开源社区：技术分享 | Online DDL 工具 pt-osc](https://mp.weixin.qq.com/s/gBkegjsDS4DQ_I8p0n0aCg)
+
+- 安装
+
+    ```sql
+    -- 安装 yum 仓库
+    yum install https://repo.percona.com/yum/percona-release-latest.noarch.rpm
+    -- 安装 percona toolkit
+    yum install percona-toolkit -y
+    ```
+
+- 原理
+
+    - 1.创建一个与原表结构相同的空表，表名是 _new 后缀；
+    - 2.修改步骤 1 创建的空表的表结构；
+    - 3.在原表上加三个触发器：delete/update/insert，用于 copy 数据过程中，将原表中要执行的语句在新表中执行；
+    - 4.将原表数据以数据块（chunk）的形式 copy 到新表；
+    - 5.rename 原表为 old 表，并把新表 rename 为原表名，然后删除旧表；
+    - 6.删除触发器。
+
+- 限制
+
+    - 1.原表上要有 primary key 或 unique index，因为当执行该工具时会创建一个 DELETE 触发器来更新新表；
+
+        - 注意：一个例外的情况是 --alter 指定的子句中是在原表中的列上创建 primary key 或 unique index，这种情况下将使用这些列用于 DELETE 触发器。
+
+    - 2.不能使用 rename 子句来重命名表；
+    - 3.列不能通过删除 + 添加的方式来重命名，这样将不会 copy 原有列的数据到新列；
+    - 4.如果要添加的列是 not null，则必须指定默认值，否则会执行失败；
+    - 5.删除外键约束（DROP FOREIGN KEY constraint_name），外键约束名前面必须添加一个下划线 '_'，即需要指定名称 _constraint_name，而不是原始的 constraint_name；
+
+    - 例如：
+
+        ```sql
+        CONSTRAINT `fk_foo` FOREIGN KEY (`foo_id`) REFERENCES `bar` (`foo_id`)
+        ```
+
+        - 必须指定 --alter "DROP FOREIGN KEY _fk_foo"。
+
+##### 参数
+
+- 1.常用基本
+
+    | 基本参数         | 说明                                                                                                   |
+    |------------------|--------------------------------------------------------------------------------------------------------|
+    | --dry-run        | 相当于真正执行前的测试。不会对原表做更改，只会创建和修改新表（不执行创建触发器、复制数据或替换原始表） |
+    | --execute        | 真正执行 DDL                                                                                           |
+    | --user, -u       | 用于登录的用户名                                                                                       |
+    | --password, -p   | 指定密码，如果密码中包含逗号，必须使用反斜杠转义。                                                     |
+    | --host, -h       | 指定连接的主机。                                                                                       |
+    | --port, -P       | 指定端口号。                                                                                           |
+    | --socket         | -S，指定用于连接的 socket 文件                                                                         |
+    | --ask-pass       | 不在命令行中指定密码，连接到 MySQL 时，提示输入密码。                                                  |
+    | --alter “string” | 指定表结构变更语句。不需要 ALTER TABLE 关键字，可以指定多个更改，用逗号隔开。                          |
+    | --database, -D   | 指定数据库                                                                                             |
+
+- 2.控制输出形式
+
+    | 控制输出形式参数 | 说明                                                                                                                                                                                                               |
+    |------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+    | --print          | 将工具执行的 SQL 语句打印到 STDOUT，可以和 --dry-run 同时使用。                                                                                                                                                    |
+    | --progress       | type: array; default: time,30 。在复制行时，将进度报告打印到 STDERR。该值是一个逗号分隔的列表，由两分组成。第一部分可以是 percentage, time, iterations（每秒打印次数）；第二部分指定对应的数值，表示打印的频率。 |  |
+    | --quiet, -    q  | 表示不要将信息打印到标准输出（禁用 --progress）。错误和警告仍然打印到 STDERR。                                                                                                                                     |
+    | --statistics     | 打印统计信息。                                                                                                                                                                                                     |
+- 3.表上行为控制
+
+    - --alter-foreign-keys-method "string"
+        - 指定修改外键以使引用新表。
+        - 当该工具重命名原始表以让新表取而代之时，外键跟随被重命名的表，因此必须更改外键以引用新表。
+        - 支持两种方式：rebuild_constraints 和 drop_swap 。可选值：
+
+            - auto：自动决定那种方式是最好的。如果可以使用 rebuild_constraints 则使用，否则使用 drop_swap。
+
+            - rebuild_constraints
+
+                - 此方法使用 ALTER TABLE 删除并重新添加引用新表的外键约束。这是首选的方式，除非子表（引用 DDL 表中列的表）太大，更改会花费太长时间。
+                - 通过比较子表的行数和将行从旧表复制到新表的速度来确定是否使用该方式。
+                - 如果估计可以在比 --chunk-time 更短的时间内修改子表，那么它将使用这种方式。
+                    - 估计修改子表（引用被修改表）所需的时间方法：行复制率乘以 --chunk-size-limit，因为 MySQL alter table 通常比复制行过程快得多。
+
+        > 说明：
+        >
+        > 由于 MySQL 中的限制，外键在更改后不能与之前的名称相同。该工具在重新定义外键时必须重命名外键，通常在名称中添加一个前导下划线 '_' 。在某些情况下，MySQL 还会自动重命名外键所需的索引。
+
+        - drop_swap
+
+            - 禁用外键检查（FOREIGH_KEY_CHECKS=0），先删除原始表，然后将新表重命名到原来的位置。这与交换新旧表的方法不同，后者使用的是客户端应用程序无法检测到的原子 RENAME。
+                - 这种方式更快，但是有一些风险：
+                - 在 drop 原表和 rename 临时表之间的一段时间，DDL 的表不存在，查询这个表的语句将会返回报错。
+                - 如果 rename 执行失败，没有修改成原表名称，但是原表已经被永久删除。
+                - 这种方式强制使用 --no-swap-tables 和 --no-drop-old-table。
+
+        - none
+
+            - 这种方式和 drop_swap 类似，但是没有 swap。任何引用原表的外键将会指向一个不存在的表，这样会造成外键违规，在 show engine innodb status 中将会有类似下面的输出：
+            ```
+            Trying to add to index `idx_fk_staff_id` tuple:
+            DATA TUPLE: 2 fields;
+            0: len 1; hex 05; asc  ;;
+            1: len 4; hex 80000001; asc     ;;
+            But the parent table `sakila`.`staff_old`
+            or its .ibd file does not currently exist!
+            ```
+            - 这是因为原始表（在本例中为 sakila.staff）被重命名为 sakila.staff_old，然后 drop 掉了。提供了这种处理外键约束的方法，以便数据库管理员可以根据需要禁用该工具的内置功能。
+
+    - --only-same-schema-fks
+        - 只在与原始表相同数据库的表上检查外键。这个选项是危险的，因为如果 fks 引用不同数据库中的表，将不会被检测到。
+
+    - --null-to-not-null
+        - 允许将允许空值的列修改为不允许空值的列。包含空值的行将被转换为定义的默认值。如果没有给出明确的默认值，MySQL 会根据数据类型指定一个默认值，例如数字数据类型为 0，字符串数据类型为空
+
+    - --[no]analyze-before-swap
+        - 默认值：yes
+        - 在与旧表 swap 之前，在新表上执行 ANALYZE TABLE。在 MySQL 5.6 及更高版本，innodb_stats_persistent 开启的情况下，默认是 yes。
+
+        > 说明：innodb_stats_persistent 为 ON，表示统计信息会持久化存储，OFF 表示统计信息只存储在内存。
+
+    - --[no]drop-new-table
+        - 默认值：yes
+        - 如果复制原始表失败，则删除新表。
+        - 指定 --no-drop-new-table 和 --no-swap-tables 将保留表的新修改副本，而不修改原始表，见 --new-table-name。
+        - --no-drop-new-table 不能和 --alter-foreign-keys-method drop_swap 同时使用。
+
+    - --[no]drop-old-table
+        - 默认值：yes
+        - 重命名后删除原始表。在原表被成功重命名以让新表取而代之之后，如果没有错误，该工具将在默认情况下删除原表。如果有任何错误，该工具将保留原始表。如果指定了 --no-swap-tables，则不删除旧表。
+
+    - --[no]swap-tables
+        - 默认值：yes
+        - 交换原始表和修改后的新表。这一步通过使具有新模式的表取代原来的表，从而完成了在线模式更改过程。原始表变成旧表，工具会删除它，除非禁用 --[no]drop-old-table。
+
+        - 使用 --no-swap-tables 会运行整个过程，它会创建新表，复制所有行但最后会删除新表。它的目的是运行一个更现实的演练。
+
+    - --[no]drop-triggers
+        - 默认值：yes
+        - 指定在旧表上删除触发器。--no-drop-old-table 强制 --no-drop-triggers。
+
+    - --preserve-triggers
+        - 在指定时保留旧触发器。在 MySQL 5.7.2 中，可以为一个给定的表定义具有相同触发事件和动作时间的多个触发器。这允许我们添加 pt-online-schema-change 所需的触发器，即使表已经有了自己的触发器。如果启用了此选项，那么在开始从原始表复制行之前，pt-online-schema-change 将尝试将所有现有触发器复制到新表，以确保在修改表之后可以应用旧触发器。
+
+        - 例如：
+
+        ```sql
+        CREATE TABLE test.t1 (
+        id INT NOT NULL AUTO_INCREMENT,
+        f1 INT,
+        f2 VARCHAR(32),
+        PRIMARY KEY (id)
+        );
+
+        CREATE TABLE test.log (
+        ts  TIMESTAMP,
+        msg VARCHAR(255)
+        );
+
+        CREATE TRIGGER test.after_update
+        AFTER
+        UPDATE ON test.t1
+        FOR EACH ROW
+        INSERT INTO test.log \
+        VALUES (NOW(), CONCAT("updated row row with id ", OLD.id, " old f1:", OLD.f1, " new f1: ", NEW.f1 ));
+        ```
+
+        - 对于这个表和触发器组合，不可能使用 --preserve-triggers 和 --alter  “DROP COLUMN f1”，因为触发器引用被删除的列，会导致触发器失败。
+
+        - 在测试触发器将在新表上工作之后，触发器将从新表中删除，直到所有行都被复制，然后它们被重新应用。
+
+        - --preserve-triggers 不能与 --no-drop-triggers，--no-drop-old-table，--no-swap-tables 这些参数一起使用，因为 --preserve-triggers 意味着旧的触发器应该被删除并在新表中重新创建。由于不可能有多个具有相同名称的触发器，因此必须删除旧的触发器，以便能够在新表中重新创建它们。
+
+        - 使用 --preserve-trigger 和 --no-swap-tables 将导致原始表的触发器仍然被定义。如果同时设置了 --no-swap-tables 和 --no-drop-new-table，那么触发器将保留在原始表上，并将复制到新表上（触发器将具有随机后缀，因为没有唯一的触发器名称）。
+
+    - --new-table-name
+
+        - type: string; default: %T_new
+        - 在交换表之前新建表名。将 %T 替换为原始表名。当使用默认值时，将在名称前添加最多 10 个 '_'（下划线），以查找唯一的表名称。如果指定了表名，则不会将其作为前缀，因此该表必须不存在。
+
+    - --force
+
+        - 在使用 --alter-foreign-keys-method = none 的情况下，这个选项会绕过确认。
+
+    - --tries
+
+        - 类型：array
+        - 遇到错误时，尝试的次数。下面是重试操作，以及它们的默认尝试次数和尝试之间的等待时间（以秒为单位）。
+        ![image](./Pictures/mysql/pt-osc的--tries.avif)
+
+        - 例子：
+            ```sql
+            --tries create_triggers:5:0.5,drop_triggers:5:0.5
+            ```
+        - 格式：
+            ```
+            operation:tries:wait[,operation:tries:wait]
+            ```
+
+            - 必须同时指定 3 个值：operation，tries，wait
+
+        - 注意：大多数操作只在 MySQL 5.5 和更新版本中受到 lock_wait_timeout（参见 --set-vars）的影响，因为元数据锁。
+
+        - 对于创建和删除触发器，尝试的次数应用于每个触发器的 create trigger 和 drop trigger 语句。
+
+        - 对于复制行，尝试的次数适用于每个块，不是整个 table。
+        - 对于交换表，尝试的次数通常只应用一次，因为通常只有一个 rename table 语句。
+        - 对于重新构建外键约束，每个语句都有相应的尝试次数（用于重新构建约束的 alter 语句：--alter-foreign-keys-method；drop_swap 方法的其他语句）
+
+        - 下面这些错误出现时，将会重试，
+            ```
+            Lock wait timeout (innodb_lock_wait_timeout and lock_wait_timeout)
+            Deadlock found
+            Query is killed (KILL QUERY <thread_id>)
+            Connection is killed (KILL CONNECTION <thread_id>)
+            Lost connection to MySQL
+            ```
+
+        - 错误和重新尝试次数被记录在 --statistics 中。
+
+- 4.负载相关
+
+    - --critical-load
+        - 类型：Array；默认值：Threads_running=50
+        - 在复制每个 chunk 之后检查 SHOW GLOBAL STATUS，如果负载太高则终止。该选项接受以逗号分隔的 MySQL 状态变量和阈值列表。格式：variable=MAX_VALUE（或：MAX_VALUE）。如果没有给出，该工具通过在启动时检查默认并将其加倍来确定阈值。
+        - 参见 --max-load 了解更多细节。不同的是，超过此选项指定的值时终止执行而不是暂停。使用该选项，可以作为一种安全检查，以防当原始表上的触发器给服务器增加过多负载导致停机。
+
+    - --max-flow-ctl
+
+        - 类型：float
+        - 有点类似于 --max-lag，但是是针对 PXC 集群的。检查用于流控制的集群平均暂停时间，如果超过选项中所示的百分比，则让工具暂停。当检测到任何流控制活动时，0 值将使工具暂停。默认是没有流控制检查。该选项可用于 PXC 版本 5.6 或更高版本。
+
+    - --max-load
+
+        - type: Array; default: Threads_running=25
+        - 复制每个块后，检查 SHOW GLOBAL STATUS，如果任何状态变量高于其阈值，则暂停执行。格式：variable=MAX 值 ( 或：MAX 值)。如果没有指定，该工具通过检查当前值并将其增加 20% 来确定一个阈值。
+
+    - --sleep
+
+        - 类型：float，默认值：0
+        - 指定 copy 完每个 chunck 后，sleep 多久。当无法通过 --max-lag 和 --max-load 进行节流时，此选项非常有用。应该使用较小的，sub-second 值，例如 0.1，否则工具将会花费较长的时间来拷贝大表。
+
+- 5.配置类
+
+    - --charset "string", -A
+        - 指定默认字符集，连接到 MySQL 后执行 set names character。
+
+    - --default-engine
+        - 使用系统默认的存储引擎创建新表。
+        - 默认情况下，创建的新表和原表 engine 相同。当指定该选项时，则去掉建表语句中的 engine 选项，使用系统默认的存储引擎创建新表。
+
+    - --defaults-file, -F
+        - 指定配置文件，需指定绝对路径。
+
+    - --data-dir
+        - 指定新表的数据文件所在目录。仅可在 5.6 及以上版本使用。如果与 --remove-data-dir 同时使用，则忽略该参数。
+
+    - --remove-data-dir
+        - 如果原始表是使用 DATA DIRECTORY 指定了数据文件目录，删除它并在 MySQL 默认数据目录中创建新表，而不创建新的 isl 文件。
+
+    - --set-vars
+
+        - 设置 MySQL 变量列表：variable=value，以逗号分隔。
+        - 默认情况下，该工具设置下面几个默认变量：
+            ```
+            wait_timeout=10000
+            innodb_lock_wait_timeout=1
+            lock_wait_timeout=60
+            ```
+
+    - --config
+        - 指定配置文件列表，用逗号分隔，如果指定这个选项，必须是命令行的第一个选项。
+
+    - --pause-file "string"
+        - 当此参数指定的文件存在时，将暂停执行 DDL。比如，当 DDL 影响业务时，可创建指定的文件，暂停 DDL。
+
+        ```
+        Sleeping 60 seconds because /tmp/a.txt exists
+        ```
+
+- 6.复制 chunk 类
+
+    - --chunk-size
+
+        - 指定每个复制块的行数，默认值：1000。可指定单位：k，M，G。
+        - 默认复制块的行为是：动态地调整块大小，试图使块在 --chunk-time 秒内复制完成。当没有显式设置此选项时，将使用其默认值作为起点，之后将忽略此选项的值。当如果显示指定该选项时，将禁用动态调整复制块的行为。
+
+    - --chunk-time
+        - 指定复制每个数据块所需要的时间。类型：float；默认值：0.5。
+        - 使用该选项可动态调整块大小，通过跟踪复制率（每秒的行数），并在复制每个数据块之后调整块大小，以使复制下一个数据块执行该选项指定的时间（以秒为单位）。
+        - 如果将此选项设置为零，则块大小不会自动调整；因此复制每个数据块时间将会变化，但复制块大小不会变化。
+
+    - --chunk-size-limit
+        - 复制块的最大限制。类型：float；默认值：4.0。
+        - 当表没有唯一索引时，块大小可能不准确。此选项指定错误的最大可容忍限制。该工具使用 <EXPLAIN> 来估计块中有多少行。如果估计值超过了期望的块大小乘以限制，那么该工具将跳过该块。
+        - 这个选项的最小值是 1，这意味着任何块都不能大于 --chunk-size。可以通过指定值 0 来禁用过大块检查。
+
+    - --chunk-index
+        - 指定对表进行分块的索引（FORCE index），如果指定索引不存在，那么工具将使用默认的方式选择索引。
+
+    - --chunk-index-columns
+        - 指定只使用复合索引中最左边的这么多列。这在 MySQL 查询优化器中的一个 bug 导致它扫描大范围的行，而不是使用索引精确地定位起始点和结束点的情况下非常有用。
+
+- 7.slave 相关
+
+    - --slave-user
+        - 类型：字符串
+        - 指定连接从库的用户。这个用户可以有很少的权限，但是用户一定要是存在的。
+
+    - --slave-password
+        - 类型：字符串
+        - 指定连接到从库的密码，可以和 --slave-user 一块使用，指定的用户和密码在所有从库上必须是一样的。
+
+    - --channel
+        - 指定使用复制通道连接到服务器时使用的通道名称。
+        - 适用场景：多源复制情况下，show slave status 会返回两行，使用此选项指定复制通道。
+
+    - --max-lag
+
+        ```
+        type: time; default: 1s
+        ```
+
+        - 指定当从库复制延迟大于该值时，暂停 data copy，直到所有复制的延迟都小于这个值。
+
+        - 在复制完每个块后，该工具会连接到所有从库，查看其复制延迟(Seconds_Behind_Master)。如果任何从库的延迟时间超过此选项的值，则工具将休眠 --check-interval 指定的时间，然后再次检查所有从库。如果指定 --check-slave-lag，那么该工具只检查该服务器的延迟，而不是所有服务器。如果希望准确地控制该工具检测哪些服务器，可以使用 --recursion-method 指定 DSN 值。
+
+        - 该工具永远等待从实例停止延迟。如果任何从实例停止，该工具将永远等待，直到从实例启动。
+
+    - --recurse
+        - type: int
+        -  发现从实例时在层次结构中要递归的级别数。默认是无限的。
+
+    - --recursion-method
+        - type：array; 默认值：processlist,host
+        - 用于判断是否存在从库的方式，可以的方式有：
+        - processlist：show processlist;
+        - hosts：show slave hosts
+        - dsn=DSN：DSNs from a table
+        - none：不查找从库
+
+- 8.check 类
+
+    - --check-interval
+        - 指定检查 --max-lag 的时间间隔，默认值 1。如果任何从库的延迟时间超过 --max-lag 的值，将休眠 --check-interval 指定的时间,然后再次检查。
+
+    - --check-slave-lag
+        - 指定检查延迟的从库，以DSN的方式指定。当延迟超过 --max-lag 时，将暂停 data copy。
+
+    - --skip-check-slave-lag
+        - 指定 DSN，跳过检查指定从库延迟，可以指定多个， 例如：
+
+    - –skip-check-slave-lag h=127.0.0.1,P=12345 –skip-check-slave-lag h=127.0.0.1,P=12346
+    - --[no]check-replication-filters
+        - 检查从库是否设置 replication filter，如 binlog_ignore_db 和  replicate_do_db，默认值为 yes。如果设置了，则中止执行。因为如果更新的表 Master 上存在，而 Slave 上不存在，会导致复制失败。使用 --no-check-replication-filters 选项来禁用该检查。
+
+    - --[no]check-alter
+        - 解析 --alter 指定的值，并警告可能的意外行为，默认值：yes。目前，它检查的有：
+        - 列名：该工具的早期版本中，用 CHANGE COLUMN name new_name 重命名列会导致该列的数据丢失。现在会尝试解析 alter 语句并捕捉这些情况，因此重命名的列应该具有与原始列相同的数据。但是，执行此操作的代码并不是一个成熟的 SQL 解析器，因此应该首先使用 --dry-run 和 --print 运行该工具，并验证它是否正确地检测到重命名的列。
+        - drop primary key：如果 --alter 包含 DROP PRIMARY KEY（大小写和空格不敏感），则会打印警告并退出，除非指定 --dry-run。更改主键可能是危险的，但是工具可以处理它。工具触发器，特别是 DELETE 触发器，最容易受到主键更改的影响。因此应该首先使用 --dry—run 和 -- print 运行该工具，并验证触发器是否正确。
+
+    - --[no]check-plan
+        - 检查 SQL 执行计划。默认值 yes，则在执行 SQL 前执行 EXPLAIN，如果 MySQL 选择了一个糟糕的执行计划，会导致访问很多行，该工具将跳过表的 chunk。
+        - 该工具使用很多个方式来决定执行计划是否糟糕。
+
+    - --[no]check-unique-key-change
+        - 默认值为 yes，如果 --alter 的指定语句试图添加惟一索引，将不会执行，并打印一个 select 语句用于检查列上是否有重复记录。
+
+        - 因为 pt-online-schema-change 使用 INSERT IGNORE 将行复制到新表，所以如果正在写入的行主键冲突，不会报错，数据将丢失。
+
+    - --[no]version-check
+        - 默认值：yes
+        - 检查 Percona Toolkit、MySQL 和其他程序的最新版本。
+
+##### 例子：将列类型由 char(20) 修改为 varchar(200)
+
+> 本示例模拟修改列类型，将列类型由 char(20) 修改为 varchar(200)
+>
+> 版本信息：MySQL 5.7.25，percona-tool 3.2.0
+>
+> 数据量 200 万
+
+- 1.创建用户
+    ```sql
+    GRANT SELECT, INSERT, UPDATE, DELETE, \
+        CREATE, DROP, PROCESS, REFERENCES, \
+        INDEX, ALTER, SUPER, LOCK TABLES, \
+        REPLICATION SLAVE, TRIGGER
+    ON *.* TO 'ptosc'@'%'
+    ```
+
+- 2.写 ALTER 语句
+    ```sql
+    modify c varchar(200) not null default "";
+    ```
+
+- 3.环境检查
+
+    > 说明：工具在执行时也会进行检查，如果遇到不能执行的情况，则报错，建议在执行前先进行 dry-run。
+
+    - 1.检查要变更的表上是否有主键或非空唯一键
+
+        ```sql
+        desc table_name;
+        ```
+
+    - 2.检查是否有其他表外键引用该表
+
+        - 若有，则需要使用 --alter-foreign-keys-method 选项
+
+        ```sql
+        select * from information_schema.key_column_usage where referenced_table_schema='testdb' and referenced_table_name='table_name'\G
+        ```
+
+    - 3.检查表上是否有触发器
+
+        - 若有，则需指定 --preserve-triggers 选项，且在 percona tool 3.0.4 起，对于 MySQL 5.7.2 以上，支持原表上有触发器，建议使用前在测试环境进行测试。
+
+        ```sql
+        select * from information_schema.triggers where event_object_schema='testdb' and event_object_table='table_name'\G
+        ```
+
+    - 4.检查从库是否设置 change filter
+
+        - 如果设置了 change filter，则不会执行，除非指定 --no-check-replication-filters
+
+        ```sql
+        show slave status\G
+        ```
+
+- 4.执行 dry run
+
+    | 参数                        | 说明                           |
+    |-----------------------------|--------------------------------|
+    | --print                     | 打印工具执行的 SQL 语句。      |
+    | --statistics                | 打印统计信息。                 |
+    | --pause-file                | 当指定的文件存在时，终止执行。 |
+    | --max-load                  | 超过指定负载时，暂定执行。     |
+    | --critical-load             | 超过指定负载时，终止执行。     |
+    | --chunck-size               | 指定每次复制的行数。           |
+    | --alter-foreign-keys-method | 指定外键更新方式。             |
+    | --progress                  | copy 进度打印的频率。          |
+
+    ```sql
+    pt-online-schema-change --print --statistics \
+    --progress time,30 --preserve-triggers --user=ptosc \
+    --password=ptosc --alter 'modify c varchar(200) not null default ""' \
+    h=127.0.1.1,P=3306,D=testdb,t=table_name \
+    --pause-file=/tmp/aa.txt --max-load=threads_running=100,threads_connected=200 \
+    --critical-load=threads_running=1000  --chunk-size=1000 \
+    --alter-foreign-keys-method auto --dry-run
+    ```
+
+- 5.执行
+
+    - --dry-run 修改为 --execute
+
+    ```sql
+    pt-online-schema-change --print --statistics \
+    --progress time,30 --preserve-triggers --user=ptosc \
+    --password=ptosc --alter 'modify c varchar(200) not null default ""' \
+    h=127.0.1.1,P=3306,D=testdb,t=table_name \
+    --pause-file=/tmp/aa.txt --max-load=threads_running=100,threads_connected=200 \
+    --critical-load=threads_running=1000  --chunk-size=1000 \
+    --alter-foreign-keys-method auto  --execute
+    ```
+
+    - 如上，输出比较简单，包括了每一步执行的 SQL。copy 数据期间打印了 copy 的进度以及预计剩余时间；最后打印出统计信息，比如 insert 的数据块数。
+
+- 6.执行后检查
+
+    - 1.检查原表是否正确修改
+
+        ```sql
+        show create table table_name\G
+
+        desc table_name
+        ```
+
+    - 2.检查引用该表的外键
+
+        ```sql
+        show create table test2\G
+        ```
+
+    - 3.检查原表上触发器
+        ```sql
+        show triggers\G
+        ```
+
+##### [索引添加到一半的时候，如何停止？](https://mp.weixin.qq.com/s/0KBBTNp-zt0dTR9CpLmJcA)
+
+- 试想这样一个场景，假如你给一个4亿空间的表进行添加索引操作，添加到一半的时候，需要停止这个加索引的操作，这个时候，我们怎么停下来最快呢？
+    - 怎样保证对线上的影响最小。其实这个场景也是我自己之前遇到的，加索引加到一般，发现主从复制发生了延迟，所以需要快速停止这个加索引的操作，如何操作？
+
+- 实验
+
+    - 1.创建测试表
+        ```sql
+        CREATE TABLE `test` (
+          `id` int(11) NOT NULL,
+          `name` varchar(10) DEFAULT NULL,
+          PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        ```
+
+    - 2.给这个表里面插入1000w数据
+        ```sql
+        delimiter ;;
+        create procedure idata()
+        begin
+        declare i int;
+        set i=1;
+        while i<10000000 do
+        insert into test(id,name) values(i,'yeyz');
+        set i=i+1;
+        end while;
+        end;;
+        delimiter ;
+        ```
+
+    - 3.使用pt-osc工具进行线上索引添加
+
+        ```sh
+        pt-online-schema-change --user=dba_admin --password=xxxxxxx -h127.0.0.1 -P5720 --alter " ADD column score smallint(4) unsigned NOT NULL DEFAULT '0' COMMENT 'score字段'" D=yeyztest,t=test --alter-foreign-keys-method=auto --recursion-method=none --print --charset=utf8 --execute
+        No slaves found.  See --recursion-method if host tk-dba-mysql10-202 has slaves.
+        Not checking slave lag because no slaves were found and --check-slave-lag was not specified.
+        Operation, tries, wait:
+          analyze_table, 10, 1
+          copy_rows, 10, 0.25
+          create_triggers, 10, 1
+          drop_triggers, 10, 1
+          swap_tables, 10, 1
+          update_foreign_keys, 10, 1
+        No foreign keys reference `yeyztest`.`test`; ignoring --alter-foreign-keys-method.
+        Altering `yeyztest`.`test`...
+        Creating new table...
+        CREATE TABLE `yeyztest`.`_test_new` (
+          `id` int(11) NOT NULL,
+          `name` varchar(10) DEFAULT NULL,
+          PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8
+        Created new table yeyztest._test_new OK.
+        Altering new table...
+        ALTER TABLE `yeyztest`.`_test_new`  ADD column score smallint(4) unsigned NOT NULL DEFAULT '0' COMMENT 'scoreå­æ®µ'
+        Altered `yeyztest`.`_test_new` OK.
+        2020-06-29T12:20:31 Creating triggers...
+        2020-06-29T12:20:31 Created triggers OK.
+        2020-06-29T12:20:31 Copying approximately 9304048 rows...
+        INSERT LOW_PRIORITY IGNORE INTO `yeyztest`.`_test_new` (`id`, `name`) SELECT `id`, `name` FROM `yeyztest`.`test` FORCE INDEX(`PRIMARY`) WHERE ((`id` >= ?)) AND ((`id` <= ?)) LOCK IN SHARE MODE /*pt-online-schema-change 10363 copy nibble*/
+        SELECT /*!40001 SQL_NO_CACHE */ `id` FROM `yeyztest`.`test` FORCE INDEX(`PRIMARY`) WHERE ((`id` >= ?)) ORDER BY `id` LIMIT ?, 2 /*next chunk boundary*/
+        Copying `yeyztest`.`test`:  24% 01:33 remain
+        ```
+
+        - 可以看到，pt-osc工具创建了中间表_test_new，然后创建了触发器、开始拷贝数据、最后给出了一个拷贝的百分比，以及预估的剩余时间。
+
+- 如何停止上面第3步操作？
+
+    - 1.直接ctrl+c停止pt-osc工具这个命令
+
+        - 使用ctrl+c的方法，停止这个pt-osc的命令，可以得到如下的输出：
+            ```sh
+            ^C# Exiting on SIGINT.
+            Not dropping triggers because the tool was interrupted.  To drop the triggers, execute:
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_del`
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_upd`
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_ins`
+            Not dropping the new table `yeyztest`.`_test_new` because the tool was interrupted.  To drop the new table, execute:
+            DROP TABLE IF EXISTS `yeyztest`.`_test_new`;
+            `yeyztest`.`test` was not altered.
+            ```
+
+        - 它会给出2个提示：
+
+            - 1.第一个提示就是没有drop掉触发器，然后给出我们drop触发器的语句。
+            - 2.第二个提示没有drop掉中间表，而且给出了drop中间表的语句，感觉这个提示还是很友好的。
+
+        - 通过查看，我们发现这三个触发器真实存在。而且中间表也存在。
+
+            ```sql
+            mysql>>show triggers from yeyztest;
+            +--------------------------+--------+-------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------+------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+----------------------+----------------------+--------------------+
+            | Trigger | Event | Table | Statement | Timing | Created | sql_mode | Definer | character_set_client | collation_connection | Database Collation |
+            +--------------------------+--------+-------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------+------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+----------------------+----------------------+--------------------+
+            | pt_osc_yeyztest_test_ins | INSERT | test | REPLACE INTO `yeyztest`.`_test_new` (`id`, `name`) VALUES (NEW.`id`, NEW.`name`)                                                                                                                                 | AFTER | 2020-06-29 16:32:52.22 | ONLY_FULL_GROUP_BY,NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION | dba_admin@127.0.0.1 | utf8 | utf8_general_ci | utf8_general_ci |
+            | pt_osc_yeyztest_test_upd | UPDATE | test | BEGIN DELETE IGNORE FROM `yeyztest`.`_test_new` WHERE !(OLD.`id` <=> NEW.`id`) AND `yeyztest`.`_test_new`.`id` <=> OLD.`id`;REPLACE INTO `yeyztest`.`_test_new` (`id`, `name`) VALUES (NEW.`id`, NEW.`name`);END | AFTER | 2020-06-29 16:32:52.22 | ONLY_FULL_GROUP_BY,NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION | dba_admin@127.0.0.1 | utf8 | utf8_general_ci | utf8_general_ci |
+            | pt_osc_yeyztest_test_del | DELETE | test | DELETE IGNORE FROM `yeyztest`.`_test_new` WHERE `yeyztest`.`_test_new`.`id` <=> OLD.`id`                                                                                                                         | AFTER | 2020-06-29 16:32:52.22 | ONLY_FULL_GROUP_BY,NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION | dba_admin@127.0.0.1 | utf8 | utf8_general_ci | utf8_general_ci |
+            +--------------------------+--------+-------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------+------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+----------------------+----------------------+--------------------+
+            mysql>>show tables;
+            +--------------------+
+            | Tables_in_yeyztest |
+            +--------------------+
+            | _test_new          |
+            | test               |
+            +--------------------+
+            2 rows in set (0.01 sec)
+            ```
+
+            - 说明ctrl+c的方法，不会自动drop掉中间表和触发器，可以认为是不完善的一种方法。但是在这个过程中该表产生的新数据会写入_test_new中，数据相对完整。
+
+    - 2.直接drop中间表
+
+        ```sql
+        mysql--root@localhost:yeyztest 16:35:07>>show tables;
+        +--------------------+
+        | Tables_in_yeyztest |
+        +--------------------+
+        | _test_new          |
+        | test               |
+        +--------------------+
+        2 rows in set (0.01 sec)
+
+        mysql--root@localhost:yeyztest 16:35:11>>drop table _test_new;
+        Query OK, 0 rows affected (0.11 sec)
+        ```
+
+        - 执行完成之后，pt-osc的命令输出结果如下：
+
+            ```sh
+            2020-06-29T12:21:05 Dropping triggers...
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_del`
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_upd`
+            DROP TRIGGER IF EXISTS `yeyztest`.`pt_osc_yeyztest_test_ins`
+            2020-06-29T12:21:05 Dropped triggers OK.
+            `yeyztest`.`test` was not altered.
+            2020-06-29T12:21:05 Error copying rows from `yeyztest`.`test` to `yeyztest`.`_test_new`: 2020-06-29T12:21:05 DBD::mysql::st execute failed: Table 'yeyztest._test_new' doesn't exist [for Statement "INSERT LOW_PRIORITY IGNORE INTO `yeyztest`.`_test_new` (`id`, `name`) SELECT `id`, `name` FROM `yeyztest`.`test` FORCE INDEX(`PRIMARY`) WHERE ((`id` >= ?)) AND ((`id` <= ?)) LOCK IN SHARE MODE /*pt-online-schema-change 10363 copy nibble*/" with ParamValues: 0='2578309', 1='2617152'] at /usr/local/bin/pt-online-schema-change line 11284.
+            ```
+
+    - 可以看到，使用drop中间表的方法，pt工具会自动drop掉触发器，同时，给出报错信息。
+
+- 对比总结
+
+    - 1.ctrl+c的方法，结束pt-osc命令，不会drop中间表和触发器，因此触发器执行过程中可能会产生报错信息。
+
+        - 但是中间表_test_new还在，触发器写入的数据还在。
+
+    - 2.drop 中间表_test_new的方式结束pt-osc命令，pt工具会自动drop掉触发器，但是触发器写入_test_new表中的部分数据会丢失。
+
+    - 3.最好避免这种pt-osc执行了一半，要强制终止的操作，本身是不安全的，如果必须要终止，就需要从业务侧进行评估。
+
+        - 如果表中的内容本身是日志类数据，数据丢失几分钟业务可以接受，那其实使用drop中间表的方法是可以的；
+
+        - 如果表中的内容无法容忍丢失，那么使用ctrl+c的方法处理，这种方法需要额外执行drop 触发器和drop中间表的操作。
+
+##### [pt-osc工具引发的主从延迟](https://mp.weixin.qq.com/s/0vr-F25vkp_D1XWSUJKB6w)
+
+> 今天早上上班来，接了一个需求，需要对线上一个大表做个归档的操作，其实就是rename一下，将表table从A库转移到B库里面，然后在A库中创建一个同名的表table，同时保持自增id连续。
+> 这个需求的处理过程比较简单，通过rename的方法处理完成之后，业务方临时考虑给B库中的table表添加一个二级索引，添加索引的时候引发了主从复制延迟的问题。
+
+- 要添加索引，首先查看这个表的数据量：
+
+    - 这张表本身里面存储的是日志数据，3.8亿的量是几乎一年的数据，从设计上来讲，这是不合理的，存储这类数据量比较大的日志，可能ES或者大数据更适合，如果非要用MySQL存，也不是不可以，尽量在设计的时候，将表设计成周期表的形式，例如日表、月表、周表、季度表等等。
+
+    ```sql
+    select count(*) from table;
+
+    +-----------+
+    | count(*) |
+    +-----------+
+    | 384434314 |
+    +-----------+
+    1 row in set (3 min 55.49 sec)
+    ```
+
+- 实际执行添加索引的时候，我使用了pt工具，当然，这里考虑到MySQL原生支持Online DDL操作，也可以使用原生Online DDL操作（这个具体的延迟没测试，4亿数据的表，Online DDL添加索引具体多长时间，不知道，有知道的朋友可以告知下），使用pt工具操作是为了保证一定对线上的表没有任何影响。(事实证明还是百密一疏~)
+
+- pt工具的执行如下：
+
+    ```sql
+    [root@ ]$pt-online-schema-change --user=dba_admin --password=xxxx -hrm-xxxxxxx.mysql.rds.aliyuncs.com -P3306 --alter " ADD index idx_uid_defid(uid,defid) " D=db_name,t=table  --alter-foreign-keys-method=auto --recursion-method=none --print --charset=utf8 --execute
+    No slaves found.  See --recursion-method if host g23h01247.cloud.nu17 has slaves.
+    Not checking slave lag because no slaves were found and --check-slave-lag was not specified.
+    Operation, tries, wait:
+      analyze_table, 10, 1
+      copy_rows, 10, 0.25
+      create_triggers, 10, 1
+      drop_triggers, 10, 1
+      swap_tables, 10, 1
+      update_foreign_keys, 10, 1
+    No foreign keys reference `db_name`.`table`; ignoring --alter-foreign-keys-method.
+    Altering `db_name`.`table`...
+    Creating new table...
+    CREATE TABLE `db_name`.`_table` (
+      `uid` bigint(20) DEFAULT NULL,
+      `id` bigint(20) NOT NULL AUTO_INCREMENT,
+      xxxxxx
+      `server` int(11) DEFAULT NULL,
+      `time` datetime DEFAULT NULL,
+      PRIMARY KEY (`id`) USING BTREE,
+      KEY `idx_time` (`time`)
+    ) ENGINE=InnoDB AUTO_INCREMENT=384440258 DEFAULT CHARSET=utf8 COLLATE=utf8_bin ROW_FORMAT=DYNAMIC
+    Created new table `db_name`.`_table_new` OK.
+    Altering new table...
+    xxx
+    INSERT LOW_PRIORITY IGNORE INTO `db_name`.`_table_new` (`uid`, `id`, `itemid`, `defid`, `amount`, `process`, `jsondata`, `server`, `time`) SELECT `uid`, `id`, `itemid`, `defid`, `amount`, `process`, `jsondata`, `server`, `time` FROM `db_name`.`table` FORCE INDEX(`PRIMARY`) WHERE ((`id` >= ?)) AND ((`id` <= ?)) LOCK IN SHARE MODE /*pt-online-schema-change 15169 copy nibble*/
+    SELECT /*!40001 SQL_NO_CACHE */ `id` FROM `db_name`.`table` FORCE INDEX(`PRIMARY`) WHERE ((`id` >= ?)) ORDER BY `id` LIMIT ?, 2 /*next chunk boundary*/
+    Copying `db_name`.`table`:   0% 01:43:57 remain
+    Copying `db_name`.`table`:   0% 01:44:29 remain
+    Copying `db_name`.`table`:   1% 01:46:58 remain
+    Copying `db_name`.`table`:   1% 01:46:46 remain
+    Copying `db_name`.`table`:   2% 01:46:34 remain
+    Copying `db_name`.`table`:   2% 01:46:23 remain
+    Copying `db_name`.`table`:   3% 01:46:01 remain
+    Copying `db_name`.`table`:   3% 01:45:49 remain
+    Copying `db_name`.`table`:   4% 01:45:28 remain
+    Copying `db_name`.`table`:   4% 01:45:17 remain
+    Copying `db_name`.`table`:   4% 01:45:08 remain
+    Copying `db_name`.`table`:   5% 01:44:52 remain
+    Copying `db_name`.`table`:   5% 01:44:47 remain
+    Copying `db_name`.`table`:   6% 01:44:42 remain
+    Copying `db_name`.`table`:   6% 01:44:38 remain
+    ```
+
+    - 可以看到，执行的预估时间是1小时45分钟左右，实际的情况下，执行到40%的时候，就发现主从复制延迟了，而且SBM的值一直在增长。（其实本质是pt-osc工具的执行过程中会使用insert的方法拷贝表里面的数据，产生的大量binlog在从节点上无法被立即重放，重放速度太慢导致的主从延迟）
+
+- 当时发现这个情况后，做了几件事情：
+    - 1.将pt-osc工具执行的中间表给drop掉，这样pt-osc工具的执行过程就停止了。
+    - 2.调整了从库上的innodb_flush_log_at_trx_commit值为0，sync_binlog值设置为0，buffer_pool值增加了一倍
+
+- 在这种情况下，主从复制始终没有得到缓解，SBM的值也一直在增加。最后是等到这个pt-osc工具的insert操作做完之后，SBM值才变成0，主从数据才实现同步。
+
+- 在主从复制的场景中，复制延迟是一个令人头疼的问题，一般来讲，复制延迟没有特别好的解决办法，《MySQL运维内参》一书中有一部分对主从复制延迟情况下的参数调优解决方案的描述，大概在MySQL5.7并行复制章节，改天找个机会补充下，大家可以参考下。
+
+- 今天这篇文章告诉大家的一个知识点就是：在使用pt-osc进行主从复制时候，可能会产生比较大的复制延迟，如果你的应用能够接受，那ok，如果不能接受，你可能就需要考虑其他的方法，比如调节--chunk-size参数(优化空间有限)，有或者Online DDL等(我没测试，有兴趣可以测试下)...
+
+#### Online DDL copy和gh-ost和pt-osc 的对比测试
+
+- 如何选择
+
+    - 从原理中，可以看出几个关键点：
+        - 可以看到 pt-osc、gh-ost、原生 Online DDL copy 方式（实际上是非 Online），都是需要 copy 原表数据到一个新表，这个是非常耗时的；
+        - pt-osc 采用触发器实现应用 DDL 期间的 DML, gh-ost 通过 binlog 应用 DDL 期间的 DML，理论上触发器会有一定的负载，且 gh-ost 可以从从库上拉取binlog，对主库的影响更小；
+        - 原生 Online DDL 中 Inplace 方式，对于 no-rebuild 方式，不需要重建表，只需要修改表的元数据，这个是非常快的；
+        - 原生 Online DDL 中 Inplace 方式，对于 rebuild 方式，需要重建表，但是也是在 InnoDB 内部完成的，比 copy 的方式要快；
+
+    - 因此，总结以下几个选择工具的判断依据：
+        - 1.如果 MySQL 版本是 5.6 之前，不支持 Online DDL，选用第三方工具 pt-osc 或 gh-ost；
+        - 2.如果 MySQL 版本是 5.6 以上，对于使用 copy table 方式的 DDL，不支持 Online，使用第三方工具 pt-osc 或 gh-ost；
+        - 3.对于可以使用 Inplace no-rebuild 方式的 DDL，使用原生 Online DDL；
+        - 4.对于使用 Inplace rebuild table 方式的 DDL，如果想使 DDL 过程更加可控，且对从库延迟比较敏感，使用第三方工具 pt-osc 或 gh-ost，否则使用原生 Online DDL；
+        - 5.对于想减少对主库的影响，实时交互，可以选用 gh-ost；
 
 - [初试GH-OST（转）](https://www.cnblogs.com/zping/p/8876148.html)
 
@@ -5659,12 +6203,12 @@ func printColumn(columns []*pbe.Column) {
 
     - PT-OSC
         ```sh
-        pt-online-schema-change --user=db_monitor --password=xxx --host=127.0.0.1 --port=xxx --alter "add COLUMN c2 varchar (120) not null default ''" D=sbtest,t=sbtest1 --no-check-replication-filters --alter-foreign-keys-method=auto --recursion-method=none --print --execute
+        pt-online-schema-change --user=db_monitor --password=xxx --host=127.0.0.1 --port=xxx --alter "add COLUMN c2 varchar (120) not null default ''" D=sbtest,t=table_name --no-check-replication-filters --alter-foreign-keys-method=auto --recursion-method=none --print --execute
         ```
 
     - GH-OST
         ```sh
-        gh-ost --assume-master-host=ip:port --master-user=db_monitor --master-password=xxx --user=db_monitor --password=yyy --host=10.xxx --port=port  --alter="ADD COLUMN c2 varchar(120)"   --database=sbtest --table="sbtest1" -execute --initially-drop-old-table --initially-drop-socket-file --initially-drop-ghost-table
+        gh-ost --assume-master-host=ip:port --master-user=db_monitor --master-password=xxx --user=db_monitor --password=yyy --host=10.xxx --port=port  --alter="ADD COLUMN c2 varchar(120)"   --database=sbtest --table="table_name" -execute --initially-drop-old-table --initially-drop-socket-file --initially-drop-ghost-table
         ```
 
 - 性能测试对比
@@ -5675,7 +6219,38 @@ func printColumn(columns []*pbe.Column) {
         ![image](./Pictures/mysql/gh-ost和pt-osc的性能测试对比.avif)
         ![image](./Pictures/mysql/gh-ost和pt-osc的性能测试对比1.avif)
 
-### [爱可生开源社区：技术分享 | MySQL 大表添加唯一索引的总结](https://mp.weixin.qq.com/s/A7on81_QVz3-JEQB1426cA)
+### 字段变更
+
+#### [爱可生开源社区：技术分享 | MySQL VARCHAR 最佳长度评估实践](https://mp.weixin.qq.com/s/gTc1nMez3_pYTl0dZbLl6A)
+
+- 省略...sql语句复盘
+
+- 问题：对一个 VARCHAR 类型的字段进行长度扩容。第一次很快就可以修改好，但是第二次却需要执行很久。
+    - 比较疑惑明明表中的数据量是差不多的，为什么从 VARCHAR(20) 调整为 VARCHAR(50) 就比较快，但是从  VARCHAR(50) 调整为 VARCHAR(100) 就需要执行很久呢？
+
+- 答案：对于 VARCHAR(63) 修改为 VARCHAR(64) 需要执行很久的这个情况进行分析。
+    - 由于 VARCHAR 字符类型在字节长度为 1 时可存储的字符为 0~255。
+    - 当前字符集类型为 UTF8MB4，由于 UTF8MB4 为四字节编码字符集，即一个字节长度可存储 63.75（255/4）个字符，所以当我们将 VARCHAR(63) 修改为 VARCHAR(64) 时，需要增加一个字节去进行数据的存储，就要通过建立临时表的方式去完成本次长度扩容，故需要花费大量时间。
+
+| 字符长度修改 | UTF8(MB3)                                  | UTF8MB4                                         |
+|--------------|--------------------------------------------|-------------------------------------------------|
+| 20->50       | online ddl (inplace)                       | online ddl (inplace)                            |
+| 50->100      | online ddl (copy)                          | online ddl (copy)                               |
+| X->Y         | 当Y*3<256 时，inplace；当X*3>=256，inplace | 当 Y*4<256 时，inplace；当 X*4>=256，inplace |
+| 备注         | 一个字符最大占用 3 个字节                  | 一个字符最大占用 4 个字节                       |
+
+- 为避免由于后期字段长度扩容，online ddl 走效率低的 copy 模式，建议：
+
+    - 对于 UTF8(MB3) 字符类型：
+        - 字符个数小于 50 个，建议设置为 VARCHAR(50) 或更小的字符长度。
+        - 字符个数接近 84（256/3=83.33）个，建议设置为 VARCHAR(84)  或更大的字符长度。
+    - 对于 UTF8MB4 字符类型：
+        - 字符个数小于 50 个，建议设置为 VARCHAR(50)，或更小的字符长度。
+        - 字符个数接近 64（256/4=64）个，建议设置为 VARCHAR(64) 或更大的字符长度。
+
+### 大表变更
+
+#### [爱可生开源社区：技术分享 | MySQL 大表添加唯一索引的总结](https://mp.weixin.qq.com/s/A7on81_QVz3-JEQB1426cA)
 
 - 在数据库的运维工作中经常会遇到业务的改表需求，这可能是 DBA 比较头疼的需求，其中添加唯一索引可能又是最头疼的需求之一了。
 
@@ -5749,7 +6324,7 @@ func printColumn(columns []*pbe.Column) {
 
     - 如果业务能接受从库长时间延迟，也推荐 ONLINE DDL 的方案。
 
-#### 风险介绍
+##### 风险介绍
 
 - 使用第三方改表工具添加唯一索引存在丢数据的风险，总结起来大致可以分如下三种：
 
@@ -5829,7 +6404,7 @@ func printColumn(columns []*pbe.Column) {
 - 改表过程中新写（包含更新）的数据出现重复值的风险规避
     - 针对这类场景，规避方式可以采用 hook 功能添加唯一索引，在全量拷完切表前校验待添加唯一索引的字段的数据唯一性。
 
-#### 添加唯一索引的测试
+##### 添加唯一索引的测试
 
 - gh-ost 支持 hook 功能。简单来理解，hook 是 gh-ost 工具跟外部脚本的交互接口。使用起来也很方便，根据要求命名脚本名且添加执行权限即可。
 
@@ -5902,7 +6477,7 @@ func printColumn(columns []*pbe.Column) {
 
     - 可以看到【GH_OST_ESTIMATED_ROWS】是预估值，只要原表在改表过程中有 DML 操作，该值就会变化，所以不能用来和【GH_OST_COPIED_ROWS】作比较。
 
-#### 加强版 hook 样例
+##### 加强版 hook 样例
 
 - 上面的 hook 样例虽然存在一定的不足，但是也给我提供了一个思路，知道有这么个辅助功能可以规避添加唯一索引引发丢数据的风险。
 
@@ -6067,7 +6642,7 @@ func printColumn(columns []*pbe.Column) {
 
             - 另外停掉从库的复制很可能也存在风险，很多业务场景是依赖从库进行读请求的，所以要慎用这个功能。
 
-#### 总结
+##### 总结
 
 - 如果业务能接受，可以不使用唯一索引。将添加唯一索引的需求改成添加普通二级索引，这样就可以避免加索引导致数据丢失。
 
@@ -6085,7 +6660,7 @@ func printColumn(columns []*pbe.Column) {
     - pt-osc 建议添加【--no-drop-old-table】参数
     - gh-ost 不建议添加【--ok-to-drop-table】参数
 
-### [爱可生开源社区：技术分享 | MySQL级联复制下进行大表的字段扩容](https://mp.weixin.qq.com/s/2PxV8K6FLC9ryMfXDfmtyQ)
+#### [爱可生开源社区：技术分享 | MySQL级联复制下进行大表的字段扩容](https://mp.weixin.qq.com/s/2PxV8K6FLC9ryMfXDfmtyQ)
 
 - 背景：某客户的业务中有一张约4亿行的表，因为业务扩展，表中open_id varchar(50) 需要扩容到 varchar(500)。变更期间尽量减少对主库的影响(最好是不要有任何影响->最终争取了4个小时的窗口期)。
 
@@ -6885,6 +7460,130 @@ ALTER TABLE table_name ENGINE=INNODB;
 
 #### [MySQL:主从binlog超过4G导致报错](https://mp.weixin.qq.com/s/5AhY0p0pCpzMveEB4_etSA)
 
+### cpu消耗过高
+
+#### [bisal的个人杂货铺：MySQL定位导致CPU消耗过高SQL的路径](https://mp.weixin.qq.com/s/qOuID_jq9IYYhzaxbAkziA)
+
+- 定位线程
+
+    ```sh
+    pidstat -t -p 1 5
+    ```
+
+    ![image](./Pictures/mysql/cpu消耗过高-定位线程.avif)
+
+    - 通过该命令我们可以定位到**「802、4445等线程消耗了大量的CPU」**，这里尽量确保在pidstat的多个样本中验证消耗是恒定的。根据这些信息，我们可以登录到数据库，并使用以下查询找出哪个MySQL线程是罪魁祸首。
+
+- 定位问题
+
+    ```sql
+    select * from performance_schema.threads where thread_os_id = xx ;
+    select * from information_schema.`PROCESSLIST` where  id=threads.processlist_id
+    ```
+
+- 查看问题SQL执行计划
+
+    - 对应看下执行计划基本就可以判断当前数据库CPU为什么消耗这么高了。
+    - 至于优化的操作，只需要在dock建一个索引即可
+    ![image](./Pictures/mysql/cpu消耗过高-查看问题sql执行计划.avif)
+
+### 自增不连续
+
+#### [MySQL学习：MySQL:自增不连续的几种情况总结](https://mp.weixin.qq.com/s/ZJwa1XBHQ19OKoS0uCS6NA)
+
+- 自增实际上是单个表上的一个计数器，对于简单的insert语句来讲肯定都是每次+1的，但是对于批量就有可能预先分配一些。
+
+- 一旦抬升不会因为错误或者回滚而降低，简单总结一下常见的情况
+    - 事务回滚，计数器增加
+    - 语句报错，计数器增加
+    - 自己填充自增值，抬高计数器
+
+    - 参数innodb_autoinc_lock_mode为2的时候(8.0默认)，insert select 类似批量导入数据，可能导致自增浪费一部分，但是却避免了自增锁
+
+        ```
+        | 1198 | g    |
+        | 1199 | g    |
+        | 1200 | g    |  ->gap
+        | 1256 | g    |  ->gap
+        | 1257 | g    |
+        ```
+
+- 如果有大量`insert on duplicate key update`的语法，这种语法当插入唯一值的时候在本应该报错唯一键冲突的时候屏蔽报错，转走update流程，但是实际上报错是存在的因此自增也随之提升，当执行下一次插入的时候就会由于自增已经提升而导致很多无谓的gap，这实际上就是第2点。
+    - replace语法也有类似的问题，replace的问题在于会如果触发update机会修改主键自增的值，导致gap。
+
+- 实验
+    - 创建测试表
+    ```sql
+    CREATE TABLE `test123` (
+      `id` int NOT NULL AUTO_INCREMENT,
+      `name` varchar(20) DEFAULT NULL,
+      `a` int DEFAULT NULL,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `a` (`a`)
+    ) ENGINE=InnoDB AUTO_INCREMENT=120 DEFAULT CHARSET=utf8mb4
+    ```
+
+    - 插入测试数据。此时自增并没有问题
+    ```
+    insert into test123(name,a) values('g',1);
+    insert into test123(name,a) values('g',2);
+    insert into test123(name,a) values('g',3);
+    insert into test123(name,a) values('g',4);
+    insert into test123(name,a) values('g',5);
+    insert into test123(name,a) values('g',6);
+    insert into test123(name,a) values('g',7);
+
+    select * from test123;
+    +-----+------+---+
+    | id  | name | a |
+    +-----+------+---+
+    | 120 | g    | 1 |
+    | 121 | g    | 2 |
+    | 122 | g    | 3 |
+    | 123 | g    | 4 |
+    | 124 | g    | 5 |
+    | 125 | g    | 6 |
+    | 126 | g    | 7 |
+    +-----+------+---+
+    ```
+
+    - 126和132之间的自增就丢失了
+    ```
+    insert into test123(name,a) values('g',1) on duplicate key update name='g';
+    insert into test123(name,a) values('g',1) on duplicate key update name='g';
+    insert into test123(name,a) values('g',1) on duplicate key update name='g';
+    insert into test123(name,a) values('g',1) on duplicate key update name='g';
+    insert into test123(name,a) values('g',1) on duplicate key update name='g';
+
+    select * from test123;
+    +-----+------+---+
+    | id  | name | a |
+    +-----+------+---+
+    | 120 | g    | 1 |
+    | 121 | g    | 2 |
+    | 122 | g    | 3 |
+    | 123 | g    | 4 |
+    | 124 | g    | 5 |
+    | 125 | g    | 6 |
+    | 126 | g    | 7 |
+    +-----+------+---+
+
+    -- 这里数据虽然没有变化但是自增最大值变了，再次插入一条数据如下
+    insert into test123(name,a) values('g',8);
+    +-----+------+---+
+    | id  | name | a |
+    +-----+------+---+
+    | 120 | g    | 1 |
+    | 121 | g    | 2 |
+    | 122 | g    | 3 |
+    | 123 | g    | 4 |
+    | 124 | g    | 5 |
+    | 125 | g    | 6 |
+    | 126 | g    | 7 |  ->gap
+    | 132 | g    | 8 |  ->gap
+    +-----+------+---+
+    ```
+
 ## 极限值测试
 
 看看一个表最多是不是 1017 列:
@@ -7011,27 +7710,24 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 
 - [MySQL 常用工具选型和建议](https://zhuanlan.zhihu.com/p/86846532)
 
-### [mycli](https://github.com/dbcli/mycli)
+### 服务端
+#### [gt-checksum：静态数据库校验修复工具](https://github.com/GreatSQL/gt-checksum)
 
-- 更友好的 mysql 命令行
-- 目前发现不能,修改和查看用户权限
+- GreatSQL社区开源的一款静态数据库校验修复工具，支持MySQL、Oracle等主流数据库。
 
-```sql
-mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';') AS query FROM mysq
-                          -> l.user;
-(1142, "SELECT command denied to user 'root'@'localhost' for table 'user'")
-```
+- 常见业务需求场景：
 
-![image](./Pictures/mysql/mycli.avif)
+    - MySQL主从复制：主从复制中断后较长时间才发现，且主从间差异的数据量太多，这时候通常基本上只能重建复制从库，如果利用pt-table-checksum先校验主从数据一致性后，再利用pt-table-sync工具修复差异数据，这个过程要特别久，时间代价太大。
 
-### [mitzasql](https://github.com/vladbalmos/mitzasql)
+    - MySQL MGR组复制：MySQL MGR因故崩溃整个集群报错退出，或某个节点异常退出，在恢复MGR集群时一般要面临着先检查各节点间数据一致性的需求，这时通常为了省事会选择其中一个节点作为主节点，其余从节点直接复制数据重建，这个过程要特别久，时间代价大。
 
-- 一个使用`vim`快捷键的 `mysql-tui`
+    - 上云下云业务场景：目前上云下云的业务需求很多，在这个过程中要进行大量的数据迁移及校验工作，如果出现字符集改变导致特殊数据出现乱码或其他的情况，如果数据迁移工具在迁移过程中出现bug或者数据异常而又迁移成功，此时都需要在迁移结束后进行一次数据校验才放心。
 
-![image](./Pictures/mysql/mysql-tui.avif)
-![image](./Pictures/mysql/mysql-tui1.avif)
+    - 异构迁移场景：有时我们会遇到异构数据迁移场景，例如从Oracle迁移到MySQL，通常存在字符集不同，以及数据类型不同等情况，也需要在迁移结束后进行一次数据校验才放心。
 
-### [percona-toolkit 运维监控工具](https://www.percona.com/doc/percona-toolkit/LATEST/index.html)
+    - 定期校验场景：作为DBA在维护高可用架构中为了保证主节点出现异常后能够快速放心切换，就需要保证各节点间的数据一致性，需要定期执行数据校验工作。
+
+#### [percona-toolkit 运维监控工具](https://www.percona.com/doc/percona-toolkit/LATEST/index.html)
 
 [percona-toolkit 工具的使用](https://www.cnblogs.com/chenpingzhao/p/4850420.html)
 
@@ -7064,22 +7760,7 @@ pt-query-digest  --type=genlog /var/log/mysql/mysql_general.log > /tmp/pt_genera
 cat /tmp/pt_general.log
 ```
 
-### [innotop](https://github.com/innotop/innotop)
-
-- [MySQL 监控-innotop](https://www.jianshu.com/p/b8508fe10b8e)
-
-这是在用 `mysqlslap` 进行压力测试下的监控
-
-![image](./Pictures/mysql/innotop.avif)
-![image](./Pictures/mysql/mysqlslap.avif)
-
-### [dbatool](https://github.com/xiepaup/dbatools)
-
-监控以及查询工具
-
-![image](./Pictures/mysql/dbatools.avif)
-
-### undrop-for-innodb(\*数据恢复)
+#### undrop-for-innodb(\*数据恢复)
 
 安装
 [MySQL · 数据恢复 · undrop-for-innodb](http://mysql.taobao.org/monthly/2017/11/01/)
@@ -7103,6 +7784,40 @@ sudo mysql -uroot -p dictionary < dictionary/*.sql
 sudo ./sys_parser -uroot -p -d dictionary sakila/actor
 ```
 
-### [osqueryi](https://github.com/osquery/osquery)
+### 客户端
+#### [mycli](https://github.com/dbcli/mycli)
 
-### [mytop](https://github.com/jzawodn/mytop)
+- 更友好的 mysql 命令行
+- 目前发现不能,修改和查看用户权限
+
+```sql
+mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';') AS query FROM mysq
+                          -> l.user;
+(1142, "SELECT command denied to user 'root'@'localhost' for table 'user'")
+```
+
+![image](./Pictures/mysql/mycli.avif)
+
+#### [mitzasql](https://github.com/vladbalmos/mitzasql)
+
+- 一个使用`vim`快捷键的 `mysql-tui`
+
+![image](./Pictures/mysql/mysql-tui.avif)
+![image](./Pictures/mysql/mysql-tui1.avif)
+
+### 监控客户端
+
+#### [innotop](https://github.com/innotop/innotop)
+
+- [MySQL 监控-innotop](https://www.jianshu.com/p/b8508fe10b8e)
+
+这是在用 `mysqlslap` 进行压力测试下的监控
+
+![image](./Pictures/mysql/innotop.avif)
+![image](./Pictures/mysql/mysqlslap.avif)
+
+#### [dbatool](https://github.com/xiepaup/dbatools)
+
+监控以及查询工具
+
+![image](./Pictures/mysql/dbatools.avif)

@@ -297,6 +297,8 @@
 
 ## 市面上消息队列对比
 
+![image](./Pictures/mq/消息队列对比.gif)
+
 ![image](./Pictures/mq/消息队列对比.avif)
 
 # RabbitMQ

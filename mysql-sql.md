@@ -3,7 +3,8 @@
 * [mysql-sql语句](#mysql-sql语句)
     * [基本命令](#基本命令)
         * [连接数据库](#连接数据库)
-        * [常用 SQL 命令](#常用-sql-命令)
+        * [简单 SQL 命令](#简单-sql-命令)
+        * [DBA 常用命令](#dba-常用命令)
         * [其他命令](#其他命令)
         * [MySQL数据库联盟：五种不输入密码登录MySQL的方法，你知道几种？](#mysql数据库联盟五种不输入密码登录mysql的方法你知道几种)
         * [如何正确地关闭 MySQL 数据库？99%的 DBA 都是错的！](#如何正确地关闭-mysql-数据库99的-dba-都是错的)
@@ -112,6 +113,8 @@
             * [hint(优化器提示)](#hint优化器提示)
             * [松散索引(loose index scan)](#松散索引loose-index-scan)
             * [慢查询优化](#慢查询优化)
+                * [mysqldumpslow：慢查询工具](#mysqldumpslow慢查询工具)
+            * [pt-query-digest(percona-toolkit)：慢查询工具](#pt-query-digestpercona-toolkit慢查询工具)
 
 <!-- vim-markdown-toc -->
 
@@ -146,7 +149,7 @@ mysql -uroot -pYouPassword -e "show databases"
 
 [如需,连接远程 server 的数据库 (可跳转至用户权限设置)](#user)
 
-### 常用 SQL 命令
+### 简单 SQL 命令
 
 在 `linux` 终端输入的命令是 `shell` 命令
 
@@ -227,6 +230,312 @@ select user();
 select version();
 ```
 
+### DBA 常用命令
+
+- 1.连接MySQL数据库
+
+    ```sql
+    mysql -uroot -p'password'
+    mysql -uroot -p'password' -h 127.0.0.1 -P 3306
+    mysql -uroot -p'password' -S /path/to/mysql.sock
+    ```
+
+- 2.查看当前数据库中的会话状态
+    ```sql
+    show processlist;
+    +----+------+-----------+------+---------+------+----------+------------------+----------+
+    | Id | User | Host      | db   | Command | Time | State    | Info             | Progress |
+    +----+------+-----------+------+---------+------+----------+------------------+----------+
+    | 7  | root | localhost | test | Query   | 0    | starting | show processlist | 0.0      |
+    +----+------+-----------+------+---------+------+----------+------------------+----------+
+    ```
+
+- 3.查看当前数据库中的活动会话（排除掉空闲Sleep状态的会话）
+    ```sql
+    select * from information_schema.processlist where command <> 'Sleep';
+    +----+------+-----------+------+---------+------+----------------------+-----------------------------------------------------------------------+---------+-------+-----------+----------+-------------+-----------------+---------------+-----------+----------+-----------------------------------------------------------------------+------+
+    | ID | USER | HOST      | DB   | COMMAND | TIME | STATE                | INFO                                                                  | TIME_MS | STAGE | MAX_STAGE | PROGRESS | MEMORY_USED | MAX_MEMORY_USED | EXAMINED_ROWS | SENT_ROWS | QUERY_ID | INFO_BINARY                                                           | TID  |
+    +----+------+-----------+------+---------+------+----------------------+-----------------------------------------------------------------------+---------+-------+-----------+----------+-------------+-----------------+---------------+-----------+----------+-----------------------------------------------------------------------+------+
+    | 7  | root | localhost | test | Query   | 0    | Filling schema table | select * from information_schema.processlist where command <> 'Sleep' | 1.258   | 0     | 0         | 0.000    | 146888      | 1042648         | 0             | 0         | 47       | select * from information_schema.processlist where command <> 'Sleep' | 7172 |
+    +----+------+-----------+------+---------+------+----------------------+-----------------------------------------------------------------------+---------+-------+-----------+----------+-------------+-----------------+---------------+-----------+----------+-----------------------------------------------------------------------+------+
+
+    -- 8.0以后版本建议使用performance_schema:
+    select * from performance_schema.processlist where command <> 'Sleep';
+
+    -- 排除掉自己的会话连接
+    select * from information_schema.processlist where command <> 'Sleep' and id <> connection_id();
+
+    -- 也可以通过其他条件来排查掉自己不想要的会话信息：如user in  或者 db in ,host等查询条件来过滤。
+    ```
+
+- 4.查看数据库的总大小
+
+    ```sql
+    -- 数据库总大小
+    select round(sum(data_length+index_length)/1024/1024/1024,2) as 'DBSIZE_GB' from information_schema.tables;
+    +-----------+
+    | DBSIZE_GB |
+    +-----------+
+    | 0.15      |
+    +-----------+
+
+    -- 查看数据库中各个库的大小合计
+    select table_schema,round(sum(data_length+index_length)/1024/1024/1024,3) as 'SIZE_GB' from information_schema.tables where table_schema not in ('sys','mysql','information_schema','performance_schema') group by table_schema ;
+    +--------------+---------+
+    | table_schema | SIZE_GB |
+    +--------------+---------+
+    | china        | 0.149   |
+    | test         | 0.001   |
+    | ytt_new2     | 0.000   |
+    +--------------+---------+
+    ```
+
+- 查看数据库中的TOP 30大表信息
+    ```sql
+    select table_schema,table_name,round((data_length+index_length)/1024/1024,2) as 'SIZE_MB',table_rows,engine from information_schema.tables where table_schema not in ('sys','mysql','information_schema','performance_schema') order by 3 desc limit 30 ;
+    +--------------+-----------------+---------+------------+--------+
+    | table_schema | table_name      | SIZE_MB | table_rows | engine |
+    +--------------+-----------------+---------+------------+--------+
+    | china        | cnarea_2019     | 152.72  | 779079     | InnoDB |
+    | test         | t1_min          | 0.16    | 2500       | InnoDB |
+    | test         | t1_max          | 0.16    | 2500       | InnoDB |
+    | test         | t1              | 0.09    | 1000       | InnoDB |
+    | test         | foo             | 0.06    | 1000       | InnoDB |
+    | test         | new             | 0.05    | 0          | InnoDB |
+    ```
+
+- 7.查看表和索引的统计信息：
+    ```sql
+    -- 表统计信息：
+    select * from mysql.innodb_table_stats where database_name='db_name' and table_name='table_name';
+
+    -- 索引统计信息：
+    select * from mysql.innodb_index_stats where database_name='' and table_name='' and index_name='idx_name';
+    ```
+
+- 8.查询锁等待时持续间大于20秒的SQL信息
+    ```sql
+     SELECT trx_mysql_thread_id AS PROCESSLIST_ID,
+           NOW(),
+           TRX_STARTED,
+           TO_SECONDS(now())-TO_SECONDS(trx_started) AS TRX_LAST_TIME ,
+           USER,
+           HOST,
+           DB,
+           TRX_QUERY
+    FROM INFORMATION_SCHEMA.INNODB_TRX trx
+    JOIN sys.innodb_lock_waits lw ON trx.trx_mysql_thread_id=lw.waiting_pid
+    JOIN INFORMATION_SCHEMA.processlist pcl ON trx.trx_mysql_thread_id=pcl.id
+    WHERE trx_mysql_thread_id != connection_id()
+      AND TO_SECONDS(now())-TO_SECONDS(trx_started) >= 20 ;
+    ```
+
+- 9.查询MySQL锁等待表的详细信息
+    ```sql
+    -- sys库锁等待表：
+    select * from sys.innodb_lock_waits\G
+    ```
+
+- 10.查询长事务SQL
+    ```sql
+    -- 长事务（包含未关闭的事务）
+    SELECT thr.processlist_id AS mysql_thread_id,
+           concat(PROCESSLIST_USER,'@',PROCESSLIST_HOST) User,
+           Command,
+           FORMAT_PICO_TIME(trx.timer_wait) AS trx_duration,
+           current_statement as `latest_statement`
+      FROM performance_schema.events_transactions_current trx
+      INNER JOIN performance_schema.threads thr USING (thread_id)
+      LEFT JOIN sys.processlist p ON p.thd_id=thread_id
+     WHERE thr.processlist_id IS NOT NULL
+       AND PROCESSLIST_USER IS NOT NULL
+       AND trx.state = 'ACTIVE'
+     GROUP BY thread_id, timer_wait
+     ORDER BY TIMER_WAIT DESC LIMIT 10;
+    ```
+
+- 11.查看当前DDL执行的进度
+    ```sql
+    use performance_schema;
+
+    select * from setup_instruments where name like 'stage/innodb/alter%';
+    +------------------------------------------------------+---------+-------+
+    | NAME                                                 | ENABLED | TIMED |
+    +------------------------------------------------------+---------+-------+
+    | stage/innodb/alter table (end)                       | YES     | YES   |
+    | stage/innodb/alter table (insert)                    | YES     | YES   |
+    | stage/innodb/alter table (log apply index)           | YES     | YES   |
+    | stage/innodb/alter table (log apply table)           | YES     | YES   |
+    | stage/innodb/alter table (merge sort)                | YES     | YES   |
+    | stage/innodb/alter table (read PK and internal sort) | YES     | YES   |
+    +------------------------------------------------------+---------+-------+
+
+    -- 如果上面查询结果为NO，则需要做如下配置：
+    update set_instrucments set enabled = 'YES' where name like 'stage/innodb/alter%';
+    update set_consumers set enabled = 'YES' where name like '%stages%';
+
+    select * from setup_consumers where name like '%stages%';
+    +----------------------------+---------+
+    | NAME                       | ENABLED |
+    +----------------------------+---------+
+    | events_stages_current      | NO      |
+    | events_stages_history      | NO      |
+    | events_stages_history_long | NO      |
+    +----------------------------+---------+
+
+    -- 查询DDL执行的进度：
+    select stmt.sql_text,
+           stage.event_name,
+           concat(work_completed, '/', work_estimated) as progress,
+           concat(round(100 * work_completed / work_estimated, 2), ' %') as processing_pct,
+           sys.format_time(stage.timer_wait) as time_costs,
+           concat(round((stage.timer_end - stmt.timer_start) / 1e12 *
+                        (work_estimated - work_completed) / work_completed,
+                        2),
+                  ' s') as remaining_seconds
+      from performance_schema.events_stages_current     stage,
+           performance_schema.events_statements_current stmt
+     where stage.thread_id = stmt.thread_id
+       and stage.nesting_event_id = stmt.event_id\G
+    ```
+
+- 12.执行次数最多的TOP 10 SQL
+    ```sql
+    SELECT
+        SCHEMA_NAME,
+        DIGEST_TEXT,
+        COUNT_STAR,
+        FIRST_SEEN,
+        LAST_SEEN
+    FROM
+        performance_schema.events_statements_summary_by_digest
+    ORDER BY
+        COUNT_STAR DESC
+    LIMIT 10;
+    ```
+
+- 13.平均响应时间最长的TOP 10 SQL
+    ```sql
+    SELECT
+        SCHEMA_NAME,
+        DIGEST_TEXT,
+        AVG_TIMER_WAIT,
+        COUNT_STAR
+    FROM
+        performance_schema.events_statements_summary_by_digest
+    ORDER BY
+        AVG_TIMER_WAIT DESC
+    LIMIT 10;
+    ```
+
+- 14.排序次数最多的TOP 10 SQL
+    ```sql
+    SELECT
+        SCHEMA_NAME,
+        DIGEST_TEXT,
+        SUM_SORT_ROWS
+    FROM
+        performance_schema.events_statements_summary_by_digest
+    ORDER BY
+        SUM_SORT_ROWS DESC
+    LIMIT 10;
+    ```
+
+- 15.扫描记录数最多的 TOP 10 SQL
+    ```sql
+    SELECT
+        SCHEMA_NAME,
+        DIGEST_TEXT,
+        SUM_ROWS_EXAMINED
+    FROM
+        performance_schema.events_statements_summary_by_digest
+    ORDER BY
+        SUM_ROWS_EXAMINED DESC
+    LIMIT 10;
+    ```
+
+- 16.使用临时表最多的TOP 10 SQL
+    ```sql
+    SELECT
+        SCHEMA_NAME,
+        DIGEST_TEXT,
+        SUM_CREATED_TMP_TABLES,
+        SUM_CREATED_TMP_DISK_TABLES
+    FROM
+        performance_schema.events_statements_summary_by_digest
+    ORDER BY
+        SUM_CREATED_TMP_TABLES DESC
+    LIMIT 10;
+    ```
+
+- 17.查询从未使用过的索引
+    ```sql
+    -- 从未使用过的索引：未使用索引建议直接删除，多余索引如不使用会影响增删改性能，且索引占用磁盘空间。
+    select * from schema_unused_indexes where object_schema not in ('performance_schema');
+    (1146, "Table 'performance_schema.schema_unused_indexes' doesn't exist")
+    ```
+
+- 18.查询冗余索引
+    ```sql
+    -- 冗余索引建议删除
+    SELECT
+        a.TABLE_SCHEMA,
+        a.TABLE_NAME,
+        a.INDEX_NAME,
+        GROUP_CONCAT(a.COLUMN_NAME ORDER BY a.SEQ_IN_INDEX) AS index_columns,
+        b.INDEX_NAME AS redundant_index_name,
+        GROUP_CONCAT(b.COLUMN_NAME ORDER BY b.SEQ_IN_INDEX) AS redundant_index_columns
+    FROM
+        information_schema.STATISTICS a
+    JOIN
+        information_schema.STATISTICS b
+    ON
+        a.TABLE_SCHEMA = b.TABLE_SCHEMA
+        AND a.TABLE_NAME = b.TABLE_NAME
+        AND a.INDEX_NAME < b.INDEX_NAME
+        AND a.SEQ_IN_INDEX = b.SEQ_IN_INDEX
+        AND a.COLUMN_NAME = b.COLUMN_NAME
+    GROUP BY
+        a.TABLE_SCHEMA,
+        a.TABLE_NAME,
+        a.INDEX_NAME,
+        b.INDEX_NAME
+    HAVING
+        COUNT(*) = COUNT(b.COLUMN_NAME) - 1;
+    ```
+- 19.查询数据库中没有主键的表
+    ```sql
+    SELECT A.table_schema, A.table_name
+      FROM information_schema.tables AS A
+           LEFT JOIN (SELECT table_schema, table_name FROM information_schema.statistics WHERE index_name = 'PRIMARY') AS B
+		    ON A.table_schema = B.table_schema AND A.table_name = B.table_name
+	       WHERE A.table_schema NOT IN ('information_schema' , 'mysql','performance_schema', 'sys')
+	       AND A.table_type='BASE TABLE'
+	       AND B.table_name IS NULL;
+    ```
+
+- 20.查询非InnoDB表
+    ```sql
+    SELECT table_schema,table_name,engine FROM information_schema.tables where table_schema not in ('mysql','sys','information_schema','performance_schema') and engine!='InnoDB';
+    ```
+
+- 21.查询从库状态信息（主从状态，延迟）
+    ```sql
+    show slave status\G
+    ```
+
+- 22.查看慢日志信息：是否开启及慢日志的位置
+    ```sql
+    show global variables like 'slow%';
+    +---------------------+-------------------------------+
+    | Variable_name       | Value                         |
+    +---------------------+-------------------------------+
+    | slow_launch_time    | 2                             |
+    | slow_query_log      | ON                            |
+    | slow_query_log_file | /var/log/mysql/mysql-slow.log |
+    +---------------------+-------------------------------+
+    ```
+
 ### 其他命令
 
 ```sh
@@ -271,7 +580,6 @@ mysqld_safe --defaults-file=/etc/my.cnf &
         - 然而，kill -9 命令并不会导致 Master 节点少数据，也不会导致 Slave 节点少数据。
         - 因此，它才是最安全和正确的命令。
         - 对数据库而言，数据一致性与可靠性高于一切。
-
 
 ## 下载数据库进行 SQL 语句 学习
 
@@ -6357,3 +6665,25 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
 
     show status like "%slow%";
     ```
+
+##### mysqldumpslow：慢查询工具
+
+```sh
+# 取出使用最多的10条慢查询
+mysqldumpslow -s c -t 10 /var/log/mysql/mysql_slow.log
+
+# 取出查询时间最慢的3条慢查询
+mysqldumpslow -s t -t 3 /var/log/mysql/mysql_slow.log
+
+# 得到按照时间排序的前10条里面含有左连接的查询语句
+mysqldumpslow -s t -t 10 -g “left join” /var/log/mysql/mysql_slow.log
+
+# 按照扫描行数最多的
+mysqldumpslow -s r -t 10 -g 'left join' /var/log/mysqld/mysql_slow.log
+```
+
+#### [pt-query-digest(percona-toolkit)：慢查询工具](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
+
+```sh
+pt-query-digest /var/log/mysql/mysql_slow.log
+```

@@ -135,6 +135,12 @@
     * [实践案例](#实践案例)
         * [OPPO百万级高并发MongoDB集群性能数十倍提升优化实践](#oppo百万级高并发mongodb集群性能数十倍提升优化实践)
 * [第三方mongodb 软件](#第三方mongodb-软件)
+    * [server（服务端）](#server服务端)
+        * [MongoShake：数据迁移和同步工具](#mongoshake数据迁移和同步工具)
+    * [client(客户端)](#client客户端)
+        * [MongoDB Compass：官方gui](#mongodb-compass官方gui)
+        * [mongoku: web client](#mongoku-web-client)
+        * [官方的mongosh插件snippet](#官方的mongosh插件snippet)
 * [第三方mongodb](#第三方mongodb)
     * [FerretDB：真正的mongodb开源代替品](#ferretdb真正的mongodb开源代替品)
     * [mongodb atlas](#mongodb-atlas)
@@ -8324,50 +8330,68 @@ mlaunch stop shard0002
 
 - [awesome-mongodb](https://github.com/ramnes/awesome-mongodb)
 
-- [FerretDB](https://github.com/FerretDB/FerretDB)
-    - 底层采用 PostgreSQL 作为存储引擎，用 Go 语言实现了 MongoDB 协议
+## server（服务端）
 
-- server（服务端）
-    - [MongoShake：集群复制](https://github.com/alibaba/MongoShake)
+### [MongoShake：数据迁移和同步工具](https://github.com/alibaba/MongoShake)
 
-- client(客户端)
+- 简介：
+    - MongoShake是阿里巴巴开源的MongoDB数据迁移和同步工具，支持MongoDB集群和副本集之间的数据同步,支持全量和增量迁移。
 
-    - [MongoDB Compass：官方gui](https://github.com/mongodb-js/compass)
+- 优点：
+    - 支持多种同步模式（全量、增量、混合）。
+    - 支持MongoDB集群和副本集的同步。
+    - 高性能，支持大规模数据传输。
 
-        ![avatar](./Pictures/mongodb/mongodb-compass.avif)
+- 缺点：
+    - 仅支持MongoDB数据库，适用范围有限。
+    - 对于某些复杂场景的配置和调优较为复杂。
 
-    - [mongoku: web client](https://github.com/huggingface/Mongoku)
+- 使用场景：
 
-    - snippet：可以增加mongosh，类似于插件
+    - MongoDB数据迁移：在不影响业务运行的情况下，将数据从一个MongoDB集群迁移到另一个集群。
+    - 灾备恢复：将MongoDB数据同步到备份集群，用于灾难恢复。
+    - 数据同步：在多环境下同步MongoDB数据，保持数据一致性。
 
-        ```mongosh
-        // 搜索snippet
-        snippet search
+- [DBA实战：MongoShake：数据迁移之王，MongoDB领域的绝对霸主，让数据轻松穿梭无边界！](https://mp.weixin.qq.com/s/E5-WCRN4Zgse9O4svOaCaw)
 
-        // 查看帮助文档
-        snippet help analyze-schema
+## client(客户端)
 
-        // 安装snippet
-        snippet install analyze-schema
+### [MongoDB Compass：官方gui](https://github.com/mongodb-js/compass)
 
-        // 查看安装的snippet
-        snippet ls
+![avatar](./Pictures/mongodb/mongodb-compass.avif)
 
-        // 卸载snippet
-        snippet uninstall analyze-schema
-        ```
+### [mongoku: web client](https://github.com/huggingface/Mongoku)
 
-        ```mongodb
-        // analyze-schema表格形式显示字段和数据类型
-        schema(db.users)
-        ┌─────────┬───────────────┬───────────┬─────────────┐
-        │ (index) │       0       │     1     │      2      │
-        ├─────────┼───────────────┼───────────┼─────────────┤
-        │    0    │ '_id        ' │ '50.0 %'  │ 'ObjectId'  │
-        │    1    │ '_id        ' │ '50.0 %'  │  'Number'   │
-        │    2    │ 'age        ' │ '50.0 %'  │  'Number'   │
-        │    3    │ 'age        ' │ '50.0 %'  │ 'Undefined' │
-        ```
+### 官方的mongosh插件snippet
+
+```mongosh
+// 搜索snippet
+snippet search
+
+// 查看帮助文档
+snippet help analyze-schema
+
+// 安装snippet
+snippet install analyze-schema
+
+// 查看安装的snippet
+snippet ls
+
+// 卸载snippet
+snippet uninstall analyze-schema
+```
+
+```mongodb
+// analyze-schema表格形式显示字段和数据类型
+schema(db.users)
+┌─────────┬───────────────┬───────────┬─────────────┐
+│ (index) │       0       │     1     │      2      │
+├─────────┼───────────────┼───────────┼─────────────┤
+│    0    │ '_id        ' │ '50.0 %'  │ 'ObjectId'  │
+│    1    │ '_id        ' │ '50.0 %'  │  'Number'   │
+│    2    │ 'age        ' │ '50.0 %'  │  'Number'   │
+│    3    │ 'age        ' │ '50.0 %'  │ 'Undefined' │
+```
 
 # 第三方mongodb
 

@@ -11232,10 +11232,9 @@ cat dump.rdb | ./redis-port decode 2>/dev/null
 
 ### [redis-shake：在两个 redis 之间同步数据的工具，满足用户非常灵活的同步、迁移需求](https://github.com/alibaba/RedisShake)
 
-- [中文文档](https://developer.aliyun.com/article/691794)
-
 - [第一次使用，如何进行配置？](https://github.com/alibaba/RedisShake/wiki/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8%EF%BC%8C%E5%A6%82%E4%BD%95%E8%BF%9B%E8%A1%8C%E9%85%8D%E7%BD%AE%EF%BC%9F)
 
+- [DBA实战：详解Redis 迁移工具redis-shark4](https://mp.weixin.qq.com/s/9u4zoiNiaKl80rBIfTM1Nw)
 
 ### [redis-faina：facebook开发的通过MONITOR命令，统计hotkey](https://github.com/facebookarchive/redis-faina)
 

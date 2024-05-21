@@ -1757,3 +1757,5 @@
 - [阿里云开发者：学习分享｜Etcd/Raft 原理篇](https://www.163.com/dy/article/I83NV3JB0518E0HL.html)
 
 - [腾讯技术工程：深入解读Raft算法与etcd工程实现](https://cloud.tencent.com/developer/article/2177980)
+
+- [SRE运维进阶之路：Etcd 概述及运维实践](https://mp.weixin.qq.com/s/QcLqbktWTeH7Xxw_FdAnAA)

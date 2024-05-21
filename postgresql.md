@@ -6,6 +6,26 @@
 
 - [IT 邦德： 避坑！手把手教你7种安装PG16的手艺](https://mp.weixin.qq.com/s/QxnABtyPlmEMuvopmzNcVQ)
 
+### 集成PostgreSQL Docker镜像，已集成热门插件和工具
+
+```sh
+# 拉取镜像, 第一次拉取一次即可. 或者需要的时候执行, 将更新到最新镜像版本.
+docker pull registry.cn-hangzhou.aliyuncs.com/digoal/opensource_database:pg14_with_exts_arm64
+
+# 启动容器
+docker run -d -it -P --cap-add=SYS_PTRACE --cap-add SYS_ADMIN --privileged=true --name pg --shm-size=1g registry.cn-hangzhou.aliyuncs.com/digoal/opensource_database:pg14_with_exts_arm64
+
+##### 如果你想学习备份恢复、修改参数等需要重启数据库实例的case, 换个启动参数, 使用参数--entrypoint将容器根进程换成bash更好. 如下:
+docker run -d -it -P --cap-add=SYS_PTRACE --cap-add SYS_ADMIN --privileged=true --name pg --shm-size=1g --entrypoint /bin/bash registry.cn-hangzhou.aliyuncs.com/digoal/opensource_database:pg14_with_exts_arm64
+##### 以上启动方式需要进入容器后手工启动数据库实例: su - postgres; pg_ctl start;
+
+# 进入容器
+docker exec -ti pg bash
+
+# 连接数据库
+psql
+```
+
 ## 插件
 
 ![image](./Pictures/postgresql/插件-生态.avif)
@@ -15,6 +35,11 @@
 - [非法加冯：技术极简主义：一切皆用Postgres](https://mp.weixin.qq.com/s?__biz=MzU5ODAyNTM5Ng==&mid=2247486931&idx=1&sn=91dbe43bb6d26c760c532f4aa8d6e3cb&chksm=fe4b3808c93cb11e00194655a49bf7aa0d4d05a61a9b06ffcc57017c633de17066443ec62b6d&scene=21#wechat_redirect)
 
 - [apache age：图数据库，可以使用图模型查询](https://age.apache.org/)
+
+- [FerretDB](https://github.com/FerretDB/FerretDB)
+    - 底层采用 PostgreSQL 作为存储引擎，用 Go 语言实现了 MongoDB 协议
+
+### nextgres：允许MySQL应用程序在PostgreSQL上无缝运行，无需任何代码更改
 
 ## OLAP
 
@@ -28,3 +53,7 @@
 ## 隔离级别
 
 - [AustinDatabases：PostgreSQL 为什么也不建议 RR隔离级别，MySQL别笑](https://mp.weixin.qq.com/s/X51JO1-eg1cPPs91pTCfIA)
+
+# reference
+
+- [PostgreSQL码农集散地：总算摸到门了！PostgreSQL及国产开源数据库学习进阶之路。](https://mp.weixin.qq.com/s/RCg5tdn1i7yBl2ZZy-ZaIw)
