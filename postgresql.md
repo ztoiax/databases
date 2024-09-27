@@ -54,6 +54,12 @@ psql
 
 - [AustinDatabases：PostgreSQL 为什么也不建议 RR隔离级别，MySQL别笑](https://mp.weixin.qq.com/s/X51JO1-eg1cPPs91pTCfIA)
 
+## 第三方工具
+
+- [pgbackweb：自动化备份](https://github.com/eduardolat/pgbackweb)
+
+- [rainfrog：tui支持类似 Vim 的快捷键、关键字高亮和历史记录等人性化功能。](https://github.com/achristmascarl/rainfrog)
+
 # reference
 
 - [PostgreSQL码农集散地：总算摸到门了！PostgreSQL及国产开源数据库学习进阶之路。](https://mp.weixin.qq.com/s/RCg5tdn1i7yBl2ZZy-ZaIw)

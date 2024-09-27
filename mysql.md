@@ -1,3 +1,184 @@
+
+<!-- vim-markdown-toc GFM -->
+
+* [mysql](#mysql)
+    * [版本](#版本)
+        * [9.0](#90)
+    * [性能对比](#性能对比)
+        * [dbaplus社群：MySQL版本越高、性能越差？你怎么想？](#dbaplus社群mysql版本越高性能越差你怎么想)
+    * [安装 MySql](#安装-mysql)
+        * [Centos 7 安装 MySQL](#centos-7-安装-mysql)
+        * [docker 安装](#docker-安装)
+        * [升级](#升级)
+            * [github升级mysql 8.0过程](#github升级mysql-80过程)
+        * [各大公司mysql架构](#各大公司mysql架构)
+            * [解剖“全球最大男性交友网站”，GitHub十五年数据库架构演进](#解剖全球最大男性交友网站github十五年数据库架构演进)
+    * [日志](#日志)
+        * [普通日志](#普通日志)
+        * [binlog (二进制日志)](#binlog-二进制日志)
+            * [解析binlog](#解析binlog)
+                * [binlog cache](#binlog-cache)
+                * [产生 binlog](#产生-binlog)
+            * [二阶段提交](#二阶段提交)
+            * [配置](#配置)
+            * [基本命令](#基本命令)
+            * [第三方binlog工具](#第三方binlog工具)
+                * [mysqlbinlog 日志分析](#mysqlbinlog-日志分析)
+                    * [--flashback 还原被添加、删除、修改的数据](#--flashback-还原被添加删除修改的数据)
+                * [binlog2sql](#binlog2sql)
+                * [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](#analysis_binlog查看分析binlog统计dml多个binlog并行解析)
+                * [reverse_sql](#reverse_sql)
+        * [redo log (重做日志)](#redo-log-重做日志)
+            * [一树一溪：Redo 日志从产生到写入日志文件](#一树一溪redo-日志从产生到写入日志文件)
+        * [binlog和redo log](#binlog和redo-log)
+        * [undo log（回滚日志）](#undo-log回滚日志)
+        * [undo log的存储结构](#undo-log的存储结构)
+        * [其他日志工具](#其他日志工具)
+            * [mysqlsla：分析日志](#mysqlsla分析日志)
+    * [性能优化](#性能优化)
+        * [profile 记录查询响应时间](#profile-记录查询响应时间)
+        * [记录计数器](#记录计数器)
+    * [监控相关](#监控相关)
+        * [informantion_schema数据库](#informantion_schema数据库)
+        * [performance_schema数据库](#performance_schema数据库)
+    * [Storage Engine (存储引擎)](#storage-engine-存储引擎)
+        * [表空间](#表空间)
+            * [系统表空间：mysql目录下的ibdata1的文件，可以保存一张或者多张表。](#系统表空间mysql目录下的ibdata1的文件可以保存一张或者多张表)
+            * [单表空间：innodb的ibd文件](#单表空间innodb的ibd文件)
+                * [ibd文件内部](#ibd文件内部)
+                * [爱可生开源社区：第14期：数据页合并](#爱可生开源社区第14期数据页合并)
+            * [通用表空间](#通用表空间)
+            * [切换各种表空间](#切换各种表空间)
+        * [MyISAM](#myisam)
+        * [InnoDB](#innodb)
+            * [TRANSACTION (事务)](#transaction-事务)
+                * [MySQL事务隔离级别究竟应该怎么选择？](#mysql事务隔离级别究竟应该怎么选择)
+                    * [结合业务场景，使用不同的事务隔离](#结合业务场景使用不同的事务隔离)
+                * [事务详解](#事务详解)
+                    * [爱可生开源社区：MySQL 核心模块揭秘 | 13 期 | 回滚到 savepoint](#爱可生开源社区mysql-核心模块揭秘--13-期--回滚到-savepoint)
+                    * [MVCC(多版本并发控制)](#mvcc多版本并发控制)
+            * [锁](#锁)
+                * [共享锁（表锁）：只能加入读取锁](#共享锁表锁只能加入读取锁)
+                * [排他锁（表锁）和悲观锁（行锁）：不能加入其他锁](#排他锁表锁和悲观锁行锁不能加入其他锁)
+                * [乐观锁（行锁）：版本号](#乐观锁行锁版本号)
+                * [事务a 和 事务b 插入相同的数据](#事务a-和-事务b-插入相同的数据)
+                * [死锁](#死锁)
+            * [Change Buffer（更改缓冲区）](#change-buffer更改缓冲区)
+        * [MyRocks:lsm存储引擎](#myrockslsm存储引擎)
+        * [查看锁和事务](#查看锁和事务)
+        * [mysqlfrm：frm文件解析利器](#mysqlfrmfrm文件解析利器)
+    * [my.cnf配置文件](#mycnf配置文件)
+    * [主从复制 (Master Slave Replication )](#主从复制-master-slave-replication-)
+        * [传统binlog复制模式](#传统binlog复制模式)
+        * [MYSQL5.6的GTID复制模式](#mysql56的gtid复制模式)
+            * [搭建](#搭建)
+            * [GTID相关命令](#gtid相关命令)
+        * [主从复制不会复制已经存在的数据库数据。因此需要自己导入](#主从复制不会复制已经存在的数据库数据因此需要自己导入)
+        * [主服务器配置](#主服务器配置)
+        * [从服务器配置](#从服务器配置)
+        * [docker 主从复制](#docker-主从复制)
+    * [高可用](#高可用)
+        * [高可用方案](#高可用方案)
+        * [MHA](#mha)
+        * [MGR（MySQL Group Replication）](#mgrmysql-group-replication)
+    * [中间件](#中间件)
+        * [DBLE](#dble)
+    * [备份与恢复](#备份与恢复)
+        * [备份工具性能对比](#备份工具性能对比)
+        * [导出不同文件格式](#导出不同文件格式)
+        * [LOAD DATA/OUTFILE 导入/导出文件](#load-dataoutfile-导入导出文件)
+        * [mysqldump 备份和恢复](#mysqldump-备份和恢复)
+        * [mydumper：比mysqldump更快](#mydumper比mysqldump更快)
+        * [go-mydumper：比mysqldump更快](#go-mydumper比mysqldump更快)
+        * [MySQL解决方案工程师：InnoDB的物理备份方法](#mysql解决方案工程师innodb的物理备份方法)
+        * [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](#mysql解决方案工程师使用可移动表空间执行innodb备份)
+        * [XtraBackup 热备份](#xtrabackup-热备份)
+            * [安装](#安装)
+        * [MySQL解决方案工程师：MySQL的备份工具——MySQL企业版备份](#mysql解决方案工程师mysql的备份工具mysql企业版备份)
+            * [备份](#备份)
+            * [恢复](#恢复)
+    * [OnlineDDL](#onlineddl)
+        * [OnlineDDL变更工具](#onlineddl变更工具)
+            * [直接alter table](#直接alter-table)
+                * [不适合的场景](#不适合的场景)
+            * [gh-ost](#gh-ost)
+                * [基本使用](#基本使用)
+                * [爱可生开源社区：社区投稿 | gh-ost 原理剖析](#爱可生开源社区社区投稿--gh-ost-原理剖析)
+                * [InsideMySQL：gh-ost 翻车！使用后导致数据丢失！](#insidemysqlgh-ost-翻车使用后导致数据丢失)
+            * [pt-osc（pt-online-schema-change）](#pt-oscpt-online-schema-change)
+                * [参数](#参数)
+                * [例子：将列类型由 char(20) 修改为 varchar(200)](#例子将列类型由-char20-修改为-varchar200)
+                * [索引添加到一半的时候，如何停止？](#索引添加到一半的时候如何停止)
+                * [pt-osc工具引发的主从延迟](#pt-osc工具引发的主从延迟)
+            * [Online DDL copy和gh-ost和pt-osc 的对比测试](#online-ddl-copy和gh-ost和pt-osc-的对比测试)
+        * [字段变更](#字段变更)
+            * [爱可生开源社区：技术分享 | MySQL VARCHAR 最佳长度评估实践](#爱可生开源社区技术分享--mysql-varchar-最佳长度评估实践)
+        * [大表变更](#大表变更)
+            * [爱可生开源社区：技术分享 | MySQL 大表添加唯一索引的总结](#爱可生开源社区技术分享--mysql-大表添加唯一索引的总结)
+                * [风险介绍](#风险介绍)
+                * [添加唯一索引的测试](#添加唯一索引的测试)
+                * [加强版 hook 样例](#加强版-hook-样例)
+                * [总结](#总结)
+            * [爱可生开源社区：技术分享 | MySQL级联复制下进行大表的字段扩容](#爱可生开源社区技术分享--mysql级联复制下进行大表的字段扩容)
+    * [字符集（character set）](#字符集character-set)
+        * [字符集相关sql语句](#字符集相关sql语句)
+        * [乱码](#乱码)
+    * [常见错误](#常见错误)
+        * [登录错误](#登录错误)
+            * [ERROR 1046 (28000)](#error-1046-28000)
+            * [ERROR 1819 (HY000)： 密码不满足策略安全](#error-1819-hy000-密码不满足策略安全)
+        * [ERROR 2013 (HY000): Lost connection to MySQL server during query(导致无法 stop slave;)](#error-2013-hy000-lost-connection-to-mysql-server-during-query导致无法-stop-slave)
+        * [ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (111)(连接不了数据库)](#error-2002-hy000-cant-connect-to-local-mysql-server-through-socket-varrunmysqldmysqldsock-111连接不了数据库)
+        * [ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined](#error-1075-42000-incorrect-table-definition-there-can-be-only-one-auto-column-and-it-must-be-defined)
+        * [爱可生开源社区：故障分析 | ERROR 1709: Index column size too large 引发的思考](#爱可生开源社区故障分析--error-1709-index-column-size-too-large-引发的思考)
+        * [插入中文错误(1366, "Incorrect string value:](#插入中文错误1366-incorrect-string-value)
+        * [启动错误](#启动错误)
+        * [表损坏](#表损坏)
+        * [爱可生开源社区：第 54 期：MySQL Too many open files 报错](#爱可生开源社区第-54-期mysql-too-many-open-files-报错)
+        * [爱可生开源社区：故障分析 | 重启数据库之后无法写入数据了？](#爱可生开源社区故障分析--重启数据库之后无法写入数据了)
+        * [knowclub：在MySQL集群中，如何从几百万个抓包中找到一个异常的包？](#knowclub在mysql集群中如何从几百万个抓包中找到一个异常的包)
+        * [5.7升级到8.0](#57升级到80)
+            * [爱可生开源社区：MySQL 5.7 升级到 8.0 可能踩的一个坑](#爱可生开源社区mysql-57-升级到-80-可能踩的一个坑)
+            * [爱可生开源社区：故障分析 | 关于 MySQL 5.7 升级 8.0 时 INT 显示问题分析](#爱可生开源社区故障分析--关于-mysql-57-升级-80-时-int-显示问题分析)
+            * [爱可生开源社区：技术分享 | MySQL 5.7 升级 8.0 后，排序规则问题解决方案汇总](#爱可生开源社区技术分享--mysql-57-升级-80-后排序规则问题解决方案汇总)
+        * [崩溃](#崩溃)
+            * [一树一溪：MySQL 崩溃恢复过程分析](#一树一溪mysql-崩溃恢复过程分析)
+            * [爱可生开源社区：故障分析 | 一则 INSERT UPDATE 触发 MySQL Crash 的案例](#爱可生开源社区故障分析--一则-insert-update-触发-mysql-crash-的案例)
+        * [连接中断](#连接中断)
+            * [爱可生开源社区：故障分析 | TCP 缓存超负荷导致的 MySQL 连接中断](#爱可生开源社区故障分析--tcp-缓存超负荷导致的-mysql-连接中断)
+        * [主从复制问题](#主从复制问题)
+            * [MySQL 主从 AUTO_INCREMENT 不一致问题分析](#mysql-主从-auto_increment-不一致问题分析)
+            * [MySQL:主从binlog超过4G导致报错](#mysql主从binlog超过4g导致报错)
+            * [爱可生开源社区：故障分析 | MySQL 主从切换后数据不一致了？](#爱可生开源社区故障分析--mysql-主从切换后数据不一致了)
+            * [爱可生开源社区：故障分析 | GRANT 操作会引起复制中断吗？](#爱可生开源社区故障分析--grant-操作会引起复制中断吗)
+            * [爱可生开源社区：故障分析 | MySQL 5.7 连续 Crash 引发 GTID 丢失](#爱可生开源社区故障分析--mysql-57-连续-crash-引发-gtid-丢失)
+            * [爱可生开源社区：故障分析 | 为什么你的 show slave status 会卡住？](#爱可生开源社区故障分析--为什么你的-show-slave-status-会卡住)
+        * [cpu消耗过高](#cpu消耗过高)
+            * [bisal的个人杂货铺：MySQL定位导致CPU消耗过高SQL的路径](#bisal的个人杂货铺mysql定位导致cpu消耗过高sql的路径)
+        * [自增不连续](#自增不连续)
+            * [MySQL学习：MySQL:自增不连续的几种情况总结](#mysql学习mysql自增不连续的几种情况总结)
+    * [监控](#监控)
+        * [爱可生开源社区：技术译文 | 分析 MySQL 中的内存使用情况](#爱可生开源社区技术译文--分析-mysql-中的内存使用情况)
+    * [极限值测试](#极限值测试)
+    * [benchmark(基准测试)](#benchmark基准测试)
+        * [sysbench](#sysbench)
+        * [iibench-mysql：基于 Java 的 MySQL/Percona/MariaDB 索引进行插入性能测试工具](#iibench-mysql基于-java-的-mysqlperconamariadb-索引进行插入性能测试工具)
+        * [tpcc-mysql：Percona开发的TPC-C测试工具](#tpcc-mysqlpercona开发的tpc-c测试工具)
+        * [benchmarksql](#benchmarksql)
+    * [第三方工具](#第三方工具)
+        * [服务端](#服务端)
+            * [gt-checksum：静态数据库校验修复工具](#gt-checksum静态数据库校验修复工具)
+            * [percona-toolkit 运维监控工具](#percona-toolkit-运维监控工具)
+            * [undrop-for-innodb(\*数据恢复)](#undrop-for-innodb数据恢复)
+        * [客户端](#客户端)
+            * [mycli](#mycli)
+            * [mitzasql](#mitzasql)
+        * [监控客户端](#监控客户端)
+            * [innotop](#innotop)
+            * [dbatool](#dbatool)
+
+<!-- vim-markdown-toc -->
+
 # mysql
 
 ## 版本
@@ -50,6 +231,89 @@
         - 任何未来的创新版本，直到下一个 LTS 版本（LTS 8.4 → LTS 9.7，但不是 LTS 8.4 → LTS 10.7）。
 
     - 如果在提升新版本后出现任何问题，支持回到前一个版本非常重要。因此，MySQL 异步复制将能够复制到前一个版本。此支持仅用于回滚目的，其中尚未使用新功能，不应视为持续生产部署的一部分。
+
+### 9.0
+
+- 2024 年第三季度 MySQL 新版本发布了，北京时间 7 月 1 日 傍晚时分，MySQL 官方发布了 MySQL 9.0 新的创新版本，以及 LTS 长周期版本 8.4.1 和 MySQL8 系列的 MySQL8.0.38 版本。
+
+- 新功能
+
+    - 从 MySQL 9.0.0 开始可以保存 EXPLAIN ANALYZE INTO 的 JSON 输出，语法如下：
+
+        ```sql
+        EXPLAIN ANALYZE FORMAT=JSON INTO @variable select_stmt
+
+        注意：只有当 explain_json_format_version 系统变量设置为 2 时，此特性才可用。
+        ```
+
+    - 从 MySQL 9.0.0 开始，`CREATE EVENT`、`ALTER EVENT`、`DROP EVENT` DDL event 可以作为 PREPARE 阶段执行。
+
+    - 从 MySQL 9.0.0 开始，添加两个 Performance Schema 系统变量表。
+
+        - variables_metadata：提供了关于系统变量的一般信息。这些信息包括 MySQL 服务器识别的每个系统变量的名称、作用域、类型、范围(如适用)和描述。该表中的两个列(MIN_VALUE 和 MAX_VALUE)用于替换 variables_info 表中已弃用的列。
+
+        - global_variale_attributes：提供了关于服务器分配给全局系统变量的属性值对的信息。
+
+    - 从 MySQL 9.0.0 开始，“mysql_native_password” 插件已经被删除，如果客户端软件不具备“CLIENT_PLUGIN_AUTH”能力将无法连接服务器。为了向后兼容，mysql_native_password 在客户端仍然可用，以便 MySQL 9.0 客户端程序可以连接到早期版本的 MySQL 服务器。在 MySQL 9.0 中，MySQL 原生身份验证插件已经被转换为必须在运行时加载的插件。
+
+        - 由于这一变化，以下服务器参数和变量也被删除:
+            - --mysql-native-password 服务器选项
+            - --mysql-native-password-proxy-users 服务器选项
+            - default_authentication_plugin 服务器系统变量
+
+    - Vector向量类型
+        - 在 CREATE 和 ALTER 语句中支持。
+
+## 性能对比
+
+### [dbaplus社群：MySQL版本越高、性能越差？你怎么想？](https://mp.weixin.qq.com/s/snTD4T9SI8RpIqifgeOb_g)
+
+- 从版本 5.7 迁移到 8.x 的步伐明显缓慢。更准确地说，许多用户仍需坚持使用 5.7 版本。
+
+- 首先，我们与一些仍在使用 MySQL 5.7 的用户聊了聊，探究他们不想迁移到 8.x 的原因。为此，我们制定了 EOL 计划，为 5.7 版本提供延长的生命周期支持[1]，确保需要依赖旧版本、二进制文件及代码修复的用户能够得到专业支持。
+
+- 性能测试
+
+    - 根据 MySQL 默认配置 运行性能测试，这里的工作假设很明确，你发布产品时使用的默认值，通常来说是最安全的配置，也经过了充分的测试。
+        - 当然，我还做了一些 配置优化[2] ，并评估优化后的参数配置会如何影响性能。
+
+    - sysbench 读写测试中
+
+        - 写操作比例约为 36%，读操作比例约为 64%，读操作由点查询和范围查询组成。
+
+        - 小数据集，默认配置：
+
+            ![image](./Pictures/mysql/sysbench小数据集，默认配置.avif)
+
+        - 小数据集，优化配置：
+
+            ![image](./Pictures/mysql/sysbench小数据集，优化配置.avif)
+
+        - 大数据集，默认配置：
+
+            ![image](./Pictures/mysql/sysbench大数据集，默认配置.avif)
+
+        - 大数据集，优化配置：
+
+            ![image](./Pictures/mysql/sysbench大数据集，优化配置.avif)
+
+        - 结论：
+
+            - 1.使用默认值的 MySQL 5.7 ，在两种情况（大小数据集）下的表现都更好。
+            - 2.MySQL 8.0.36 因为默认配置参数不佳，使其在第一种（小数据集）的情况表现拉垮。但只要进行一些优化调整，就能让它的性能表现超过 8.4，并更接近 5.7。
+
+    - TPC-C 测试
+        - 读写操作的比例则均为 50/50 %。
+        - TPC-C 测试应为写入密集型，会使用事务，执行带有 JOIN，GROUP，以及排序的复杂查询。
+        - 使用最常用的两种 隔离等级：可重复读（Repeatable Read）、读已提交（Read Committed），来运行 TPC-C 测试。
+
+        - 优化配置，RR隔离等级：
+            ![image](./Pictures/mysql/TPC-C优化配置，RR隔离等级.avif)
+
+        - 优化配置，RC隔离等级：
+            ![image](./Pictures/mysql/TPC-C优化配置，RC隔离等级.avif)
+
+        - 结论：MySQL 5.7 的性能比其他 MySQL 版本要更好。
 
 ## 安装 MySql
 
@@ -227,8 +491,6 @@ mysql -uroot -pYouPassword -h 127.0.0.1 -P3306
     - 4.升级其他用于备份或者非生产的实例
 
     - 5.如果在8.0的版本下运行了足够长的时间（至少24小时），则把集群内5.7版本的MySQL全删除。
-
-#### [爱可生开源社区：MySQL 5.7 升级到 8.0 可能踩的一个坑](https://mp.weixin.qq.com/s/DLf98FgoE-FbxmETzGnSZw)
 
 ### 各大公司mysql架构
 
@@ -3253,6 +3515,11 @@ grep "^CREATE TABLE" createtb.sql |wc -l
     ```
 
 ## 主从复制 (Master Slave Replication )
+
+- 有不少介绍mysql读写分离已提升mysql并发性能的文章，在游戏项目中用得比较少，主要是读写比例的原因。
+    - 网站那种读多写少的应用场景可以采用读写分离
+    - 游戏的读和写差不多多，读写分离的用处不大；
+    - 而且用户可能是海量的，分多台db是常事，如果分库后再搞读写分离，整个db就过于复杂了。
 
 ### 传统binlog复制模式
 
@@ -7382,6 +7649,8 @@ alter table test modify id int(10);
 alter table test drop primary key;
 ```
 
+### [爱可生开源社区：故障分析 | ERROR 1709: Index column size too large 引发的思考](https://mp.weixin.qq.com/s/ed21Glfrbp1vdZVyuSjgew)
+
 ### 插入中文错误(1366, "Incorrect string value:
 
 ```sql
@@ -7432,7 +7701,19 @@ REPAIR TABLE table_name;
 ALTER TABLE table_name ENGINE=INNODB;
 ```
 
+### [爱可生开源社区：第 54 期：MySQL Too many open files 报错](https://mp.weixin.qq.com/s/-Oo3HIlxAXy2TONkfAE44Q)
+
+### [爱可生开源社区：故障分析 | 重启数据库之后无法写入数据了？](https://mp.weixin.qq.com/s/Jg3s14kCpo4w6yqXEItrJQ)
+
 ### [knowclub：在MySQL集群中，如何从几百万个抓包中找到一个异常的包？](https://mp.weixin.qq.com/s/C04qADbcfZP9e7RQDbz-Kg)
+
+### 5.7升级到8.0
+
+#### [爱可生开源社区：MySQL 5.7 升级到 8.0 可能踩的一个坑](https://mp.weixin.qq.com/s/DLf98FgoE-FbxmETzGnSZw)
+
+#### [爱可生开源社区：故障分析 | 关于 MySQL 5.7 升级 8.0 时 INT 显示问题分析](https://mp.weixin.qq.com/s/KyLPLWDPck1epIqCTOWx3A)
+
+#### [爱可生开源社区：技术分享 | MySQL 5.7 升级 8.0 后，排序规则问题解决方案汇总](https://mp.weixin.qq.com/s/R1Y0fm7UVMY5YZVsELpLaw)
 
 ### 崩溃
 
@@ -7459,6 +7740,14 @@ ALTER TABLE table_name ENGINE=INNODB;
 #### [MySQL 主从 AUTO_INCREMENT 不一致问题分析](https://mp.weixin.qq.com/s/iQuPMPv4gD6udQub6C0h_A)
 
 #### [MySQL:主从binlog超过4G导致报错](https://mp.weixin.qq.com/s/5AhY0p0pCpzMveEB4_etSA)
+
+#### [爱可生开源社区：故障分析 | MySQL 主从切换后数据不一致了？](https://mp.weixin.qq.com/s/Pgf2teIXLzhqgjJ6RwwpKg)
+
+#### [爱可生开源社区：故障分析 | GRANT 操作会引起复制中断吗？](https://mp.weixin.qq.com/s/OWI8kH587hDZH2jmxDjN0w)
+
+#### [爱可生开源社区：故障分析 | MySQL 5.7 连续 Crash 引发 GTID 丢失](https://mp.weixin.qq.com/s/Wx6R8DIYu_PbtOhRDa8-NQ)
+
+#### [爱可生开源社区：故障分析 | 为什么你的 show slave status 会卡住？](https://mp.weixin.qq.com/s/GsGnf6CLMmDetHlAXPUA-Q)
 
 ### cpu消耗过高
 
@@ -7584,6 +7873,10 @@ ALTER TABLE table_name ENGINE=INNODB;
     +-----+------+---+
     ```
 
+## 监控
+
+### [爱可生开源社区：技术译文 | 分析 MySQL 中的内存使用情况](https://mp.weixin.qq.com/s/tUXi12PHK6NVQIDqVP_RfA)
+
 ## 极限值测试
 
 看看一个表最多是不是 1017 列:
@@ -7700,6 +7993,12 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 ### [iibench-mysql：基于 Java 的 MySQL/Percona/MariaDB 索引进行插入性能测试工具](https://github.com/tmcallaghan/iibench-mysql)
 
 ### [tpcc-mysql：Percona开发的TPC-C测试工具](https://github.com/Percona-Lab/tpcc-mysql)
+
+### [benchmarksql](https://github.com/petergeoghegan/benchmarksql)
+
+- [tidb维护的benchmarksql](https://github.com/pingcap/benchmarksql)
+
+- [yangyidba：工具| benchmarksql使用指南](https://mp.weixin.qq.com/s/JYPeP0hHJWZMTcqwWB_bXA)
 
 ## 第三方工具
 

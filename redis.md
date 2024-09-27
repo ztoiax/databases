@@ -154,6 +154,11 @@
             * [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](#腾讯云开发者redis你永远不知道告警和下班谁先到来)
             * [记一次Ziplist导致Redis Core Dump分析](#记一次ziplist导致redis-core-dump分析)
             * [集群在做了一个前缀删除后，耗时涨了3倍](#集群在做了一个前缀删除后耗时涨了3倍)
+            * [系统和硬件故障导致的3次Redis“诡异”慢查询](#系统和硬件故障导致的3次redis诡异慢查询)
+                * [服务器电源故障造成Redis慢查询](#服务器电源故障造成redis慢查询)
+                * [服务器MCE造成Redis慢查询](#服务器mce造成redis慢查询)
+                * [不可纠正硬件错误：](#不可纠正硬件错误)
+                * [CPU温度过高，导致可能降频：](#cpu温度过高导致可能降频)
     * [缓存（cache）](#缓存cache)
         * [缓存穿透、缓存雪崩、缓存击穿](#缓存穿透缓存雪崩缓存击穿)
         * [缓存无底洞问题：更多的节点不代表更高的性能](#缓存无底洞问题更多的节点不代表更高的性能)
@@ -169,6 +174,13 @@
         * [键值设计](#键值设计)
             * [登录系统。用户表](#登录系统用户表)
             * [tag系统。book表](#tag系统book表)
+    * [数据迁移](#数据迁移)
+        * [redis-shake：数据迁移工具](#redis-shake数据迁移工具)
+            * [配置](#配置-1)
+            * [实验](#实验)
+            * [function模式](#function模式)
+                * [实践](#实践)
+        * [redis-full-check：数据校验工具。redis-shake后使用](#redis-full-check数据校验工具redis-shake后使用)
 * [k8s](#k8s)
 * [redis 安装](#redis-安装)
     * [centos7 安装 redis6.0.9](#centos7-安装-redis609)
@@ -200,7 +212,6 @@
         * [vire-benchmark：虚拟测试](#vire-benchmark虚拟测试)
         * [redis-rdb-tools：分析bigkey](#redis-rdb-tools分析bigkey)
         * [redis-port：分析rdb，可以在master和slave进行同步](#redis-port分析rdb可以在master和slave进行同步)
-        * [redis-shake：在两个 redis 之间同步数据的工具，满足用户非常灵活的同步、迁移需求](#redis-shake在两个-redis-之间同步数据的工具满足用户非常灵活的同步迁移需求)
         * [redis-faina：facebook开发的通过MONITOR命令，统计hotkey](#redis-fainafacebook开发的通过monitor命令统计hotkey)
         * [京东hotkey中间件方案：proxy缓存+热点数据的发现与存储](#京东hotkey中间件方案proxy缓存热点数据的发现与存储)
         * [twemproxy：推特开发的集群代理层](#twemproxy推特开发的集群代理层)
@@ -3958,42 +3969,66 @@ for i in list1:
         - 而且在短、平、快的游戏迭代中，谁能早一天发布，谁就能多一点市场机会。因为维护一个全游戏玩家的一致性视图是很困难的，所以分区分服是常见的业务策略。
             - 这样一个区/服的数据量进一步缩小和独立，如果能在一个数据节点上存储所有的数据，并且完整的支持 Lua 机制的话对游戏开发来说是很幸福的事情。
 
+- 有3点要补充下：
+
+    - 1.在实际项目中，在redis中使用lua一定要谨慎，极端情况可能直接将redis hang死
+    - 2.运营redis的平台最好能够统筹和限制lua的使用
+    - 3.一些非常简单的lua命令，可以考虑改到redis源码原子实现或者开发module实现。
+
 ##### 基本命令
+
+- Eval和Evalsha比较
+    - Evalsha优势：如果lua脚本很大，Eval每次都需要上传，可能影响性能
+    - Evalsha劣势：
+        - 如果lua脚本找不到了，当前想找到比较困难。
+        - 集群升级、迁移、扩容之类的要兼容防止丢失。
 
 - `eval` 命令: 执行lua语句
 
-```redis
-# return 1 (0表示传递参数的数量)
-eval "return 1" 0
+    > `EVAL script numkeys [key [key ...]] [arg [arg ...]]`
 
-# return 123
-eval "return {1,2,3}" 0
+    ```redis
+    # return 1 (0表示传递参数的数量)
+    eval "return 1" 0
 
-# return key和值(这里是a和123)
-eval "return {KEYS[1],ARGV[1]}" 1 a 123
-eval "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 a b 123 321
-```
+    # return 123
+    eval "return {1,2,3}" 0
+
+    # return hello
+    EVAL "return ARGV[1]" 0 hello
+
+    # return key和值(这里是a和123)
+    eval "return {KEYS[1],ARGV[1]}" 1 a 123
+    eval "return {KEYS[1],KEYS[2],ARGV[1],ARGV[2]}" 2 a b 123 321
+    ```
 
 - `evalsha` 命令: 执行已经加载进redis内存的lua脚本
 
     - 避免每次发送lua脚本
 
-```redis
-# script load 会把脚本缓存进服务器,并返回hash(SHA1)值
-script load "return {1,2,3}"
+    ```redis
+    # script load 会把脚本缓存进服务器,并返回hash(SHA1)值
+    script load "return {1,2,3}"
 
-# evalsha 执行哈希值的脚本, 0表示传递参数的数量 (一般情况下执行eval命令,底层会转换为执行evalsha)
-evalsha <hash> 0
+    # script load 上传lua文件
+    cat xxx.lua
+    return 'Immabe a cached script'
 
-# 查看脚本是否已经加载到redis内存当中
-script exists "<hash>"
+    SCRIPT LOAD xxx.lua
+    "c664a3bf70bd1d45c4284ffebb65a6f2299bfc9f"
 
-# 清空redis内存中的脚本
-SCRIPT FLUSH
+    # evalsha 执行哈希值的脚本, 0表示传递参数的数量 (一般情况下执行eval命令,底层会转换为执行evalsha)
+    evalsha <hash> 0
 
-# 杀死目前正在执行的脚本(如果lua脚本正在执行写入操作, 则script kill不会生效)
-SCRIPT KILL
-```
+    # 查看脚本是否已经加载到redis内存当中
+    script exists "<hash>"
+
+    # 清空redis内存中的脚本
+    SCRIPT FLUSH
+
+    # 杀死目前正在执行的脚本(如果lua脚本正在执行写入操作, 则script kill不会生效)
+    SCRIPT KILL
+    ```
 
 - `redis.call` or `redis.pcall()`
 
@@ -8977,6 +9012,219 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
 - 综合看，流量无上涨、主调方无变动、删除大量数据、CPU上涨但可容忍（但业务可能不容忍），立刻做了关掉碎片整理的决定，服务瞬间恢复。
 
+#### [系统和硬件故障导致的3次Redis“诡异”慢查询](https://mp.weixin.qq.com/s/L6Get0C_uWn2UWn-lXa2yA)
+
+##### 服务器电源故障造成Redis慢查询
+
+- 1.我们和业务排查问题时候发现:
+
+    - 每天时不时发生：一些小的get命令，耗时达到了40ms（正常是微秒级别）。
+
+    - 慢查询集中在1台服务器的全部实例。
+
+        | 实例           | 角色   | 耗时(微秒) | 命令              | value大小 |
+        |----------------|--------|------------|-------------------|-----------|
+        | 10.xx.xx.xx:yy | master | 41432      | get rta_12345xxxx | 15字节    |
+        | 10.xx.xx.xx:yy | master | 41613      | get rta_6789yyyyy | 15字节    |
+
+- 2.快速定位：
+
+    - 快速定位为服务器问题，因为同机器的其他Redis集群均出现上述情况。
+
+    - 机器问题几板斧：
+        - 分钟级核心指标：cpu、mem、网络、io一通查，没有异常。
+        - 系统日志：dmesg日志一通查，没有异常。
+        - 硬件问题：内存、网卡、CPU均正常，只有一台电源异常（当前是单路供电）
+
+- 3.深入定位
+
+    - 因为之前定位过类似问题，单路供电能会导致CPU降频，但是查询监控未发现有降频：
+        ![avatar](./Pictures/redis/服务器电源故障造成Redis慢查询.avif)
+
+    - 中间又辗转怀疑了很多点，最后排查同学还是怀疑和电源故障有关
+
+        - 添加了CPU主频秒级监控：发现一瞬间降频（从2800MHz 降低到了 120 MHz）时间点和Redis慢查询时间点一致，
+
+        ![avatar](./Pictures/redis/服务器电源故障造成Redis慢查询1.avif)
+
+    - 电源故障开始时间和机器出现异常慢查询时间也是一致的。
+
+
+- 4.后续优化：
+    - 监控单服务器慢查询数量：基本上有多个集群都有慢查询，机器可能就有问题。
+    - 对于单路电源故障，之前绝对非高优维修，后期需要对此类故障增加优先级。
+    - 添加对CPU频率告警和提供秒级诊断工具能力。
+
+##### 服务器MCE造成Redis慢查询
+
+- 1.发现问题：
+
+    - 某周末晚上，某业务在21:55可用性突然报警，从100%->98%，经排查该分钟该集群的全部实例出现慢日志(均为小命令)，并且集中在一台机器。
+
+    | 实例           | 角色   | 耗时(微秒) | 命令            | value大小 |
+    |----------------|--------|------------|-----------------|-----------|
+    | 10.xx.xx.xx:yy | master | 20,421     | incr small_key1 | 10字节    |
+    | 10.xx.xx.xx:yy | master | 21,324     | get small_key2  | 10字节    |
+
+    ![avatar](./Pictures/redis/电源问题导致cpu降频1.avif)
+
+- 2.快速定位
+
+    - 快速定位为服务器问题，因为同机器的其他Redis集群均出现上述情况。
+
+    - 机器问题几板斧：
+        - 分钟级核心指标：cpu、mem、网络、io一通查，没有异常。
+        - 硬件问题：内存、网卡、CPU、电源均正常
+        - 系统日志：dmesg有异常日志，初步判断MCE在做内存故障纠错。
+
+        ```sh
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 4
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]: It has been corrected by h/w and requires no further action
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]: event severity: corrected
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:  Error 0, type: corrected
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:  fru_text: A2
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   section_type: memory error
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   error_status: 0x0000000000000400
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   physical_address: 0x00000009f7466ac0
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   node: 0 card: 1 module: 0 rank: 0 bank: 0 row: 18297 column: 936
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   error_type: 2, single-bit ECC
+        May 18 21:55:04 机器名 kernel: core: [Hardware Error]: Machine check events logged
+        May 18 21:55:04 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7466 offset:0xac0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:04 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7467 offset:0x5c0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:04 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7441 offset:0xa40 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:04 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7447 offset:0x140 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:05 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7443 offset:0x640 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:05 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7444 offset:0x240 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:06 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f74e5 offset:0x3c0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:06 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7461 offset:0xac0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:06 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7460 offset:0x3c0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:06 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7464 offset:0x2c0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        May 18 21:55:07 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7440 offset:0x340 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        ```
+
+- 一些基础知识(我也是临时学的，如果不对欢迎来喷)
+
+    - 什么是MCE？
+        - 简单说有硬件错误，需要中断当前的进程，调用一个专用的硬件异常处理handler进行处理。
+
+    - MCE什么时候触发？
+        - 通过修改`/sys/devices/system/machinecheck/machinecheck0/check_interval` 的值，可以调整错误修复的初始和最大轮询间隔。
+
+    - 硬件错误分类
+        - 1.CE，可纠正错误；（注意这里的CE和MCE也不是一个东西，corrected exception）
+        - 2.UE，不可纠正错误，但系统没有崩溃（通常进程coredump，异常退出）；
+        - 3.Fatal，不可纠正错误，系统崩溃。
+
+        - 从可用性角度看，似乎最应该关注的是2，3类错误，但实际上1类错误更具有欺骗性，在分布式系统中，确定性要好过不确定性。
+
+    - x86处理硬件故障的方式
+        - PCIe AER 是PCIe的新特性，发生故障时，通过中断报告故障详情；
+        - APEI，先通过SMI进入BIOS/firmware，让BIOS/firmware先处理，其根据处理情况决定要不要通知OS继续处理；
+        - BIOS/firmware 可以通过MCE中断，让OS继续处理。
+
+        - 这里重点是SMI中断（SMI中断使CPU进入SMM），它是Linux无法感知的，如果BIOS/firmware 处理错误耗费了太长时间，可能导致延迟抖动，没有统一的方法从Linux测度量。而其它中断是Linux处理的，其耗时Linux总是有办法度量
+
+- 日志分析，几个核心点：
+
+    - CE Memory：可纠正的内存错误
+
+        ```sh
+        May 18 21:55:04 机器名 kernel: EDAC MC0: 0 CE memory read error on CPU_SrcID#0_Ha#0_Chan#1_DIMM#0 (channel:1 slot:0 page:0x9f7466 offset:0xac0 grain:32 syndrome:0x0 -  area:DRAM err_code:0000:009f socket:0 ha:0 channel_mask:2 rank:0)
+        ```
+
+    - 关键日志：
+
+        ```sh
+        Machine check events logged
+        ```
+
+    - 内存错误和内存信息：
+
+        ```sh
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:  fru_text: A2
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   section_type: memory error
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   error_status: 0x0000000000000400
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   physical_address: 0x00000009f7466ac0
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   node: 0 card: 1 module: 0 rank: 0 bank: 0 row: 18297 column: 936
+        May 18 21:55:04 机器名 kernel: {2}[Hardware Error]:   error_type: 2, single-bit ECC
+        ```
+
+- 结论：系统发生硬件错误会导致机器进入 MCE中断，可能会将大部份内核时间用于处理 MCE中断(例如本例子CE Memory)
+
+##### 不可纠正硬件错误：
+
+- Uncorrected hardware memory error ，导致Redis直接core
+
+    ```sh
+    May 27 15:48:58 机器名 kernel: core: Uncorrected hardware memory error in user-access at 1a1f914a80
+    May 27 15:48:58 机器名 kernel: core: [Hardware Error]: Machine check events logged
+    May 27 15:48:58 机器名 mcelog: Hardware event. This is not a software error.
+    May 27 15:48:58 机器名 mcelog: MCE 0
+    May 27 15:48:58 机器名 mcelog: CPU 15 BANK 1 TSC e7a1f64e03e47a
+    May 27 15:48:58 机器名 mcelog: RIP 33:465af1
+    May 27 15:48:58 机器名 mcelog: MISC 86 ADDR 1a1f914a80
+    May 27 15:48:58 机器名 mcelog: TIME 1716796138 Mon May 27 15:48:58 2024
+    May 27 15:48:58 机器名 mcelog: MCG status:RIPV EIPV MCIP LMCE
+    May 27 15:48:58 机器名 mcelog: MCi status:
+    May 27 15:48:58 机器名 mcelog: Uncorrected error
+    May 27 15:48:58 机器名 mcelog: Error enabled
+    May 27 15:48:58 机器名 mcelog: MCi_MISC register valid
+    May 27 15:48:58 机器名 mcelog: MCi_ADDR register valid
+    May 27 15:48:58 机器名 mcelog: SRAR
+    May 27 15:48:58 机器名 mcelog: MCA: Data CACHE Level-0 Data-Read Error
+    May 27 15:48:58 机器名 mcelog: STATUS bd80000000100134 MCGSTATUS f
+    May 27 15:48:58 机器名 mcelog: MCGCAP f000c14 APICID 1e SOCKETID 0
+    May 27 15:48:58 机器名 mcelog: PPIN 2c6b0193f6fb1bb7
+    May 27 15:48:58 机器名 mcelog: CPUID Vendor Intel Family 6 Model 85
+    May 27 15:48:58 机器名 mcelog: warning: 8 bytes ignored in each record
+    May 27 15:48:58 机器名 mcelog: consider an update
+    May 27 15:48:58 机器名 kernel: Memory failure: 0x1a1f914: Killing redis-server:44454 due to hardware memory corruption
+    May 27 15:48:58 机器名 kernel: Memory failure: 0x1a1f914: recovery action for dirty LRU page: Recovered
+    May 27 15:48:58 机器名 kernel: MCE: Killing redis-server:44454 due to hardware memory corruption fault at 7f392cb4a9c0
+    ```
+
+##### CPU温度过高，导致可能降频：
+
+- 1.日志：
+
+    ```sh
+    Jun  2 20:13:29 机器名 kernel: CPU20: Core temperature above threshold, cpu clock throttled (total events = 176720)
+    Jun  2 20:13:30 机器名 kernel: CPU48: Core temperature above threshold, cpu clock throttled (total events = 176498)
+    Jun  2 20:17:30 机器名 kernel: CPU50: Core temperature above threshold, cpu clock throttled (total events = 177150)
+    Jun  2 20:17:30 机器名 kernel: CPU22: Core temperature above threshold, cpu clock throttled (total events = 177136)
+    Jun  2 20:20:57 机器名 kernel: CPU44: Core temperature above threshold, cpu clock throttled (total events = 269866)
+    Jun  2 20:20:58 机器名 kernel: CPU16: Core temperature above threshold, cpu clock throttled (total events = 269730)
+    Jun  2 20:37:29 机器名 kernel: CPU54: Core temperature above threshold, cpu clock throttled (total events = 33630)
+    Jun  2 20:37:30 机器名 kernel: CPU26: Core temperature above threshold, cpu clock throttled (total events = 33635)
+    Jun  2 20:45:29 机器名 kernel: CPU17: Core temperature above threshold, cpu clock throttled (total events = 214231)
+    Jun  2 20:45:30 机器名 kernel: CPU45: Core temperature above threshold, cpu clock throttled (total events = 214140)
+    ```
+
+- 关于CPU功耗管理，有以下几种模式：
+
+    | 值           | 说明                                                                                                               |
+    |--------------|--------------------------------------------------------------------------------------------------------------------|
+    | performance  | 运行于最大频率                                                                                                     |
+    | powersave    | 运行于最小频率                                                                                                     |
+    | userspace    | 运行于用户指定的频率                                                                                               |
+    | ondemand     | 按需快速动态调整CPU频率， 一有cpu计算量的任务，就会立即达到最                   大频率运行，空闲时间增加就降低频率 |
+    | conservative | 按需快速动态调整CPU频率， 比 ondemand 的调整更保守                                                                 |
+    | schedutil    | 基于调度程序调整 CPU 频率                                                                                          |
+
+- 查看当前支持模式：
+
+    ```sh
+    cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+    performance powersave
+    ```
+
+- 查看当前使用模式：
+
+    ```sh
+    cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    performance
+    ```
+
 ## 缓存（cache）
 
 - 大部分的流量实际上都是读请求，而且大部分数据也是没有那么多变化的，如热门商品信息、微博的内容等常见数据就是如此。此时，缓存就是我们应对此类场景的利器。
@@ -9781,6 +10029,384 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
         inter_list = redis.sunion("tag.ruby", "tag:web")
         ```
 
+## 数据迁移
+
+### [redis-shake：数据迁移工具](https://github.com/alibaba/RedisShake)
+
+- 在两个 redis 之间同步数据的工具，满足用户非常灵活的同步、迁移需求
+
+- [第一次使用，如何进行配置？](https://github.com/alibaba/RedisShake/wiki/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8%EF%BC%8C%E5%A6%82%E4%BD%95%E8%BF%9B%E8%A1%8C%E9%85%8D%E7%BD%AE%EF%BC%9F)
+
+- [DBA实战：详解Redis 迁移工具redis-shark4](https://mp.weixin.qq.com/s/9u4zoiNiaKl80rBIfTM1Nw)
+
+- [数据库运维札记：redis数据迁移处理利器之redis-shake](https://mp.weixin.qq.com/s/mhiAhdd1RBNIDcv76XwX2Q)
+
+- redis-shake是一个用于处理和迁移redis数据的工具，它支持以下特性：
+
+    - 1.redis兼容性：redis-shake 支持从 2.8-7.2的 redis 所有版本，并支持各种部署方式，包括单机，主从，哨兵和集群。
+    - 2.云服务兼容性：redis-shake 与主流云服务服务商redis无缝工作。包括但不限于 aws 和 aliyun。
+    - 3.多种导出模式：redis-shake 支持 psync，rdb 和 scan 导出模式。
+    - 4.数据处理：redis-shake 通过自定义lua脚本实现数据过滤和转换。
+
+- 注意事项
+    - 1.不要在同一个目录运行两个 RedisShake 进程，因为运行时产生的临时文件可能会被覆盖，导致异常行为。
+    - 2.不要降低 Redis 版本，比如从 6.0 降到 5.0，因为 RedisShake 每个大版本都会引入一些新的命令和新的编码方式，如果降低版本，可能会导致不兼容。
+
+- 编译安装
+    ```sh
+    git clone https://github.com/alibaba/RedisShake
+    cd RedisShake
+    sh build.sh
+    ```
+
+- 直接安装
+    ```sh
+    Wget https://github.com/tair-opensource/RedisShake/archive/refs/tags/v4.0.5.tar.gz
+    yum install go
+    tar -xvf redis-shake-linux-amd64.tar.gz
+    cd redis-shark
+    ```
+
+#### 配置
+
+- redis-shake 配置项主要分为 function，reader ，writer ，advanced 四个部分。
+
+    - 一般使用下只要 reader 和 writer 俩个部分即可。
+
+    - 对于 function 和 advanced 部分为进阶用法，可以根据自己实际需求进行配置调整。
+
+- reader 配置分为三种模式
+
+    - 场景应用：
+
+        - 对于数据迁移场景，优先选择 sync_reader。一些云厂商没有提供 PSync 协议支持，可以选择scan_reader。
+
+        - 对于长期的数据同步场景，RedisShake 目前没有能力承接，因为 PSync 协议并不可靠，当复制连接断开时，RedisShake 将无法重新连接至源端数据库。如果对于可用性要求不高，可以使用 scan_reader。如果写入量不大，且不存在大 key，也可以考虑 scan_reader。
+
+        - 对于从备份中恢复数据的场景，可以使用 rdb_reader。
+
+    - 架构不同的场景应用：
+
+        - Redis Cluster 架构
+
+            - 当源端 Redis 以 cluster 架构部署时，可以使用 sync_reader 或者 scan_reader。两者配置项中均有开关支持开启 cluster 模式，会通过 cluster nodes 命令自动获取集群中的所有节点，并建立连接。
+
+        - Redis Sentinel 架构
+            - 当源端 Redis 以 sentinel 架构部署且 RedisShake 使用 sync_reader 连接主库时，会被主库当做 slave，从而有可能被 sentinel 选举为新的 master。
+            - 为了避免这种情况，应选择备库作为源端。
+
+        - 云 Redis 服务
+
+            - 主流云厂商都提供了 Redis 服务，不过有几个原因导致在这些服务上使用 RedisShake 较为复杂：
+                - 引擎限制。存在一些自研的 Redis-like 数据库没有兼容 PSync 协议。
+                - 架构限制。较多云厂商支持代理模式，即在用户与 Redis 服务之间增加 Proxy 组件。因为 Proxy 组件的存在，所以 PSync 协议无法支持。
+                - 安全限制。在原生 Redis 中 PSync 协议基本会触发 fork(2)，会导致内存膨胀与用户请求延迟增加，较坏情况下甚至会发生 out of memory。尽管这些都有方案缓解，但并不是所有云厂商都有这方面的投入。
+                - 商业策略。较多用户使用 RedisShake 是为了下云或者换云，所以部分云厂商并不希望用户使用 RedisShake，从而屏蔽了 PSync 协议。
+
+            - 阿里云「云数据库 Redis」与「云原生内存数据库Tair」
+                - 「云数据库 Redis」与「云原生内存数据库Tair」都支持 PSync 协议，推荐使用 sync_reader。用户需要创建一个具有复制权限的账号（可以执行 PSync 命令），RedisShake 使用该账号进行数据同步，具体创建步骤见 创建与管理账号。
+                - 例外情况：
+                    - 1.2.8 版本的 Redis 实例不支持创建复制权限的账号，需要 升级大版本。
+                    - 2.集群架构的 Reids 与 Tair 实例在 代理模式 下不支持 PSync 协议。
+                    - 3.读写分离架构不支持 PSync 协议。
+                - 在不支持 PSync 协议的场景下，可以使用 scan_reader。需要注意的是，scan_reader 会对源库造成较大的压力。
+
+
+            - AWS ElastiCache and MemoryDB
+
+                - 优选 sync_reader, AWS ElastiCache and MemoryDB 默认情况下没有开启 PSync 协议，但是可以通过提交工单的方式请求开启 PSync 协议。AWS 会在工单中给出一份重命名的 PSync 命令，比如 xhma21yfkssync 和 nmfu2bl5osync。此命令效果等同于 psync 命令，只是名字不一样。用户修改 RedisShake 配置文件中的 aws_psync 配置项即可。对于单实例只写一对 ip:port@cmd 即可，对于集群实例，需要写上所有的 ip:port@cmd，以逗号分隔。
+
+                - 不方便提交工单时，可以使用 scan_reader。需要注意的是，scan_reader 会对源库造成较大的压力。
+
+    - 1.sync_reader
+
+        - 优势：数据一致性最佳，对源库影响小，可以实现不停机的切换
+
+        - 原理：redis-shack 模拟 slave连接到 master 节点，master 会向 redis-shack 发送数据，数据包含全量与增量两部分。全量是一个 rdb 文件，增量是 aof 数据流，redis-shack 会接受全量与增量将其暂存到硬盘上。
+
+        - 全量同步阶段：redis-shack 首先会将 rdb 文件解析为一条条的 redis 命令，然后将这些命令发送至目的端。
+
+        - 增量同步阶段：redis-shack 会持续将 aof 数据流同步至目的端。
+
+        - sync_reader 配置项
+
+            ```ini
+            [sync_reader]
+            cluster = false            # set to true if source is a redis cluster
+            address = "127.0.0.1:6379" # when cluster is true, set address to one of the cluster node
+            username = ""              # keep empty if not using ACL
+            password = ""              # keep empty if no authentication is required
+            tls = false
+            sync_rdb = true # set to false if you don't want to sync rdb
+            sync_aof = true # set to false if you don't want to sync aof
+            ```
+
+            - cluster：源端是否为集群
+            - address：源端地址, 当源端为集群时，address 为集群中的任意一个节点即可
+
+            - 鉴权：
+
+                - 当源端使用 ACL 账号时，配置 username 和 password
+                - 当源端使用传统账号时，仅配置 password
+                - 当源端无鉴权时，不配置 username 和 password
+
+            - tls：源端是否开启 TLS/SSL，不需要配置证书因为 redis-shack 没有校验服务器证书
+            - sync_rdb：是否同步 rdb，设置为 false 时，redis-shack 会跳过全量同步阶段
+            - sync_aof：是否同步 aof ，设置为 false 时，redis-shack 会跳过增量同步阶段，此时 redis-shack 会在全量同步阶段结束后退出
+
+    - 2.scan_reader
+
+        - scan_reader 是通过 scan 命令遍历源端数据库中的所有 key，并使用 dump与 restore 命令来读取与写入 key 的内容。
+
+        - scan_reader 配置项
+
+            ```ini
+            [scan_reader]
+            cluster = false            # set to true if source is a redis cluster
+            address = "127.0.0.1:6379" # when cluster is true, set address to one of the cluster node
+            username = ""              # keep empty if not using ACL
+            password = ""              # keep empty if no authentication is required
+            tls = false
+            ksn = false                # set to true to enabled Redis keyspace notifications (KSN) subscription
+            dbs = []                   # set you want to scan dbs, if you don't want to scan all
+            ```
+
+        - 注意：
+
+            - 1.redis 的 scan 命令只保证 scan 的开始与结束之前均存在的 key一定会被返回，但是新写入的 key 有可能会被遗漏，期间删除的 key 也可能已经被写入目的端。
+            - 2.scan 命令与 dump 命令会占用源端数据库较多的 cpu 资源。
+
+    - 3.rdb_reader
+
+        - 可以使用 rdb_reader 来从 rdb 文件中读取数据，然后写入目标端。常见于从备份文件中恢复数据。
+
+        - rdb_reader 配置项
+
+            ```ini
+            [rdb_reader]
+            filepath = "/tmp/dump.rdb"
+            ```
+
+- writer 配置
+
+    > 简简单单它就是用来配置目标端，用于将数据写入数据库
+
+- redis_writer 配置项
+
+    ```ini
+    [redis_writer]
+    cluster = false
+    address = "127.0.0.1:6379" # when cluster is true, address is one of the cluster node
+    username = ""              # keep empty if not using ACL
+    password = ""              # keep empty if no authentication is required
+    tls = false
+    ```
+
+    - cluster：是否为集群。
+    - address：连接地址。当目的端为集群时，address 填写集群中的任意一个节点即可
+    - 鉴权：
+        - 当使用 ACL 账号体系时，配置 username 和 password
+        - 当使用传统账号体系时，仅配置 password
+        - 当无鉴权时，不配置 username 和 password
+    - tls：是否开启 TLS/SSL，不需要配置证书因为 redis-shack 没有校验服务器证书
+
+#### 实验
+
+- 1.备份`shake.toml`配置文件
+- 2.修改`shake.toml`配置文件
+    ![avatar](./Pictures/redis/redis-shake-shake配置文件.avif)
+- 3.执行
+    ```sh
+    ./redis-shake shake.toml
+    ```
+
+#### function模式
+
+- RedisShake 通过提供 function 功能，实现了的 ETL(提取-转换-加载) 中的 transform 能力。通过利用 function 可以实现类似功能：
+    - 更改数据所属的 db，比如将源端的 db 0 写入到目的端的 db 1。
+    - 对数据进行筛选，例如，只将 key 以 user: 开头的源数据写入到目标端。
+    - 改变 Key 的前缀，例如，将源端的 key prefix_old_key 写入到目标端的 key prefix_new_key。
+
+    - 要使用 function 功能，只需编写一份 lua 脚本。RedisShake 在从源端获取数据后，会将数据转换为 Redis 命令。然后，它会处理这些命令，从中解析出 KEYS、ARGV、SLOTS、GROUP 等信息，并将这些信息传递给 lua 脚本。lua 脚本会处理这些数据，并返回处理后的命令。最后，RedisShake 会将处理后的数据写入到目标端。
+
+- `shake.toml`配置的具体例子：
+    ```ini
+    function = """
+    shake.log(DB)
+    if DB == 0
+    then
+    return
+    end
+    shake.call(DB, ARGV)
+    """
+    [sync_reader]
+    address = "127.0.0.1:6379"
+    [redis_writer]
+    address = "127.0.0.1:6380"
+    DB 是 RedisShake 提供的信息，表示当前数据所属的 db。shake.log 用于打印日志，shake.call 用于调用 Redis 命令。上述脚本的目的是丢弃源端 db 0 的数据，将其他 db 的数据写入到目标端。
+    除了 DB，还有其他信息如 KEYS、ARGV、SLOTS、GROUP 等，可供调用的函数有 shake.log 和 shake.call，具体请参考 function API。
+    ```
+
+- function API
+    - 变量
+    - 因为有些命令中含有多个 key，比如 mset 等命令。所以，KEYS、KEY_INDEXES、SLOTS 这三个变量都是数组类型。如果确认命令只有一个 key，可以直接使用 KEYS[1]、KEY_INDEXES[1]、SLOTS[1]。
+
+        | 变量        | 类型   | 示例                                           | 描述                                                                                                                                                                                                                       |
+        |-------------|--------|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+        | DB          | number | 1                                              | 命令所属的 `db`                                                                                                                                                                                                            |
+        | GROUP       | string | "LIST"                                         | 命令所属的 `group`，符合 [Command key specifications](https://redis.io/docs/reference/key-specs/)，可以在 [commands](https://github.com/tair-opensource/RedisShake/tree/v4/scripts/commands) 中查询每个命令的 `group` 字段 |
+        | CMD         | string | "XGROUP-DELCONSUMER"                           | 命令的名称                                                                                                                                                                                                                 |
+        | KEYS        | table  | \{"key1", "key2"\}                             | 命令的所有 Key                                                                                                                                                                                                             |
+        | KEY_INDEXES | table  | \{2, 4\}                                       | 命令的所有 Key 在 `ARGV` 中的索引                                                                                                                                                                                          |
+        | SLOTS       | table  | \{9189, 4998\}                                 | 当前命令的所有 Key 所属的 [slot](https://redis.io/docs/reference/cluster-spec/#key-distribution-model)                                                                                                                     |
+        | ARGV        | table  | \{"mset", "key1", "value1", "key2", "value2"\} | 命令的所有参数                                                                                                                                                                                                             |
+
+    - 函数
+        - lshake.call(DB, ARGV)：返回一个 Redis 命令，RedisShake 会将该命令写入目标端。
+        - lshake.log(msg)：打印日志。
+
+##### 实践
+
+- 过滤 Key
+
+    - 效果是只将 key 以 user: 开头的源数据写入到目标端。没有考虑 mset 等多 key 命令的情况。
+
+    ```lua
+    local prefix = "user:"
+    local prefix_len = #prefix
+    if string.sub(KEYS[1], 1, prefix_len) ~= prefix then
+    return
+    end
+    shake.call(DB, ARGV)
+    ```
+
+- 过滤db
+
+    - 效果是丢弃源端db0的数据，将其他db的数据写入到目标端。
+
+    ```lua
+    shake.log(DB)
+    if DB == 0
+    then
+    return
+    end
+    shake.call(DB, ARGV)
+    ```
+
+- 过滤某数据类型
+
+    - 效果是丢弃源端的hash类型数据，将其他数据写入到目标端。
+
+    ```lua
+    if GROUP == "HASH" then
+    return
+    end
+    shake.call(DB, ARGV)
+    ```
+
+- 修改key前缀
+
+    - 效果是将源端的 keyprefix_old_key写入到目标端的 key prefix_new_key。
+
+    ```lua
+    local prefix_old = "prefix_old_"
+    local prefix_new = "prefix_new_"
+
+    shake.log("old=" .. table.concat(ARGV, " "))
+
+    for i, index in ipairs(KEY_INDEXES) do
+    local key = ARGV[index]
+    if string.sub(key, 1, #prefix_old) == prefix_old then
+    ARGV[index] = prefix_new .. string.sub(key, #prefix_old + 1)
+    end
+    end
+
+    shake.log("new=" .. table.concat(ARGV, " "))
+    shake.call(DB, ARGV)
+    ```
+
+- 交换db
+
+    - 效果是将源端的db 1写入到目标端的db 2，将源端的db 2写入到目标端的db 1, 其他db不变。
+
+    ```lua
+    local db1 = 1
+    local db2 = 2
+
+    if DB == db1 then
+    DB = db2
+    elseif DB == db2 then
+    DB = db1
+    end
+    shake.call(DB, ARGV)
+    ```
+
+### [redis-full-check：数据校验工具。redis-shake后使用](https://github.com/tair-opensource/RedisFullCheck)
+
+- [数据库运维札记：redis-full-check 数据校验工具浅析](https://mp.weixin.qq.com/s/Nb6FH_Ikvs74uG-cUIwUbQ)
+
+- redis-full-check 是阿里开源用于校验2个redis数据是否一致的工具，通常用于 redis-shake 迁移后正确性的校验。能够提取源端和目的端的数据进行多轮差异化比较，并将比较结果记录在一个sqlite3数据库中，从而达到全量数据校验的目的。
+
+    - 需要注意的是，redis-full-check 比较的是源实例是否是目标实例的子集。也就是说它只能单向比较。如果需要双向验证，需要进行两次比较。
+
+    ![avatar](./Pictures/redis/redis-full-check原理.avif)
+
+- 编译安装
+    ```sh
+    git clone https://github.com/alibaba/RedisFullCheck.git
+    cd RedisFullCheck/
+    ./build.sh
+    ```
+
+- 直接安装
+    ```sh
+    wget https://github.com/alibaba/RedisFullCheck/releases/download/release-v1.4.8-20200212/redis-full-check-1.4.8.tar.gz
+    tar -zxvf redis-full-check-1.4.8.tar.gz
+    ```
+
+- 参数
+
+    ```
+    -s, --source=SOURCE               源redis库地址（ip:port），如果源redis为集群版，每个集群地址间需要以半角分号（;）分割不同的连接地址
+    -p, --sourcepassword=Password     源redis库密码
+      --sourcedbtype=               源库的类别：0（默认）：单节点版、标准版 1：集群版直连模式 2：集群版代理模式
+      --sourcedbfilterlist=         源端redis指定需要校验的DB。以分号（;）分割，例如：0;5;15表示db0,db5和db15都会被抓取
+    -t, --target=TARGET               目的redis库地址（ip:port）
+    -a, --targetpassword=Password     目的redis库密码
+      --targetdbtype=               参考 sourcedbtype
+      --targetdbfilterlist=         参考 sourcedbfilterlist
+      --comparetimes=COUNT          校验次数，默认为3，最小值为1，无最大值，建议不超过5次。
+    -m, --comparemode=                校验模式，1表示全量比较，2表示只对比value的长度（默认），3只对比key是否存在，4全量比较的情况下，忽略大key的比较
+    -q, --qps=                        限速阈值，默认为15000。
+    -f, --filterlist=FILTER           需要比较的key列表，以分号（;）分割。例如："abc*|efg|m*"表示对比'abc', 'abc1', 'efg', 'm', 'mxyz'，不对比'efgh', 'p'
+    ```
+
+- 实验
+
+    - 简单验证redis-shake 的结果。
+
+    - 即将源端db1迁移到目标端db5之后的数据校验。
+        - 源端为：192.168.30.100:6379 db1
+        - 目标端为：192.168.30.101:6379 db5
+
+    ```sh
+    ./redis-full-check -s 192.168.30.100:6379 -p '' --sourcedbtype=0 --sourcedbfilterlist=1 -t 192.168.30.101:6379 -a '123456' --targetdbtype=0 --targetdbfilterlist=5
+    ```
+
+    ![avatar](./Pictures/redis/redis-full-check实验.avif)
+
+    - 结果可见，不存在键和字段冲突，说明迁移顺利。
+
+    - 需要注意的是：当指定多个db进行比对时，可能会报错，这时候用引号括起来即可
+
+        ```sh
+        redis-full-check -s 192.168.30.100:6379 -p '123456' --sourcedbtype=0 --sourcedbfilterlist="0;1" -t 192.168.30.102:6379 -a '123456' --targetdbtype=0 --targetdbfilterlist="0;1"
+        ```
+
+    - 如果有数据不一致，通过以下命令查看
+        ```sh
+        sqlite3 result.db.5
+        ```
 # k8s
 
 - [字节跳动技术团队：火山引擎 Redis 云原生实践]()
@@ -11229,12 +11855,6 @@ cat dump.rdb | ./redis-port decode 2>/dev/null
 # sync 同步master和slave
 ./redis-port sync -f 127.0.0.1:6379 -t 127.0.0.1:6380 -n 8
 ```
-
-### [redis-shake：在两个 redis 之间同步数据的工具，满足用户非常灵活的同步、迁移需求](https://github.com/alibaba/RedisShake)
-
-- [第一次使用，如何进行配置？](https://github.com/alibaba/RedisShake/wiki/%E7%AC%AC%E4%B8%80%E6%AC%A1%E4%BD%BF%E7%94%A8%EF%BC%8C%E5%A6%82%E4%BD%95%E8%BF%9B%E8%A1%8C%E9%85%8D%E7%BD%AE%EF%BC%9F)
-
-- [DBA实战：详解Redis 迁移工具redis-shark4](https://mp.weixin.qq.com/s/9u4zoiNiaKl80rBIfTM1Nw)
 
 ### [redis-faina：facebook开发的通过MONITOR命令，统计hotkey](https://github.com/facebookarchive/redis-faina)
 

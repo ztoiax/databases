@@ -4,88 +4,216 @@
 
 - [咸鱼运维杂谈：关于消息队列的那些事](https://mp.weixin.qq.com/s?__biz=MzkzNzI1MzE2Mw==&mid=2247484660&idx=1&sn=8be392c3a1b67bec66f690645b734717&chksm=c29304b0f5e48da614c2bc81b4f920fe74b9522a3354b3d84cab98c48bbcd7c6247226f7fcb5&scene=21#wechat_redirect)
 
-    - 在日常当中，消息队列往往指的是消息中间件，它主要的功能就是用来存放消息，便于应用之间的消息通信
+- 在日常当中，消息队列往往指的是消息中间件，它主要的功能就是用来存放消息，便于应用之间的消息通信
 
-    - ”对象之间的关系远比对象本身要重要“
+- ”对象之间的关系远比对象本身要重要“
 
-    - 为什么需要消息队列？
+- 为什么需要消息队列？
 
-        - 在过去业务量小的时候，企业用的都是单机架构，直接一台单机就能满足日常业务的需求了
+    - 在过去业务量小的时候，企业用的都是单机架构，直接一台单机就能满足日常业务的需求了
 
-        - 随着互联网的不断发展，公司的业务体量不断扩大，老旧的单机架构已经不能满足日常需求了，于是分布式、微服务这些新架构新方法不断涌现出来
+    - 随着互联网的不断发展，公司的业务体量不断扩大，老旧的单机架构已经不能满足日常需求了，于是分布式、微服务这些新架构新方法不断涌现出来
 
-        - 这也意味着成千上百服务之间的依赖、调用关系越来越复杂，这时候我们迫切的需要一个【中间件】来解耦服务之间的关系，控制资源的合理合时分配以及缓冲流量高峰等等
+    - 这也意味着成千上百服务之间的依赖、调用关系越来越复杂，这时候我们迫切的需要一个【中间件】来解耦服务之间的关系，控制资源的合理合时分配以及缓冲流量高峰等等
 
-    - 消息队列应运而生，消息队列的三大经典场景——异步处理、服务解耦、流量控制
+- 消息队列应运而生，消息队列的三大经典场景——异步处理、服务解耦、流量控制
 
-- [小白debug：Kafka 是什么？](https://mp.weixin.qq.com/s/SNMmCMV-gqkHtWS0Ca3j4g)
+### [小白debug：Kafka 是什么？](https://mp.weixin.qq.com/s/SNMmCMV-gqkHtWS0Ca3j4g)
 
-    - 问题：两个服务 A 和 B。B 服务每秒只能处理 100 个消息，但 A 服务却每秒发出 200 个消息，B 服务哪里顶得住，分分钟被压垮。
+- 问题：两个服务 A 和 B。B 服务每秒只能处理 100 个消息，但 A 服务却每秒发出 200 个消息，B 服务哪里顶得住，分分钟被压垮。
 
-    - 解决方法：没有什么是加一层中间层不能解决的，如果有，那就再加一层。这次我们要加的中间层是 消息队列 Kafka。让 B 在不被压垮的同时，还能处理掉 A 的消息
+- 解决方法：没有什么是加一层中间层不能解决的，如果有，那就再加一层。这次我们要加的中间层是 消息队列 Kafka。让 B 在不被压垮的同时，还能处理掉 A 的消息
 
-    - 消息队列的概念和演变过程：
+- 消息队列的概念和演变过程：
 
-    - 1.offset：为了保护 B 服务，我们很容易想到可以在 B 服务的内存中加入一个队列。
-        - 其实是个链表，链表的每个节点就是一个消息。
-        - 每个节点有一个序号，我们叫它 Offset，记录消息的位置。
-        ![image](./Pictures/mq/mq概念-offset.avif)
-        ![image](./Pictures/mq/mq概念-offset1.avif)
+- 1.offset：为了保护 B 服务，我们很容易想到可以在 B 服务的内存中加入一个队列。
+    - 其实是个链表，链表的每个节点就是一个消息。
+    - 每个节点有一个序号，我们叫它 Offset，记录消息的位置。
+    ![image](./Pictures/mq/mq概念-offset.avif)
+    ![image](./Pictures/mq/mq概念-offset1.avif)
 
-    - 2.独立进程：
-        - 问题：来不及处理的消息会堆积在内存里，如果 B 服务更新重启，这些消息就都丢了。
-        - 解决方法：将队列挪出来，变成一个单独的进程。
-            - 就算 B 服务重启，也不会影响到了队列里的消息。
-            ![image](./Pictures/mq/mq概念-独立进程.avif)
+- 2.独立进程：
+    - 问题：来不及处理的消息会堆积在内存里，如果 B 服务更新重启，这些消息就都丢了。
+    - 解决方法：将队列挪出来，变成一个单独的进程。
+        - 就算 B 服务重启，也不会影响到了队列里的消息。
+        ![image](./Pictures/mq/mq概念-独立进程.avif)
 
-        - 这样一个简陋的队列进程，其实就是所谓的消息队列。
-            - 而像 A 服务这样负责发数据到消息队列的角色，就是生产者，像 B 服务这样处理消息的角色，就是消费者。
-            ![image](./Pictures/mq/mq概念-独立进程1.avif)
+    - 这样一个简陋的队列进程，其实就是所谓的消息队列。
+        - 而像 A 服务这样负责发数据到消息队列的角色，就是生产者，像 B 服务这样处理消息的角色，就是消费者。
+        ![image](./Pictures/mq/mq概念-独立进程1.avif)
 
-    - 高性能：
+- 高性能：
 
-        - 3.topic：
-            - 问题：随着生产者和消费者都变多，我们会发现它们会同时争抢同一个消息队列，抢不到的一方就得等待，这不纯纯浪费时间吗！
-            - 解决方法：对消息进行分类，每一类是一个 *topic*，然后根据 topic 新增队列的数量，生产者将数据按 topic 投递到不同的队列中，消费者则根据需要订阅不同的 topic。这就大大降低了 topic 队列的压力。
-                ![image](./Pictures/mq/mq概念-topic.avif)
+    - 3.topic：
+        - 问题：随着生产者和消费者都变多，我们会发现它们会同时争抢同一个消息队列，抢不到的一方就得等待，这不纯纯浪费时间吗！
+        - 解决方法：对消息进行分类，每一类是一个 *topic*，然后根据 topic 新增队列的数量，生产者将数据按 topic 投递到不同的队列中，消费者则根据需要订阅不同的 topic。这就大大降低了 topic 队列的压力。
+            ![image](./Pictures/mq/mq概念-topic.avif)
 
-        - 4.partition分区：
-            - 单个 topic 的消息还是可能过多，我们可以将单个队列，拆成好几段，每段就是一个 partition分区，每个消费者负责一个 partition。这就大大降低了争抢，提升了消息队列的性能。
-                ![image](./Pictures/mq/mq概念-partition分区.avif)
+    - 4.partition分区：
+        - 单个 topic 的消息还是可能过多，我们可以将单个队列，拆成好几段，每段就是一个 partition分区，每个消费者负责一个 partition。这就大大降低了争抢，提升了消息队列的性能。
+            ![image](./Pictures/mq/mq概念-partition分区.avif)
 
-    - 高可用：
+- 高可用：
 
-        - 5.broker：
-            - 问题：随着 partition 变多，如果 partition 都在同一台机器上的话，就会导致单机 cpu 和内存过高，影响整体系统性能。
-                ![image](./Pictures/mq/mq概念-broker.avif)
-            - 解决方法：将 partition 分散部署在多台机器上，这每一台机器，就代表一个 broker。
-                - 我们可以通过增加 broker 缓解机器 cpu 过高带来的性能问题。
-                ![image](./Pictures/mq/mq概念-broker1.avif)
+    - 5.broker：
+        - 问题：随着 partition 变多，如果 partition 都在同一台机器上的话，就会导致单机 cpu 和内存过高，影响整体系统性能。
+            ![image](./Pictures/mq/mq概念-broker.avif)
+        - 解决方法：将 partition 分散部署在多台机器上，这每一台机器，就代表一个 broker。
+            - 我们可以通过增加 broker 缓解机器 cpu 过高带来的性能问题。
+            ![image](./Pictures/mq/mq概念-broker1.avif)
 
-        - 6.Leader和Follower：
-            - 问题：如果其中一个 partition 所在的 broker 挂了，那 broker 里所有 partition 的消息就都没了。
-            - 解决方法：给 partition 多加几个副本，也就是 replicas。Leader 负责应付生产者和消费者的读写请求，而 Follower 只管同步 Leader 的消息。
-                - 这样 Leader 所在的 broker 挂了，也不会影响到 Follower 所在的 broker, 并且还能从 Follower 中选举出一个新的 Leader partition 顶上。
-                ![image](./Pictures/mq/mq概念-Leader和Follower.avif)
-                ![image](./Pictures/mq/mq概念-Leader和Follower1.avif)
+    - 6.Leader和Follower：
+        - 问题：如果其中一个 partition 所在的 broker 挂了，那 broker 里所有 partition 的消息就都没了。
+        - 解决方法：给 partition 多加几个副本，也就是 replicas。Leader 负责应付生产者和消费者的读写请求，而 Follower 只管同步 Leader 的消息。
+            - 这样 Leader 所在的 broker 挂了，也不会影响到 Follower 所在的 broker, 并且还能从 Follower 中选举出一个新的 Leader partition 顶上。
+            ![image](./Pictures/mq/mq概念-Leader和Follower.avif)
+            ![image](./Pictures/mq/mq概念-Leader和Follower1.avif)
 
-    - 7.持久化和过期策略
-        - 问题：假设所有 broker 都挂了，那岂不是数据全丢了？
-        - 解决方法：
-            - 持久化：不能光把数据放内存里，还要持久化到磁盘中，这样哪怕全部 broker 都挂了，数据也不会全丢，重启服务后，也能从磁盘里读出数据，继续工作。
-                ![image](./Pictures/mq/mq概念-持久化和过期策略.avif)
-            - 过期策略：磁盘总是有限的，这一直往里写数据迟早有一天得炸。所以我们还可以给数据加上保留策略，也就是所谓的 retention policy，比如磁盘数据超过一定大小或消息放置超过一定时间就会被清理掉。
+- 7.持久化和过期策略
+    - 问题：假设所有 broker 都挂了，那岂不是数据全丢了？
+    - 解决方法：
+        - 持久化：不能光把数据放内存里，还要持久化到磁盘中，这样哪怕全部 broker 都挂了，数据也不会全丢，重启服务后，也能从磁盘里读出数据，继续工作。
+            ![image](./Pictures/mq/mq概念-持久化和过期策略.avif)
+        - 过期策略：磁盘总是有限的，这一直往里写数据迟早有一天得炸。所以我们还可以给数据加上保留策略，也就是所谓的 retention policy，比如磁盘数据超过一定大小或消息放置超过一定时间就会被清理掉。
 
-    - 8.consumer group（消费者组）
-        - 问题：按现在的消费方式，每次新增的消费者只能跟着最新的消费 Offset 接着消费。如果我想让新增的消费者从某个 Offset 开始消费呢？
-            - 例子：哪怕 B 服务有多个实例，但本质上，它只有一个消费业务方，新增实例一般也是接着之前的 offset 继续消费。假设现在来了个新的业务方，C 服务，它想从头开始消费消息队列里的数据，这时候就不能跟在 B 服务的 offset 后边继续消费了。
+- 8.consumer group（消费者组）
+    - 问题：按现在的消费方式，每次新增的消费者只能跟着最新的消费 Offset 接着消费。如果我想让新增的消费者从某个 Offset 开始消费呢？
+        - 例子：哪怕 B 服务有多个实例，但本质上，它只有一个消费业务方，新增实例一般也是接着之前的 offset 继续消费。假设现在来了个新的业务方，C 服务，它想从头开始消费消息队列里的数据，这时候就不能跟在 B 服务的 offset 后边继续消费了。
 
-        - 解决方法：加入consumer group（消费者组）的概念，B 和 C 服务各自是一个独立的消费者组，不同消费者组维护自己的消费进度，互不打搅。
-            - 消费者组互相独立
-            ![image](./Pictures/mq/mq概念-consumer_group（消费者组）.avif)
+    - 解决方法：加入consumer group（消费者组）的概念，B 和 C 服务各自是一个独立的消费者组，不同消费者组维护自己的消费进度，互不打搅。
+        - 消费者组互相独立
+        ![image](./Pictures/mq/mq概念-consumer_group（消费者组）.avif)
 
-    - ZooKeeper：组件太多了，而且每个组件都有自己的数据和状态，所以还需要有个组件去统一维护这些组件的状态信息，于是我们引入 ZooKeeper 组件。它会定期和 broker 通信，获取 整个 kafka 集群的状态，以此判断 某些 broker 是不是跪了，某些消费组消费到哪了。
+- ZooKeeper：组件太多了，而且每个组件都有自己的数据和状态，所以还需要有个组件去统一维护这些组件的状态信息，于是我们引入 ZooKeeper 组件。它会定期和 broker 通信，获取 整个 kafka 集群的状态，以此判断 某些 broker 是不是跪了，某些消费组消费到哪了。
+    ![image](./Pictures/mq/ZooKeeper.avif)
+
+### [小白debug：RocketMQ 是什么？它的架构是怎么样的？和 Kafka 又有什么区别？](https://mp.weixin.qq.com/s/oje7PLWHz_7bKWn8M72LUw)
+
+- 作为一个程序员，假设你有 A、B 两个服务，A 服务发出消息后，不想让 B 服务立马处理到。而是要过半小时才让 B 服务处理到，该怎么实现？
+
+    - 这类延迟处理消息的场景非常常见，举个例子，比如我每天早上到公司后都会点个外卖，我希望外卖能在中午送过来，而不是立马送过来，这就需要将外卖消息经过延时后，再投递到商家侧。
+
+    - 当然有，没有什么是加一层中间层不能解决的，如果有，那就再加一层。这次我们要加的中间层是消息队列 RocketMQ。
+
+- RocketMQ 是阿里自研的国产消息队列，目前已经是 Apache 的顶级项目。和其他消息队列一样，它接受来自生产者的消息，将消息分类，每一类是一个 topic，消费者根据需要订阅 topic，获取里面的消息。
+
+- RocketMQ 和 Kafka 的区别
+
+    - RocketMQ 的架构其实参考了 Kafka 的设计思想，同时又在 Kafka 的基础上做了一些调整。
+
+    - 这些调整，用一句话总结就是，"和 Kafka 相比，RocketMQ 在架构上做了减法，在功能上做了加法"。
+
+#### 在架构上做减法
+
+- 简单回顾下消息队列 Kafka 的架构。
+    - kakfa 也是通过多个 topic 对消息进行分类。
+    - 为了提升单个 topic 的并发性能，将单个 topic 拆为多个 partition。
+    - 为了提升系统扩展性，将多个 partition 分别部署在不同 broker 上。
+    - 为了提升系统的可用性，为 partition 加了多个副本。
+    - 为了协调和管理 Kafka 集群的数据信息，引入Zookeeper作为协调节点。
+    ![image](./Pictures/mq/kafka架构.avif)
+
+- 简化协调节点
+
+    - Zookeeper 在 Kafka 架构中会和 broker 通信，维护 Kafka 集群信息。一个新的 broker 连上 Zookeeper 后，其他 broker 就能立马感知到它的加入，像这种能在分布式环境下，让多个实例同时获取到同一份信息的服务，就是所谓的分布式协调服务。
+
         ![image](./Pictures/mq/ZooKeeper.avif)
+
+    - 问题：但 Zookeeper 作为一个通用的分布式协调服务，它不仅可以用于服务注册与发现，还可以用于分布式锁、配置管理等场景。Kafka 其实只用到了它的部分功能，多少有点杀鸡用牛刀的味道。太重了。
+
+        - 解决方法：RocketMQ 直接将 Zookeeper 去掉，换成了 nameserver，用一种更轻量的方式，管理消息队列的集群信息。生产者通过 nameserver 获取到 topic 和 broker 的路由信息，然后再与 broker 通信，实现服务发现和负载均衡的效果。
+
+            ![image](./Pictures/mq/RocketMQ-nameserver.avif)
+
+        - 当然，开发 Kafka 的大佬们后来也意识到了 Zookeeper 过重的问题，所以从 2.8.0 版本就支持将 Zookeeper 移除，通过 在 broker 之间加入一致性算法 raft 实现同样的效果，这就是所谓的 KRaft 或 Quorum 模式。
+            ![image](./Pictures/mq/Kafka-KRaft.avif)
+
+- 简化分区
+
+    - Kafka 会将 topic 拆分为多个 partition，用来提升并发性能。
+        ![image](./Pictures/mq/Kafka-partition分区.avif)
+    - RocketMQ 里也一样，将 topic 拆分成了多个分区，但换了个名字，叫 Queue,也就是"队列"。
+        ![image](./Pictures/mq/RocketMQ-Queue.avif)
+
+    - Kafka 中的 partition 会存储完整的消息体，而 RocketMQ 的 Queue 上却只存一些简要信息，比如消息偏移 offset，而消息的完整数据则放到"一个"叫 commitlog 的文件上，通过 offset 我们可以定位到 commitlog 上的某条消息。
+
+    - Kafka 消费消息，broker 只需要直接从 partition 读取消息返回就好，也就是读第一次就够了。
+        ![image](./Pictures/mq/Kafka-partition读取1次.avif)
+
+    - 而在 RocketMQ 中，broker 则需要先从 Queue 上读取到 offset 的值，再跑到 commitlog 上将完整数据读出来，也就是需要读两次。
+        ![image](./Pictures/mq/RocketMQ-Queue读取2次.avif)
+
+    - 那么问题就来了，看起来 Kafka 的设计更高效？为什么 RocketMQ 不采用 Kafka 的设计？这就不得说一下 Kafka 的底层存储了。
+
+- Kafka 的底层存储
+    - Kafka 的 partition 分区，其实在底层由很多段（segment）组成，每个 segment 可以认为就是个小文件。将消息数据写入到 partition 分区，本质上就是将数据写入到某个 segment 文件下。
+        ![image](./Pictures/mq/Kafka-底层存储segment.avif)
+
+    - 问题：
+        - 我们知道，操作系统的机械磁盘，顺序写的性能会比随机写快很多，差距高达几十倍。为了提升性能，Kafka 对每个小文件都是顺序写。
+        - 如果只有一个 segment 文件，那写文件的性能会很好。
+        - 但当 topic 变多之后，topic 底下的 partition 分区也会变多，对应的 partition 底下的 segment 文件也会变多。同时写多个 topic 底下的 partition，就是同时写多个文件，虽然每个文件内部都是顺序写，但多个文件存放在磁盘的不同地方，原本顺序写磁盘就可能劣化变成了随机写。于是写性能就降低了。
+        ![image](./Pictures/mq/Kafka-底层存储segment1.avif)
+
+        - 究竟多少 topic 才算多？这个看实际情况，我给一个经验值仅供参考，8 个分区的情况下，超过 64 topic, Kafka 性能就会开始下降。
+
+- RocketMQ 的底层存储
+
+    - 为了缓解同时写多个文件带来的随机写问题，RocketMQ 索性将单个 broker 底下的多个 topic 数据，全都写到"一个"逻辑文件 CommitLog 上，这就消除了随机写多文件的问题，将所有写操作都变成了顺序写。大大提升了 RocketMQ 在多 topic 场景下的写性能。
+
+        > 注意上面提到的"一个"是带引号的，虽然逻辑上它是一个大文件，但实际上这个 CommitLog 由多个小文件组成。每个文件的大小是固定的，当一个文件被写满后，会创建一个新的文件来继续存储新的消息。这种方式可以方便地管理和清理旧的消息。
+
+        ![image](./Pictures/mq/RocketMQ-底层存储CommitLog.avif)
+
+- 简化备份模型
+
+    - Kafka 会将 partiton 分散到多个 broker 中，并为 partiton 配置副本，将 partiton 分为 leader和 follower，也就是主和从。broker 中既可能有 A topic 的主 partiton，也可能有 B topic 的从 partiton。
+        - 主从 partiton 之间会建立数据同步，本质上就是同步 partiton 底下的 segment 文件数据
+
+        ![image](./Pictures/mq/Kafka-主从备份.avif)
+
+    - RocketMQ 将 broker 上的所有 topic 数据到写到 CommitLog 上。如果还像 Kafka 那样给每个分区单独建立同步通信，就还得将 CommitLog 里的内容拆开，这就还是退化为随机读了。
+        - 于是 RocketMQ 索性以 broker 为单位区分主从，主从之间同步 CommitLog 文件，保持高可用的同时，也大大简化了备份模型。
+
+        ![image](./Pictures/mq/RocketMQ-主从备份.avif)
+
+- Kafka架构
+    ![image](./Pictures/mq/Kafka架构.avif)
+- RocketMQ架构
+    ![image](./Pictures/mq/RocketMQ架构.avif)
+
+#### 在功能上做加法
+
+- 虽然 RocketMQ 的架构比 Kafka 的简单，但功能却比 Kafka 要更丰富，我们来看下。
+
+- 消息过滤
+
+    - 问题：Kafka 支持通过 topic 将数据进行分类，比如订单数据和用户数据是两个不同的 topic
+        - 但如果我还想再进一步分类呢？比如同样是用户数据，还能根据 vip 等级进一步分类。假设我们只需要获取 vip6 的用户数据，在 Kafka 里，消费者需要消费 topic 为用户数据的所有消息，再将 vip6 的用户过滤出来。
+
+    - 解决方法：RocketMQ 支持对消息打上标记，也就是打 tag，消费者能根据 tag 过滤所需要的数据。比如我们可以在部分消息上标记 tag=vip6，这样消费者就能只获取这部分数据，省下了消费者过滤数据时的资源消耗。
+        ![image](./Pictures/mq/RocketMQ-tag.avif)
+
+- 支持事务
+
+    - Kafka 支持事务，比如生产者发三条消息 ABC，这三条消息要么同时发送成功，要么同时发送失败。
+        ![image](./Pictures/mq/Kafka-事务.avif)
+
+    - RocketMQ 支持的事务能力："执行一些自定义逻辑"和"生产者发消息"这两件事，要么同时成功，要么同时失败。
+        ![image](./Pictures/mq/RocketMQ-事务.avif)
+
+- 加入延时队列
+    - 如果我们希望消息投递出去之后，消费者不能立马消费到，而是过个一定时间后才消费，也就是所谓的延时消息，就像文章开头的定时外卖那样。如果我们使用 Kafka， 要实现类似的功能的话，就会很费劲。
+    - 但 RocketMQ 天然支持延时队列，我们可以很方便实现这一功
+
+- 加入死信队列
+    - 消费消息是有可能失败的，失败后一般可以设置重试。如果多次重试失败，RocketMQ 会将消息放到一个专门的队列，方便我们后面单独处理。这种专门存放失败消息的队列，就是死信队列。
+    - Kafka 原生不支持这个功能，需要我们自己实现。
+
+- 消息回溯
+    - Kafka 支持通过调整 offset 来让消费者从某个地方开始消费
+        - kafka在0.10.1后支持调时间
+    - RocketMQ，除了可以调整 offset, 还支持调整时间
 
 ## 3大应用场景
 
@@ -304,6 +432,55 @@
 # RabbitMQ
 
 - [java技术爱好者：超详细的RabbitMQ入门，看这篇就够了！](https://developer.aliyun.com/article/769883)
+
+# RocketMQ
+
+- [小白debug：RocketMQ 为什么性能不如 Kafka？](https://mp.weixin.qq.com/s/4ZTqvsLzg6-kJFJez4Zkqw)
+
+- RocketMQ 的架构其实参考了 kafka 的设计思想，同时又在 kafka 的基础上做了一些调整。看起来，RocketMQ 好像各方面都比 kafka 更能打。
+
+    - 但 kafka 却一直没被淘汰，RocketMQ 必然是有着不如 kafka 的地方。是啥呢？ 性能，严格来说是吞吐量。
+
+    - 阿里中间件团队对它们做过压测，同样条件下，kafka 比 RocketMQ 快 50%左右。但即使这样，RocketMQ 依然能每秒处理 10w 量级的数据，依旧非常能打。
+
+        - 你不能说 RocketMQ 弱，只能说 Kafka 性能太强了。
+
+- kafka 为什么性能比 RocketMQ 好？
+
+    - 因为 RocketMQ 使用的是 `mmap` 零拷贝技术，而 kafka 使用的是 `sendfile`。
+
+    - 为什么 RocketMQ 不使用 `sendfile`？参考 kafka 抄个作业也不难啊？
+
+        - 我们来看下 `sendfile` 函数长啥样。
+
+            ```c
+            ssize_t sendfile(int out_fd, int in_fd, off_t* offset, size_t count);
+            // num = sendfile(xxx);
+            ```
+
+        - 再来看下 mmap 函数长啥样。
+
+            ```c
+            void *mmap(void *addr, size_t length, int prot, int flags,
+            int fd, off_t offset);
+            // buf = mmap(xxx)
+            ```
+
+        - 注释里写的是两个函数的用法
+
+            - `mmap` 返回的是数据的具体内容，应用层能获取到消息内容并进行一些逻辑处理。
+            - `sendfile` 返回的则是发送成功了几个字节数，具体发了什么内容，应用层根本不知道。
+
+        - RocketMQ 的一些功能，却需要了解具体这个消息内容，方便二次投递等
+            - 比如将消费失败的消息重新投递到死信队列中，如果 RocketMQ 使用 `sendfile`，那根本没机会获取到消息内容长什么样子，也就没办法实现一些好用的功能了。
+
+        - kafka 却没有这些功能特性，追求极致性能，正好可以使用 sendfile。
+
+            - 除了零拷贝以外，kafka 高性能的原因还有很多，比如什么批处理，数据压缩啥的，但那些优化手段 rocketMQ 也都能借鉴一波，唯独这个零拷贝，那是毫无办法。
+
+- kafka 和 RocketMQ 怎么选？
+
+    - 我的标准只有一个，如果是大数据场景，比如你能频繁听到 spark，flink 这些关键词的时候，那就用 kafka。除此之外，如果公司组件支持，尽量用 RocketMQ。
 
 # kafka
 
@@ -726,3 +903,12 @@ advertised.host.name=192.168.239.128
 ## 第三方软件
 
 - [kafka-ui：web ui管理](https://github.com/provectus/kafka-ui)
+
+## 未读
+
+- [Kafka 常用工具脚本总结](https://mp.weixin.qq.com/s/qIrob9I6XgI1eLRd1mBMJA)
+
+- [腾讯云开发者：图解Kafka：架构设计、消息可靠、数据持久、高性能背后的底层原理](https://mp.weixin.qq.com/s/2PEYaSiKzNfB_Ijq69UOJQ)
+
+- [腾讯技术工程：消息队列选型看这一篇就够了](https://mp.weixin.qq.com/s/jWKHAic4Tt4Ohsj4pTmYFw)
+
