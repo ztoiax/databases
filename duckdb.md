@@ -1,3 +1,14 @@
+
+<!-- mtoc-start -->
+
+* [duckdb](#duckdb)
+  * [架构](#架构)
+  * [基本使用](#基本使用)
+* [reference](#reference)
+* [第三方工具](#第三方工具)
+
+<!-- mtoc-end -->
+
 # duckdb
 
 - DuckDB 是一个 In-Process 的 OLAP 数据库，可以理解为 AP 版本的 SQLite，但其底层是列式存储。2019 年 SIGMOD 有一篇 Demo 论文介绍 DuckDB：[an embedded analytical database](https://arxiv.org/abs/1805.08520)
