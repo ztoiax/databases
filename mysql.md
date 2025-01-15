@@ -15,28 +15,41 @@
       * [解剖“全球最大男性交友网站”，GitHub十五年数据库架构演进](#解剖全球最大男性交友网站github十五年数据库架构演进)
   * [日志](#日志)
     * [普通日志](#普通日志)
-    * [binlog (二进制日志)](#binlog-二进制日志)
+    * [一条修改语句的执行过程](#一条修改语句的执行过程)
+    * [BinLog、RedoLog、UndoLog三大日志差异：](#binlogredologundolog三大日志差异)
+      * [Buffer Pool（缓冲池）](#buffer-pool缓冲池)
+        * [如何管理 Buffer Pool？](#如何管理-buffer-pool)
+      * [BinLog和Redo Log的区别](#binlog和redo-log的区别)
+        * [两阶段提交](#两阶段提交)
+        * [组提交：](#组提交)
+          * [爱可生开源社区：MySQL 核心模块揭秘 | 07 期 | 两阶段提交 (1) prepare 阶段](#爱可生开源社区mysql-核心模块揭秘--07-期--两阶段提交-1-prepare-阶段)
+          * [爱可生开源社区：MySQL 核心模块揭秘 | 08 期 | 两阶段提交 (2) commit 阶段](#爱可生开源社区mysql-核心模块揭秘--08-期--两阶段提交-2-commit-阶段)
+    * [BinLog (二进制日志)](#binlog-二进制日志)
       * [解析binlog](#解析binlog)
         * [binlog cache](#binlog-cache)
         * [产生 binlog](#产生-binlog)
-      * [二阶段提交](#二阶段提交)
       * [配置](#配置)
       * [基本命令](#基本命令)
+      * [爱可生开源社区：技术分享 | 如何通过 binlog 定位大事务？](#爱可生开源社区技术分享--如何通过-binlog-定位大事务)
       * [第三方binlog工具](#第三方binlog工具)
         * [mysqlbinlog 日志分析](#mysqlbinlog-日志分析)
           * [--flashback 还原被添加、删除、修改的数据](#--flashback-还原被添加删除修改的数据)
         * [binlog2sql](#binlog2sql)
         * [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](#analysis_binlog查看分析binlog统计dml多个binlog并行解析)
         * [reverse_sql](#reverse_sql)
-    * [redo log (重做日志)](#redo-log-重做日志)
-      * [一树一溪：Redo 日志从产生到写入日志文件](#一树一溪redo-日志从产生到写入日志文件)
-    * [binlog和redo log](#binlog和redo-log)
-    * [undo log（回滚日志）](#undo-log回滚日志)
-    * [undo log的存储结构](#undo-log的存储结构)
+    * [Redo Log (重做日志)](#redo-log-重做日志)
+      * [写入机制](#写入机制)
+      * [redo log file日志文件组](#redo-log-file日志文件组)
+        * [一树一溪：Redo 日志从产生到写入日志文件](#一树一溪redo-日志从产生到写入日志文件)
+    * [Undo Log（回滚日志）](#undo-log回滚日志)
+      * [Undo Tablespace（表空间）](#undo-tablespace表空间)
+        * [历史演变](#历史演变)
+        * [配置和维护](#配置和维护)
+      * [MVCC](#mvcc)
     * [其他日志工具](#其他日志工具)
       * [mysqlsla：分析日志](#mysqlsla分析日志)
   * [性能优化](#性能优化)
-    * [profile 记录查询响应时间](#profile-记录查询响应时间)
+    * [profile 记录每条查询的具体时间](#profile-记录每条查询的具体时间)
     * [记录计数器](#记录计数器)
   * [监控相关](#监控相关)
     * [informantion_schema数据库](#informantion_schema数据库)
@@ -81,32 +94,45 @@
     * [高可用方案](#高可用方案)
     * [MHA](#mha)
     * [MGR（MySQL Group Replication）](#mgrmysql-group-replication)
+      * [AustinDatabases：MySQL Innodb Cluster 高可用推广“失败” 了？](#austindatabasesmysql-innodb-cluster-高可用推广失败-了)
   * [中间件](#中间件)
     * [DBLE](#dble)
   * [备份与恢复](#备份与恢复)
-    * [备份工具性能对比](#备份工具性能对比)
-    * [导出不同文件格式](#导出不同文件格式)
-    * [LOAD DATA/OUTFILE 导入/导出文件](#load-dataoutfile-导入导出文件)
-    * [mysqldump 备份和恢复](#mysqldump-备份和恢复)
-    * [mydumper：比mysqldump更快](#mydumper比mysqldump更快)
-    * [go-mydumper：比mysqldump更快](#go-mydumper比mysqldump更快)
-    * [MySQL解决方案工程师：InnoDB的物理备份方法](#mysql解决方案工程师innodb的物理备份方法)
-    * [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](#mysql解决方案工程师使用可移动表空间执行innodb备份)
-    * [XtraBackup 热备份](#xtrabackup-热备份)
-      * [安装](#安装)
+    * [备份工具优缺点梳理](#备份工具优缺点梳理)
+    * [逻辑备份](#逻辑备份)
+      * [LOAD DATA/OUTFILE 导入/导出文件](#load-dataoutfile-导入导出文件)
+      * [mysqldump 备份和恢复](#mysqldump-备份和恢复)
+        * [参数](#参数)
+        * [备份的基本流程](#备份的基本流程)
+        * [基本使用](#基本使用)
+      * [mydumper：比mysqldump更快](#mydumper比mysqldump更快)
+      * [go-mydumper：比mysqldump更快](#go-mydumper比mysqldump更快)
+    * [物理备份](#物理备份)
+      * [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](#mysql解决方案工程师使用可移动表空间执行innodb备份)
+      * [XtraBackup（PXB）](#xtrabackuppxb)
+        * [备份流程](#备份流程)
+        * [基本使用](#基本使用-1)
+          * [--stream流备份、远程备份](#--stream流备份远程备份)
+      * [clone插件](#clone插件)
+        * [备份流程](#备份流程-1)
+        * [参数](#参数-1)
+        * [基本命令](#基本命令-1)
+          * [如何查看克隆操作的进度](#如何查看克隆操作的进度)
+          * [如何基于克隆数据搭建从库](#如何基于克隆数据搭建从库)
     * [MySQL解决方案工程师：MySQL的备份工具——MySQL企业版备份](#mysql解决方案工程师mysql的备份工具mysql企业版备份)
       * [备份](#备份)
       * [恢复](#恢复)
+    * [ibd2sql](#ibd2sql)
   * [OnlineDDL](#onlineddl)
     * [OnlineDDL变更工具](#onlineddl变更工具)
       * [直接alter table](#直接alter-table)
         * [不适合的场景](#不适合的场景)
       * [gh-ost](#gh-ost)
-        * [基本使用](#基本使用)
+        * [基本使用](#基本使用-2)
         * [爱可生开源社区：社区投稿 | gh-ost 原理剖析](#爱可生开源社区社区投稿--gh-ost-原理剖析)
         * [InsideMySQL：gh-ost 翻车！使用后导致数据丢失！](#insidemysqlgh-ost-翻车使用后导致数据丢失)
       * [pt-osc（pt-online-schema-change）](#pt-oscpt-online-schema-change)
-        * [参数](#参数)
+        * [参数](#参数-2)
         * [例子：将列类型由 char(20) 修改为 varchar(200)](#例子将列类型由-char20-修改为-varchar200)
         * [索引添加到一半的时候，如何停止？](#索引添加到一半的时候如何停止)
         * [pt-osc工具引发的主从延迟](#pt-osc工具引发的主从延迟)
@@ -159,6 +185,7 @@
       * [MySQL学习：MySQL:自增不连续的几种情况总结](#mysql学习mysql自增不连续的几种情况总结)
   * [监控](#监控)
     * [爱可生开源社区：技术译文 | 分析 MySQL 中的内存使用情况](#爱可生开源社区技术译文--分析-mysql-中的内存使用情况)
+    * [奇妙的Linux世界：MySQL 数据库监控、管理和可观测性工具 PMM 入门指南](#奇妙的linux世界mysql-数据库监控管理和可观测性工具-pmm-入门指南)
   * [极限值测试](#极限值测试)
   * [benchmark(基准测试)](#benchmark基准测试)
     * [sysbench](#sysbench)
@@ -579,48 +606,654 @@ show variables like '%log%file%';
     SET GLOBAL slow_query_log = 'ON';
     ```
 
-### binlog (二进制日志)
+### 一条修改语句的执行过程
+
+- [转转技术：MySQL核心揭秘：从查询到修改，彻底理解 Undo Log、Redo Log、Binlog 与 ACID 的关系](https://mp.weixin.qq.com/s/B3I7lEoCaNtB-_1cuikZsw)
+
+- 一条SQL为例 update table set name=“张三” where id = 10。
+
+- 简化的流程：
+
+    ![image](./Pictures/mysql/一条sql修改语句的执行过程-简化流程.avif)
+
+    - 1.找存储引擎取到 id = 10 这一行记录。
+    - 2.根据主键索引树找到这一行，如果 id = 10 这一行所在的数据页本来就在内存池（Buffer Pool）中，就直接返回给执行器；否则，需要先从磁盘读入内存池，然后再返回。
+    - 3.记录Undo Log日志，对数据进行备份，便于回滚。
+    - 4.拿到存储引擎返回的行记录，把 name 字段设置为 “张三”，得到一行新的记录，然后再调用存储引擎的接口写入这行新记录。
+    - 5.将这行新数据更新到内存中，同时将这个更新操作记录到 Redo Log 里面，为 Redo Log 中的事务打上 prepare 标识。然后告知执行器执行完成了，随时可以提交事务。
+    - 6.生成这个操作的 Binlog，并把 Binlog 写入磁盘。
+    - 7.提交事务。
+    - 8.把刚刚写入的 Redo Log 状态改成提交（commit）状态，更新完成。
+
+- 全流程：
+
+    ![image](./Pictures/mysql/一条sql修改语句的执行过程-全流程.avif)
+
+    - 1.首先客户端发送一条 SQL 语句到 Server 层的 SQL interface。
+    - 2.SQL interface 接到该请求后，先对该条语句进行解析，验证权限是否匹配，也就是在我们上文中讲到的执行器中在执行。
+    - 3.验证通过以后，分析器会对该语句分析，是否语法有错误等。
+    - 4.接下来是优化器生成相应的执行计划，选择最优的执行计划，然后是执行器根据执行计划执行这条语句。
+    - 5.执行器从Buffer Pool中获取数据页的数据，如果数据页没有，需要从磁盘中进行加载。
+    - 6.开启事务，修改数据之前先记录Undo Log，写入Buffer Pool的Undo Page。
+    - 7.开始更新数据页中的记录，被修改的数据页称为脏页，修改会被记录到内存中的 Redo Log Buffer中，再刷盘到磁盘的Redo Log文件，此时事务是 `perpare`阶段（两阶段提交的第1阶段）。
+    - 8.这个时候更新就完成了，当时脏页不会立即写入磁盘，而是由后台线程完成，这里会用double write来保证脏页刷盘的可靠性。
+    - 9.通知Server层，可以正式提交数据了，执行器记录Binlog cache，事务提交时才会将该事务中的Binlog刷新到磁盘中。
+    - 10.这个时候Update语句完成了Buffer Pool中数据页的修改、Undo Log、Redo Log缓存记录，以及记录Binlog cache缓存。
+    - 11.将Redo Log中事务状态标记为`commit阶段`（两阶段提交的第2阶段）。
+    - 12.此时Binlog和Redo Log都已经写入磁盘，如果触发了刷新脏页的操作，先把脏页copy到double write buffer里，double write buffer 的内存数据刷到磁盘中的共享表空间 ibdata，再刷到数据磁盘上数据文件 ibd。
+
+    - 以上就是修改语句的全部流程，可以看到，上图中涉及刷盘的操作本初没有详细讲解，刷盘要结合三大日志（ Undo Log、Redo Log和Binlog日志）。
+
+
+### BinLog、RedoLog、UndoLog三大日志差异：
+
+- [小林coding：MySQL 日志：undo log、redo log、binlog 有什么用？](https://xiaolincoding.com/mysql/log/how_update.html#%E4%B8%BA%E4%BB%80%E4%B9%88%E9%9C%80%E8%A6%81-undo-log)
+
+- [小许code：结合MySQL更新流程看 undolog、redolog、binlog](https://mp.weixin.qq.com/s/NAvFdfltAeuRnYiJlD3HLQ)
+
+- 只记录对数据库更改的所有操作如（`INSERT`、`UPDATE`、`DELETE`），不包括 `SELECT`，`SHOW` 等这类操作不修改数据的语句
+
+- binlog是逻辑日志，在Server层中，位于每条线程中。
+
+- redolog、undolog都是物理日志，都是InnoDB引擎中的日志。而且都是在Buffer Pool中
+    - 并且每种日志在磁盘中的的归档方式和文件都是不一样的
+
+    ![image](./Pictures/mysql/binlog_and_redolog.avif)
+
+    ![image](./Pictures/mysql/binlog_and_redolog_and_undolog.avif)
+
+- WAL的核心思想是`先写日志，再写磁盘`；目的是将随机写转变为了顺序写
+    - MySQL真正使用WAL的原因是：机械磁盘的性能。日志是顺序写io，而数据页是随机写io。
+    - 顺序写的性能更高，所以先把日志归档。
+        - 由于顺序写入大概率是在一个磁盘块内，这样产生的IO次数也大大降低。
+
+#### Buffer Pool（缓冲池）
+
+- [小林coding：揭开 Buffer Pool 的面纱](https://xiaolincoding.com/mysql/buffer_pool/buffer_pool.html#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E6%9C%89-buffer-pool)
+
+- Buffer Pool（缓冲池）
+
+    ![image](./Pictures/mysql/Buffer_Pool（缓冲池）.avif)
+
+    - 当读取数据时，如果数据存在于 Buffer Pool 中，客户端就会直接读取 Buffer Pool 中的数据，否则再去磁盘中读取。
+
+    - 当修改数据时，如果数据存在于  Buffer Pool  中，那直接修改 Buffer Pool 中数据所在的页，然后将其页设置为脏页（该页的内存数据和磁盘上的数据已经不一致），为了减少磁盘I/O，不会立即将脏页写入磁盘，后续由后台线程选择一个合适的时机将脏页写入到磁盘。
+
+- Buffer Pool 有多大？
+    - Buffer Pool 是在 MySQL 启动的时候，向操作系统申请的一片连续的内存空间，默认配置下 Buffer Pool 只有 `128MB` 。
+    - 可以通过调整 `innodb_buffer_pool_size` 参数来设置 Buffer Pool 的大小，一般建议设置成可用物理内存的 60%~80%。
+    ```sql
+    show variables like 'innodb_buffer_pool_size';
+    +-------------------------+-----------+
+    | Variable_name           | Value     |
+    +-------------------------+-----------+
+    | innodb_buffer_pool_size | 134217728 |
+    +-------------------------+-----------+
+    ```
+
+- Buffer Pool 缓存什么？
+
+    - Buffer Pool 除了缓存「索引页」和「数据页」，还包括了 Undo 页，插入缓存、自适应哈希索引、锁信息等等。
+
+    - 在 MySQL 启动的时候，InnoDB 会为 Buffer Pool 申请一片连续的内存空间，然后按照默认的16KB的大小划分出一个个的页， Buffer Pool 中的页就叫做缓存页。此时这些缓存页都是空闲的，之后随着程序的运行，才会有磁盘上的页被缓存到 Buffer Pool 中。
+
+    - 当我们查询一条记录时，InnoDB 是会把整个页的数据加载到 Buffer Pool 中，因为，通过索引只能定位到磁盘中的页，而不能定位到页中的一条记录。将页加载到 Buffer Pool 后，再通过页里的页目录去定位到某条具体的记录。
+
+- 为了更好的管理这些在 Buffer Pool 中的缓存页，InnoDB 为每一个缓存页都创建了一个`控制块`
+
+    - `控制块`信息包括「缓存页的表空间、页号、缓存页地址、链表节点」等等。
+
+    - `控制块`也是占有内存空间的，它是放在 Buffer Pool 的最前面，接着才是缓存页，如下图：
+        ![image](./Pictures/mysql/Buffer_Pool-控制块.avif)
+        - `碎片空间`：上图中控制块和缓存页之间灰色部分
+
+##### 如何管理 Buffer Pool？
+
+- 如何管理空闲页？
+
+    - Buffer Pool 是一片连续的内存空间，当 MySQL 运行一段时间后，这片连续的内存空间中的缓存页既有空闲的，也有被使用的。
+        - 那当我们从磁盘读取数据的时候，总不能通过遍历这一片连续的内存空间来找到空闲的缓存页吧，这样效率太低了。
+        - 所以，为了能够快速找到空闲的缓存页，可以使用链表结构，将空闲缓存页的「控制块」作为链表的节点，这个链表称为 `Free链表`（空闲链表）。
+        ![image](./Pictures/mysql/Buffer_Pool-Free链表.avif)
+
+    - Free 链表上除了有控制块，还有一个头节点，该头节点包含链表的头节点地址，尾节点地址，以及当前链表中节点的数量等信息。
+
+    - Free 链表节点是一个一个的控制块，而每个控制块包含着对应缓存页的地址，所以相当于 Free 链表节点都对应一个空闲的缓存页。
+
+    - 有了 Free 链表后，每当需要从磁盘中加载一个页到 Buffer Pool 中时，就从 Free链表中取一个空闲的缓存页，并且把该缓存页对应的控制块的信息填上，然后把该缓存页对应的控制块从 Free 链表中移除。
+
+- 如何管理脏页？
+
+    - 设计 Buffer Pool 除了能提高读性能，还能提高写性能，也就是更新数据的时候，不需要每次都要写入磁盘，而是将 Buffer Pool 对应的缓存页标记为脏页，然后再由后台线程将脏页写入到磁盘。
+
+    - 那为了能快速知道哪些缓存页是脏的，于是就设计出 Flush 链表，它跟 Free 链表类似的，链表的节点也是控制块，区别在于 `Flush 链表`的元素都是脏页。
+        ![image](./Pictures/mysql/Buffer_Pool-Flush链表.avif)
+
+- 如何提高缓存命中率？
+
+    - 淘汰策略：Buffer Pool  的大小是有限的，对于一些频繁访问的数据我们希望可以一直留在 Buffer Pool 中，而一些很少访问的数据希望可以在某些时机可以淘汰掉，从而保证 Buffer Pool  不会因为满了而导致无法再缓存新的数据，同时还能保证常用数据留在 Buffer Pool 中。
+
+    - LRU（Least recently used）算法：
+        - 当访问的页在 Buffer Pool  里，就直接把该页对应的 LRU 链表节点移动到链表的头部。
+        - 当访问的页不在 Buffer Pool 里，除了要把页放入到 LRU 链表的头部，还要淘汰  LRU 链表末尾的节点。
+
+- 到这里我们可以知道，Buffer Pool 里有三种页和链表来管理数据。
+
+    ![image](./Pictures/mysql/Buffer_Pool-3种页和链表.avif)
+
+    - Free Page（空闲页），表示此页未被使用，位于 Free 链表；
+    - Clean Page（干净页），表示此页已被使用，但是页面未发生修改，位于LRU 链表。
+    - Dirty Page（脏页），表示此页「已被使用」且「已经被修改」，其数据和磁盘上的数据已经不一致。当脏页上的数据写入磁盘后，内存数据和磁盘数据一致，那么该页就变成了干净页。脏页同时存在于 LRU 链表和 Flush 链表。
+
+    - **简单的 LRU 算法并没有被  MySQL 使用**，因为简单的 LRU 算法无法避免下面这两个问题：
+        - 1.预读失效；
+        - 2.Buffer Pool  污染；
+
+    - 1.预读失效；
+
+        - 预读机制：MySQL 在加载数据页时，会提前把它相邻的数据页一并加载进来，目的是为了减少磁盘 IO。
+            - 但是可能这些被提前加载进来的数据页，并没有被访问，相当于这个预读是白做了，这个就是预读失效。
+
+        - 问题：如果这些预读页如果一直不会被访问到，就会出现一个很奇怪的问题，不会被访问的预读页却占用了 LRU 链表前排的位置，而末尾淘汰的页，可能是频繁访问的页，这样就大大降低了缓存命中率。
+
+        - 解决方法：要避免预读失效带来影响，最好就是让预读的页停留在 Buffer Pool 里的时间要尽可能的短，让真正被访问的页才移动到 LRU 链表的头部，从而保证真正被读取的热数据留在 Buffer Pool 里的时间尽可能长。
+
+            - MySQL 改进了 LRU 算法，将 LRU 划分了 2 个区域：`old` 区域 和 `young` 区域。
+                - `young` 区域在 LRU 链表的前半部分，`old` 区域则是在后半部分
+
+                ![image](./Pictures/mysql/Buffer_Pool-mysql改进的LRU算法.avif)
+
+                - old 区域占整个 LRU 链表长度的比例可以通过 `innodb_old_blocks_pct` 参数来设置，默认是 37，代表整个 LRU 链表中 young 区域与 old 区域比例是 63:37。
+
+                    ```sql
+                    show variables like 'innodb_old_blocks_pct';
+                    +-----------------------+-------+
+                    | Variable_name         | Value |
+                    +-----------------------+-------+
+                    | innodb_old_blocks_pct | 37    |
+                    +-----------------------+-------+
+                    ```
+
+                - 划分这两个区域后，预读的页就只需要加入到 old 区域的头部，当页被真正访问的时候，才将页插入 young 区域的头部。如果预读的页一直没有被访问，就会从 old 区域移除，这样就不会影响 young 区域中的热点数据。
+
+                - 虽然通过划分 old 区域 和 young 区域避免了预读失效带来的影响，但是还有个问题无法解决，那就是  Buffer Pool  污染的问题。
+
+            - 例子：
+                - 假设有一个长度为 10 的 LRU 链表，其中 young 区域占比 70 %，old 区域占比 30 %。
+                    ![image](./Pictures/mysql/Buffer_Pool-mysql改进的LRU算法-例子.avif)
+                - 现在有个编号为 20 的页被预读了，这个页只会被插入到  old 区域头部，而 old 区域末尾的页（10号）会被淘汰掉。
+                    ![image](./Pictures/mysql/Buffer_Pool-mysql改进的LRU算法-例子1.avif)
+                - 如果 20 号页一直不会被访问，它也没有占用到 young 区域的位置，而且还会比 young 区域的数据更早被淘汰出去。
+
+                - 如果 20 号页被预读后，立刻被访问了，那么就会将它插入到 young 区域的头部，young 区域末尾的页（7号），会被挤到 old 区域，作为 old 区域的头部，这个过程并不会有页被淘汰。
+                    ![image](./Pictures/mysql/Buffer_Pool-mysql改进的LRU算法-例子2.avif)
+
+    - 2.Buffer Pool  污染；
+
+        - Buffer Pool  污染：当某一个 SQL 语句扫描了大量的数据时，在  Buffer Pool 空间比较有限的情况下，可能会将 Buffer Pool 里的所有页都替换出去，导致大量热数据被淘汰了，等这些热数据又被再次访问的时候，由于缓存未命中，就会产生大量的磁盘 IO，MySQL 性能就会急剧下降
+
+            > 类似于缓存雪崩
+
+            - 比如，在一个数据量非常大的表，执行了这条语句：
+
+                ```sql
+                select * from t_user where name like "%xiaolin%";
+                ```
+            - 可能这个查询出来的结果就几条记录，但是由于这条语句会发生索引失效，所以这个查询过程是全表扫描的，接着会发生如下的过程：
+                - 从磁盘读到的页加入到 LRU 链表的 old 区域头部；
+                - 当从页里读取行记录时，也就是页被访问的时候，就要将该页放到 young 区域头部；
+                - 接下来拿行记录的 name 字段和字符串 xiaolin 进行模糊匹配，如果符合条件，就加入到结果集里；
+                - 如此往复，直到扫描完表中的所有记录。
+                - 经过这一番折腾，原本 young 区域的热点数据都会被替换掉。
+
+            - 例子：假设需要批量扫描：21，22，23，24，25 这五个页，这些页都会被逐一访问（读取页里的记录）。
+
+                ![image](./Pictures/mysql/Buffer_Pool污染-例子.avif)
+                - 在批量访问这些数据的时候，会被逐一插入到 young 区域头部。
+                ![image](./Pictures/mysql/Buffer_Pool污染-例子1.avif)
+
+                - 可以看到，原本在 young 区域的热点数据 6 和 7 号页都被淘汰了，这就是  Buffer Pool  污染的问题。
+
+        - 解决方法
+
+            - 像前面这种全表扫描的查询，很多缓冲页其实只会被访问一次，但是它却只因为被访问了一次而进入到 young 区域，从而导致热点数据被替换了。
+
+                - LRU 链表中 young 区域就是热点数据，只要我们提高进入到 young 区域的门槛，就能有效地保证 young 区域里的热点数据不会被替换掉。
+
+            - MySQL 是这样做的，进入到 young 区域条件增加了一个**停留在 old 区域的时间判断。**
+                - 具体是这样做的，在对某个处在 old 区域的缓存页进行第一次访问时，就在它对应的控制块中记录下来这个访问时间：
+                    - 如果后续的访问时间与第一次访问的时间**在某个时间间隔内**，那么该缓存页就不会被从 old 区域移动到 young 区域的头部；
+                    - 如果后续的访问时间与第一次访问的时间**不在某个时间间隔内**，那么该缓存页移动到 young 区域的头部；
+
+                - 这个间隔时间是由 `innodb_old_blocks_time` 控制的，默认是 1000 ms。
+                    ```sql
+                    show variables like 'innodb_old_blocks_time';
+                    +------------------------+-------+
+                    | Variable_name          | Value |
+                    +------------------------+-------+
+                    | innodb_old_blocks_time | 1000  |
+                    +------------------------+-------+
+                    ```
+
+                - 也就说，只有同时满足「被访问」与「在 old 区域停留时间超过 1 秒」两个条件，才会被插入到 young 区域头部，这样就解决了 Buffer Pool  污染的问题 。
+
+            - 另外，MySQL 针对 young 区域其实做了一个优化，为了防止 young 区域节点频繁移动到头部。young 区域前面 1/4 被访问不会移动到链表头部，只有后面的 3/4被访问了才会。
+
+#### BinLog和Redo Log的区别
+
+- 为什么有了 binlog， 还要有 redo log？
+
+    - 其实redo log、bin log都是记录更新数据库的操作，为啥要设计两个日志呢，这个问题跟 MySQL 的时间线有关系。
+    - 最开始 MySQL 里并没有 InnoDB 引擎，MySQL 自带的引擎是 MyISAM，但是 MyISAM 没有 crash-safe 的能力，binlog 日志只能用于归档。
+    - InnoDB引擎 是另一个公司以插件形式引入 MySQL 的，而MYSQL的bin log没有灾难恢复能力，所以 InnoDB 使用 redo log 来实现 crash-safe 能力，确保任何事务提交后数据都不会丢失。
+
+- 位置不同：
+
+    - binlog是逻辑日志：记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
+
+        - 不管用什么存储引擎，只要发生了表数据更新，都会产生binlog日志。
+
+        - 只记录对数据库更改的所有操作，不包括 `select`，`show` 等这类操作不修改数据的语句
+
+    - redo log它是物理日志：记录内容是“在某个数据页上做了什么修改”，属于InnoDB存储引擎。
+
+        ![image](./Pictures/mysql/binlog_and_redolog.avif)
+
+- 写入方式不同：
+    - binlog 是追加写，写满一个文件，就创建一个新的文件继续写，不会覆盖以前的日志，保存的是全量的日志。
+    - redo log 是循环写，日志空间大小是固定，全部写满就从头开始，保存未被刷入磁盘的脏页日志。
+
+- 虽然它们都属于持久化的保证，但是则重点不同。
+
+    - 在执行更新语句过程，会记录redo log与binlog两块日志，以基本的事务为单位，redo log在事务执行过程中可以不断写入，而binlog只有在提交事务时才写入，所以redo log与binlog的写入时机不一样。
+
+    ![image](./Pictures/mysql/binlog_and_redolog1.avif)
+
+- 用途不同：
+    - binlog 用于备份恢复、主从复制
+    - redo log 用于掉电等故障恢复
+
+    - 如果不小心整个数据库的数据被删除了，能使用 redo log 文件恢复数据吗？
+        - 因为 redo log  文件是循环写，是会边写边擦除日志的，只记录未被刷入磁盘的数据的物理日志，已经刷入磁盘的数据都会从 redo log 文件里擦除。
+        - binlog 文件保存的是全量的日志，也就是保存了所有数据变更的情况，理论上只要记录在 binlog 上的数据，都可以恢复，所以如果不小心整个数据库的数据被删除了，得用 binlog 文件恢复数据。
+
+##### 两阶段提交
+
+- redo log与binlog两份日志之间的逻辑不一致，会出现什么问题？
+
+    - 假设执行过程中写完redo log日志后，binlog日志写期间发生了异常，会出现什么情况呢？
+
+        ![image](./Pictures/mysql/binlog_and_redolog2.avif)
+        ![image](./Pictures/mysql/binlog_and_redolog3.avif)
+
+    - 解决方法：两阶段提交。将redo log的写入拆成了两个步骤prepare和commit，这就是两阶段提交。
+        ![image](./Pictures/mysql/binlog_and_redolog4.avif)
+
+        - 使用两阶段提交后，写入binlog时发生异常也不会有影响，因为MySQL根据redo log日志恢复数据时，发现redo log还处于prepare阶段，并且没有对应binlog日志，就会回滚该事务。
+        ![image](./Pictures/mysql/binlog_and_redolog5.avif)
+
+    - 例子：
+        - 假设 id = 1 这行数据的字段 name 的值原本是 'jay'，然后执行 UPDATE t_user SET name = 'xiaolin' WHERE id = 1; 如果在持久化 redo log 和 binlog 两个日志的过程中，出现了半成功状态，那么就有两种情况：
+        - 1.如果在将 redo log 刷入到磁盘之后：MySQL 突然宕机了，而 binlog 还没有来得及写入。MySQL 重启后，通过 redo log 能将 Buffer Pool 中 id = 1 这行数据的 name 字段恢复到新值 xiaolin，但是 binlog 里面没有记录这条更新语句，在主从架构中，binlog 会被复制到从库，由于 binlog 丢失了这条更新语句，从库的这一行 name 字段是旧值 jay，与主库的值不一致性；
+        - 2.如果在将 binlog 刷入到磁盘之后：MySQL 突然宕机了，而 redo log 还没有来得及写入。由于 redo log 还没写，崩溃恢复以后这个事务无效，所以 id = 1 这行数据的 name 字段还是旧值 jay，而 binlog 里面记录了这条更新语句，在主从架构中，binlog 会被复制到从库，从库执行了这条更新语句，那么这一行 name 字段是新值 xiaolin，与主库的值不一致性；
+
+- 两阶段提交把单个事务的提交拆分成了 2 个阶段：两阶段提交是一种用于保证分布式事务原子性的协议。
+    - 1.prepare 阶段：写binlog、redo log
+    - 2.commit 阶段：把binlog、redo log刷盘
+
+    - 举个拳击比赛的例子，两位拳击手（参与者）开始比赛之前，裁判（协调者）会在中间确认两位拳击手的状态，类似于问你准备好了吗？
+        - 准备阶段：裁判（协调者）会依次询问两位拳击手（参与者）是否准备好了，然后拳击手听到后做出应答，如果觉得自己准备好了，就会跟裁判说准备好了；如果没有自己还没有准备好（比如拳套还没有带好），就会跟裁判说还没准备好。
+        - 提交阶段：如果两位拳击手（参与者）都回答准备好了，裁判（协调者）宣布比赛正式开始，两位拳击手就可以直接开打；如果任何一位拳击手（参与者）回答没有准备好，裁判（协调者）会宣布比赛暂停，对应事务中的回滚操作。
+
+- 两阶段提交有什么问题？性能
+    - 磁盘 I/O 次数高：对于“双1”配置，每个事务提交都会进行两次 fsync（刷盘），一次是 redo log 刷盘，另一次是 binlog 刷盘。
+    - 锁竞争激烈：两阶段提交虽然能够保证「单事务」两个日志的内容一致，但在「多事务」的情况下，却不能保证两者的提交顺序一致，因此，在两阶段提交的流程基础上，还需要加一个锁来保证提交的原子性，从而保证多事务的情况下，两个日志的提交顺序一致。
+
+- MySQL 把 binlog 也看作一个存储引擎，开启 binlog，SQL 语句改变（插入、更新、删除）InnoDB 表的数据，这个 SQL 语句执行过程中，就涉及到两个存储引擎。
+
+    - 使用两阶段提交，就是为了保证2个存储引擎的数据一致性。
+
+        - 如果没有开启 binlog，SQL 语句改变表中数据，不产生 binlog，不用保证 binlog 和表中数据的一致性，用户事务也就不需要使用两阶段提交了。
+
+    - 用户事务提交分为2种场景，如果开启了 binlog，它们都会使用两阶段提交。
+
+        - 1.通过 `BEGIN` 或其它开始事务的语句，显式开始一个事务，用户手动执行 `COMMIT` 语句提交事务。
+
+        - 2.没有显式开始的事务，一条 SQL 语句执行时，InnoDB 会隐式开始一个事务，SQL 语句执行完成之后，自动提交事务。
+
+- 两阶段提交的过程是怎样的？
+
+    - 在 MySQL 的 InnoDB 存储引擎中，开启 binlog 的情况下，MySQL 会同时维护 binlog 日志与 InnoDB 的 redo log，为了保证这两个日志的一致性，MySQL 使用了`内部 XA 事务`（是的，也有外部  XA 事务，跟本文不太相关，我就不介绍了），内部 XA 事务由 binlog 作为协调者，存储引擎是参与者。
+
+    - 当客户端执行 commit 语句或者在自动提交的情况下，MySQL 内部开启一个 XA 事务，`分两阶段来完成 XA 事务的提交`，如下图：
+
+        ![image](./Pictures/mysql/两阶段提交过程.avif)
+
+    - 从图中可看出，事务的提交过程有两个阶段，就是将 redo log 的写入拆成了两个步骤：`prepare` 和 `commit`，中间再穿插写入binlog，具体如下：
+        - `prepare` 阶段：将 XID（内部 XA 事务的 ID） 写入到 redo log，同时将 redo log 对应的事务状态设置为 prepare，然后将 redo log 持久化到磁盘（innodb_flush_log_at_trx_commit = 1 的作用）；
+        - `commit` 阶段：把 XID  写入到 binlog，然后将 binlog 持久化到磁盘（sync_binlog = 1 的作用），接着调用引擎的提交事务接口，将 redo log 状态设置为 commit，此时该状态并不需要持久化到磁盘，只需要 write 到文件系统的 page cache 中就够了，因为只要 binlog 写磁盘成功，就算 redo log 的状态还是 prepare 也没有关系，一样会被认为事务已经执行成功；
+
+- 异常重启会出现什么现象？
+
+    ![image](./Pictures/mysql/两阶段提交过程-异常重启.avif)
+
+    - 不管是时刻 A（redo log 已经写入磁盘， binlog 还没写入磁盘），还是时刻 B （redo log 和 binlog 都已经写入磁盘，还没写入 commit 标识）崩溃，**此时的 redo log 都处于 prepare 状态。**
+        - **如果 binlog 中没有当前内部 XA 事务的 XID，说明 redolog 完成刷盘，但是 binlog 还没有刷盘，则回滚事务。**对应时刻 A 崩溃恢复的情况。
+        - **如果 binlog 中有当前内部 XA 事务的 XID，说明 redolog 和 binlog 都已经完成了刷盘，则提交事务。**对应时刻 B 崩溃恢复的情况。
+
+    - 可以看到，**对于处于 prepare 阶段的 redo log，即可以提交事务，也可以回滚事务，这取决于是否能在 binlog 中查找到与 redo log 相同的  XID**，如果有就提交事务，如果没有就回滚事务。这样就可以保证 redo log 和 binlog 这两份日志的一致性了。
+
+    - 所以说，**两阶段提交是以 binlog 写成功为事务提交成功的标识**，因为 binlog 写成功了，就意味着能在 binlog 中查找到与 redo log 相同的  XID。
+
+##### 组提交：
+
+- **MySQL  引入了 binlog 组提交（group commit）机制，当有多个事务提交的时候，会将多个 binlog 刷盘操作合并成一个，从而减少磁盘 I/O 的次数**，如果说 10 个事务依次排队刷盘的时间成本是 10，那么将这 10 个事务一次性一起刷盘的时间成本则近似于 1。
+
+    - 引入了组提交机制后，prepare 阶段不变，只针对 commit 阶段，将 commit 阶段拆分为三个过程：
+        - flush 阶段：多个事务按进入的顺序将 binlog 从 cache 写入文件（不刷盘）；
+        - sync 阶段：对 binlog 文件做 fsync 操作（多个事务的 binlog 合并一次刷盘）；
+        - commit 阶段：各个事务按顺序做 InnoDB commit 操作；
+
+    - 上面的**每个阶段都有一个队列**，每个阶段有锁进行保护，因此保证了事务写入的顺序，第一个进入队列的事务会成为 leader，leader领导所在队列的所有事务，全权负责整队的操作，完成后通知队内其他事务操作结束。
+
+    - 对每个阶段引入了队列后，锁就只针对每个队列进行保护，不再锁住提交事务的整个过程，可以看的出来，**锁粒度减小了，这样就使得多个阶段可以并发执行，从而提升效率。**
+
+- redo log 组提交
+    - 这个要看 MySQL 版本，MySQL 5.6 没有 redo log 组提交，MySQL 5.7 有 redo log 组提交。
+    - 在 MySQL 5.6 的组提交逻辑中，每个事务各自执行 prepare 阶段，也就是各自将  redo log 刷盘，这样就没办法对 redo log 进行组提交。
+
+    - 所以在 MySQL 5.7 版本中，做了个改进，在 prepare 阶段不再让事务各自执行 redo log 刷盘操作，而是推迟到组提交的 flush 阶段，也就是说 prepare 阶段融合在了  flush 阶段。
+    - 这个优化是将 redo log 的刷盘延迟到了 flush 阶段之中，sync 阶段之前。通过延迟写 redo log 的方式，为 redolog 做了一次组写入，这样 binlog 和 redo log 都进行了优化。
+
+- 接下来介绍每个阶段的过程，注意下面的过程针对的是“双 `1`” 配置（`sync_binlog` 和 `innodb_flush_log_at_trx_commit` 都配置为 1）。
+
+- flush 阶段：
+    - 第一个事务会成为 flush 阶段的 Leader，此时后面到来的事务都是 Follower ：
+        ![image](./Pictures/mysql/组提交-flush阶段.avif)
+
+    - 接着，获取队列中的事务组，由绿色事务组的 Leader 对 redo log 做一次  write + fsync，即一次将同组事务的 redolog 刷盘：
+        ![image](./Pictures/mysql/组提交-flush阶段1.avif)
+
+    - 完成了 prepare 阶段后，将绿色这一组事务执行过程中产生的 binlog 写入 binlog 文件（调用 write，不会调用 fsync，所以不会刷盘，binlog 缓存在操作系统的文件系统中）。
+        ![image](./Pictures/mysql/组提交-flush阶段2.avif)
+
+    - 从上面这个过程，可以知道 flush 阶段队列的作用是**用于支撑 redo log 的组提交。**
+    - 如果在这一步完成后数据库崩溃，由于 binlog 中没有该组事务的记录，所以 MySQL 会在重启后回滚该组事务。
+
+- sync 阶段
+
+    - 绿色这一组事务的 binlog 写入到 binlog 文件后，并不会马上执行刷盘的操作，而是**会等待一段时间**，这个等待的时长由 `Binlog_group_commit_sync_delay` 参数控制，目的是为了组合更多事务的 binlog，然后再一起刷盘，如下过程：
+        ![image](./Pictures/mysql/组提交-sync阶段.avif)
+
+    - 不过，在等待的过程中，如果事务的数量提前达到了 `Binlog_group_commit_sync_no_delay_count` 参数设置的值，就不用继续等待了，就马上将 binlog 刷盘，如下图：
+        ![image](./Pictures/mysql/组提交-sync阶段1.avif)
+
+        - 从上面的过程，可以知道 sync 阶段队列的作用是**用于支持 binlog 的组提交。**
+
+    - 如果想提升 binlog 组提交的效果，可以通过设置下面这两个参数来实现：
+            - `binlog_group_commit_sync_delay= N`，表示在等待 N 微妙后，直接调用 fsync，将处于文件系统中 page cache 中的 binlog 刷盘，也就是将「 binlog 文件」持久化到磁盘。
+            - `binlog_group_commit_sync_no_delay_count = N`，表示如果队列中的事务数达到 N 个，就忽视binlog_group_commit_sync_delay 的设置，直接调用 fsync，将处于文件系统中 page cache 中的 binlog 刷盘。
+
+        - 如果在这一步完成后数据库崩溃，由于 binlog 中已经有了事务记录，MySQL会在重启后通过 redo log 刷盘的数据继续进行事务的提交。
+
+- commit 阶段：最后进入 commit 阶段，调用引擎的提交事务接口，将 redo log 状态设置为 commit。
+    ![image](./Pictures/mysql/组提交-commit阶段.avif)
+    - commit 阶段队列的作用是承接 sync 阶段的事务，完成最后的引擎提交，使得 sync 可以尽早的处理下一组事务，最大化组提交的效率。
+
+###### [爱可生开源社区：MySQL 核心模块揭秘 | 07 期 | 两阶段提交 (1) prepare 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513770&idx=1&sn=d7cf4c9ba5acafbe33fab85219692d0b&chksm=fc955435cbe2dd2374ed1d72c332cff16f1d9c10ff8ed01f450d7fa44c4d1f3df7035f00dcef&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+- prepare 阶段
+    - binlog prepare阶段：什么也不会干
+    - InnoDB prepare阶段：主要做五件事
+
+        - 1.把分配给事务的所有 undo 段的状态从 TRX_UNDO_ACTIVE 修改为 TRX_UNDO_PREPARED
+
+            - 进入两阶段提交的事务，都至少改变过（插入、更新、删除）一个用户表的一条记录，最少会分配 1 个 undo 段，最多会分配 4 个 undo 段。
+
+            - 意义：如果数据库发生崩溃，重新启动后，undo 段的状态是影响事务提交还是回滚的因素之一。
+
+        - 2.把事务 Xid 写入所有 undo 段中当前提交事务的 undo 日志组头信息。
+            - InnoDB 给当前提交事务分配的每个 undo 段中，都会有一组 undo 日志属于这个事务，事务 Xid 就写入 undo 日志组的头信息。
+
+        - 对于第 1、2 件事，如果事务改变了用户普通表的数据，修改 undo 段状态、把事务 Xid 写入 undo 日志组头信息，都会产生 redo 日志。
+
+        - 3.把内存中的事务对象状态从 TRX_STATE_ACTIVE 修改为 TRX_STATE_PREPARED。
+            - 前面修改 undo 状态，是为了事务提交完成之前，MySQL 崩溃了，下次启动时，能够从 undo 段中恢复崩溃之前的事务状态。
+
+            - 这里修改事务对象状态，用于 MySQL 正常运行过程中，标识事务已经进入两阶段提交的 prepare 阶段。
+
+        - 4.如果当前提交事务的隔离级别是读未提交（READ-UNCOMMITTED）或读已提交（READ-COMMITTED)，InnoDB 会释放事务给记录加的共享、排他 GAP 锁。
+            - 虽然读未提交、读已提交隔离级别一般都只加普通记录锁，不加 GAP 锁，但是，外键约束检查、插入记录重复值检查这两个场景下，还是会给相应的记录加 GAP 锁。
+
+        - 5.调用 trx_flush_logs()，处理 事务产生的 redo 日志刷盘的相关逻辑。
+
+- 两阶段提交的 commit 阶段，分为三个子阶段。
+
+    - 1.flush 子阶段，要干两件事：
+
+        - 1.触发操作系统把 prepare 阶段及之前产生的 redo 日志刷盘。
+
+            - 事务执行过程中，改变（插入、更新、删除）表中数据产生的 redo 日志、prepare 阶段修改 undo 段状态产生的 redo 日志，都会由后台线程先写入 page cache，再由操作系统把 page cache 中的 redo 日志刷盘。
+
+            - 等待操作系统把 page cache 中的 redo 日志刷盘，这个时间存在不确定性，InnoDB 会在需要时主动触发操作系统马上把 page cache 中的 redo 日志刷盘。
+
+        - 2.把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
+
+            - 这个写入操作，也是先写入 page cache，至于操作系统什么时候把 page cache 中的 binlog 日志刷盘，flush 子阶段就不管了。
+
+    - 2.sync 子阶段，根据系统变量 sync_binlog 的值决定是否要触发操作系统马上把 page cache 中的 binlog 日志刷盘。
+
+    - 3.commit 子阶段，完成 InnoDB 的事务提交。
+
+- 组提交与重复刷盘
+
+    - 小事务：TP 场景，比较常见的情况是事务只改变（插入、更新、删除）表中少量数据，产生的 redo 日志、binlog 日志也比较少。
+
+    - 以redo 日志为例，binlog 日志也有同样的问题。一个事务产生的 redo 日志少，操作系统的一个页就有可能存放多个事务产生的 redo 日志。
+
+    - 问题：如果每个事务提交时都把自己产生的 redo 日志刷盘，共享操作系统同一个页存放 redo 日志的多个事务，就会触发操作系统把这个页多次刷盘。
+        - 数据库闲的时候，把操作系统的同一个页多次刷盘，也没啥问题，反正磁盘闲着也是闲着。
+        - 数据库忙的时候，假设某个时间点有 1 万个小事务要提交，每 10 个小事务共享操作系统的一个页用于存放 redo 日志，总共需要操作系统的 1000 个页。
+            - 1 万个事务各自提交，就要触发操作系统把这 1000 个数据页刷盘 10000 次。
+
+
+    - 解决方法：组提交。某个时间点提交的多个事务触发操作系统的同一个页重复刷盘。这样一来，1000 个数据页，只刷盘 1000 次就可以了，刷盘次数只有原来的十分之一。
+
+        - 组提交，就是把一组事务攒到一起提交，InnoDB 使用队列把多个事务攒到一起。
+
+        - commit 阶段的 3 个子阶段都有自己的队列，分别为 flush 队列、sync 队列、commit 队列。
+            - 每个队列都会选出一个队长，负责管理这个队列，选队长的规则很简单，先到先得。
+
+            - 对于每个队列，第一个加入该队列的用户线程就是队长，第二个及以后加入该队列的都是队员。
+                - 队长要多干活：每个子阶段的队长，都会把自己和所有队员在对应子阶段要干的事全都干了。队员只需要在旁边当吃瓜群众就好。
+                - 以 flush 子阶段为例
+                    - 1.我们假设 flush 队列的队长为 A 队长，A 队长收编一些队员之后，它会带领这帮队员从 flush 队列挪走，并且开始给自己和所有队员干活，队员们就在一旁当吃瓜群众。
+                    - 2.A 队长带领它的队员挪走之后，flush 队列就变成空队列了。
+                    - 3.接下来第一个进入 flush 队列的用户线程，又成为下一组的队长，我们称它为 B 队长。
+                    - 4.A 队长正在干活，还没干完呢。B 队长收编了一些队员之后，也带领这帮队员从 flush 子阶段的队列挪走，并且也要开始给自己和所有队员干活了。
+
+                    - 如果 A 队长和 B 队长都把自己和各自队员产生的 binlog 日志写入 binlog 日志文件，相互交叉写入，那是会出乱子的。
+
+                        - 为了避免 flush 子阶段出现两个队长同时干活导致出乱子，InnoDB 给 flush 子阶段引入了一个互斥量，名字是 LOCK_log。
+
+                        - sync 子阶段、commit 子阶段也需要避免出现多个队长同时干活的情况，这两个子阶段也有各自的互斥量，分别是 LOCK_sync、LOCK_commit。
+
+###### [爱可生开源社区：MySQL 核心模块揭秘 | 08 期 | 两阶段提交 (2) commit 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513864&idx=1&sn=9896ca5bd7cf5d775ee9cb8c65a9ab6c&chksm=fc955597cbe2dc811614bf1d1281831d9e1cb8b04df43127aa43f25bf7f2ef94f341d5e9da20&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
+
+- 简单总结：
+
+    - 1.flush 子阶段，flush 队长会把自己和队员在 prepare 阶段及之前产生的 redo 日志都刷盘，把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
+
+    - 2.sync 子阶段，如果 sync_counter + 1 大于等于系统变量 max_binlog_size 的值，sync 队长会把 binlog 日志刷盘。
+
+    - 3.commit 子阶段，如果系统变量 binlog_order_commits 的值为 true，commit 队长会把自己和队员们的 InnoDB 事务都提交，否则，commit 队长和队员各自提交自己的 InnoDB 事务。
+
+
+- 例子：假设有 30 个事务，它们对应的用户线程编号也从 1 到 30
+
+- 1.flush 子阶段
+
+    - 用户线程 16 加入 flush 队列，成为 flush 队长，并且通过申请获得 LOCK_log 互斥量。
+
+    - flush 队长收编用户线程 17 ~ 30 作为它的队员，队员们进入 flush 队列之后，就开始等待，收到 commit 子阶段的队长发来的通知才会结束等待。
+
+    - flush 队长开始干活之前，会带领它的队员从 flush 队列挪出来，给后面进入两阶段提交的其它事务腾出空间。
+
+    - 从 flush 队列挪出来之后，flush 队长会触发操作系统，把截止目前产生的所有 redo 日志都刷盘。
+        - 这些 redo 日志，当然就包含了它和队员们在 prepare 阶段及之前产生的所有 redo 日志了。
+
+        - 触发 redo 日志刷盘之后，flush 队长会从它自己开始，把它和队员们产生的 binlog 日志写入 binlog 日志文件。
+
+    - 以队长为例，写入过程是这样的：
+
+        - 从事务对应的 trx_cache 中把 binlog 日志读出来，存放到 trx_cache 的内存 buffer 中。
+            - 每次读取 4096（对应代码里的 IO_SIZE）字节的 binlog 日志，最后一次读取剩余的 binlog 日志（小于或等于 4096 字节）。
+
+        - 把 trx_cache 内存 buffer 中的 binlog 日志写入 binlog 日志文件。
+
+
+    - 队员们产生的 binlog 日志写入 binlog 日志文件的过程，和队长一样。队长把自己和所有队员产生的 binlog 日志都写入 binlog 日志文件之后，flush 子阶段的活就干完了。
+
+        - flush 队长写完 binlog 日志之后，如果发现 binlog 日志文件的大小大于等于系统变量 max_binlog_size 的值（默认为 1G），会设置一个标志（rotate = true），表示需要切换 binlog 日志文件。后面 commit 子阶段会用到。
+
+- 2.sync 子阶段
+
+    - 假设用户线程 6 ~ 15 此刻还在 sync 队列中，用户线程 6 最先进入队列，是 sync 队长，用户线程 7 ~ 15 都是队员。
+
+    - 用户线程 16（flush 队长）带领队员们来到 sync 子阶段，发现 sync 队列中已经有先行者了。
+        - 有点遗憾，用户线程 16 不能成为 sync 子阶段的队长，它和队员们都会变成 sync 子阶段的队员。
+        - 此时，用户线程 6 是 sync 队长，用户线程 7 ~ 30 是队员。
+        - 进入 sync 子阶段之后，用户线程 16（flush 队长）会释放它在 flush 子阶段获得的 LOCK_log 互斥量，flush 子阶段下一屇的队长就可以获得 LOCK_log 互斥量开始干活了。
+
+    - sync 队长会申请 LOCK_sync 互斥量，获得互斥量之后，就开始准备给自己和队员们干 sync 子阶段的活了。
+        - 队员们依然在一旁当吃瓜群众，等待 sync 队长给它们干活。它们会一直等待，收到 commit 子阶段的队长发来的通知才会结束等待。
+
+    - 就在 sync 队长准备甩开膀子大干一场时，它发现前面还有一个关卡：本次组提交能不能触发操作系统把 binlog 日志刷盘。 sync 队长怎么知道自己能不能过这一关？
+
+        - 它会查看一个计数器的值（sync_counter），如果 sync_counter + 1 大于等于系统变量 `sync_binlog` 的值，就说明自己可以过关。
+
+            - sync_counter：
+
+                - sync_counter 的值从 0 开始，某一次组提交的 sync 队长没有过关，不会触发操作系统把 binlog 日志刷盘，sync_counter 就加 1。
+
+                - sync_counter 会一直累加，直到后续的某一次组提交，sync_counter + 1 大于等于系统变量 sync_binlog 的值，sync 队长会把 sync_counter 重置为 0，并且触发操作系统把 binlog 日志刷盘。接着又会开始一个新的轮回。
+
+            - 如果 sync 队长不过关了：用户线程 6 作为队长的 sync 子阶段就到此结束了，它什么都不用干。
+
+            - 如果 sync 队长过关了：
+
+                - sync 队长会带领队员们继续在 sync 队列中等待，以收编更多队员。这个等待过程是有期限的，满足以下两个条件之一，就结束等待：
+
+                    - 已经等待了系统变量 binlog_group_commit_sync_delay 指定的时间（单位：微妙），默认值为 0。
+                    - sync 队列中的用户线程数量（sync 队长和所有队员加在一起）达到了系统变量 binlog_group_commit_sync_no_delay_count 的值，默认值为 0。
+
+                - 等待结束之后，sync 队长会带领队员们从 sync 队列挪出来，给后面进入两阶段提交的其它事务腾出空间。
+
+        - 接下来，sync 队长终于可以大干一场了，它会触发操作系统把 binlog 日志刷盘，确保它和队员们产生的 binlog 日志写入到磁盘上的 binlog 日志文件中。
+            - 这样即使服务器突然异常关机，binlog 日志也不会丢失了。
+
+        - 刷盘完成之后，用户线程 6 作为队长的 sync 子阶段，就到此结束。
+
+- 3.commit 子阶段
+
+    - 假设用户线程 1 ~ 5 此刻还在 commit 队列中，用户线程 1 最先进入队列，是 commit 队长，用户线程 2 ~ 5 都是队员。
+
+        - 用户线程 6（sync 队长）带领队员们来到 commit 子阶段，发现 commit 队列中也已经有先行者了。
+
+        - 用户线程 6 和队员们一起，都变成了 commit 子阶段的队员。
+
+    - 此刻，用户线程 1 是 commit 队长，用户线程 2 ~ 30 是队员。
+
+    - 进入 commit 子阶段之后，用户线程 6（sync 队长）会释放它在 sync 子阶段获得的 LOCK_sync 互斥量，sync 子阶段下一屇的队长就可以获得 LOCK_sync 互斥量开始干活了。
+
+    - commit 队长会申请 LOCK_commit 互斥量，获得互斥量之后，根据系统变量 binlog_order_commits 的值决定接下来的活要怎么干。
+
+        - 值为true：commit 队长会把它和队员们的 InnoDB 事务逐个提交，然后释放 LOCK_commit 互斥量。
+
+            - 提交 InnoDB 事务完成之后，commit 队长会通知它的队员们（用户线程 2 ~ 30）：所有活都干完了，你们都散了吧，别围观了，该干啥干啥去。
+
+            - 队员们收到通知之后，作鸟兽散，它们的两阶段提交也都结束了。
+
+        - 值为false：commit 队长不会帮助队员们提交 InnoDB 事务，它提交自己的 InnoDB 事务之后，就会释放 LOCK_commit 互斥量。
+
+            - 然后，通知所有队员（用户线程 2 ~ 30）：flush 子阶段、sync 子阶段的活都干完了，你们自己去提交 InnoDB 事务。
+
+            - 队员们收到通知之后，就各自提交自己的 InnoDB 事务，谁提交完成，谁的两阶段提交就结束了。
+
+    - 最后，commit 队长还要处理最后一件事。
+
+        - 如果用户线程 16（flush 队长）把 rotate 设置为 true 了，说明 binlog 日志文件已经达到了系统变量 max_binlog_size 指定的上限，需要切换 binlog 日志文件。
+
+        - 切换指的是关闭 flush 子阶段刚写入的 binlog 日志文件，创建新的 binlog 日志文件，以供后续事务提交时写入。
+
+        - 如果需要切换 binlog 日志文件，切换之后，还会根据系统变量 binlog_expire_logs_auto_purge、binlog_expire_logs_seconds、expire_logs_days 清理过期的 binlog 日志。
+
+        - 处理完切换 binlog 日志文件的逻辑之后，commit 队长的工作就此结束，它的两阶段提交就完成了。
+
+
+### BinLog (二进制日志)
 
 MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 
-- binlog是逻辑日志，记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
+- Binlog主要有2个功能：
 
-    - 不管用什么存储引擎，只要发生了表数据更新，都会产生binlog日志。
+    - 1.备份恢复：实现崩溃一致性（Crash Consistency）。原理是每次事务进行提交时，都会将增、删、改操作以追加的方式记录到Binlog文件中。
+    - 2.主从复制：实现 主从复制的一致性。原理是主从复制常用于MySQL主从集群搭建，MySQL从节点通过监听主节点Binlog日志进行同步即可。
 
-    - 只记录对数据库更改的所有操作，不包括 `select`，`show` 等这类操作不修改数据的语句
-
-- redo log它是物理日志，记录内容是“在某个数据页上做了什么修改”，属于InnoDB存储引擎。
-
-    ![image](./Pictures/mysql/binlog_and_redolog.avif)
 
 - binlog的作用：MySQL数据库的数据备份、主备、主主、主从都离不开binlog，需要依靠binlog来同步数据，保证数据一致性。
     ![image](./Pictures/mysql/binlog作用.avif)
 
 - 启用了binlog的服务器会使性能稍微降低
 
-- 写入机制：
+- 写入机制和`binlog cache`：
 
-    - 事务执行过程中，先把日志写到binlog cache，事务提交的时候，再把binlog cache写到binlog文件中。
+    - 事务执行过程中：先把日志写到`binlog cache`；
+    - 事务提交的时候：再把`binlog cache`写到`binlog文件`中。
 
-    - 因为一个事务的binlog不能被拆开，无论这个事务多大，也要确保一次性写入，所以系统会给每个线程分配一个块内存作为binlog cache
+    - 因为一个事务的binlog不能被拆开，无论这个事务多大，也要确保一次性写入，所以系统会给每个线程分配一个块内存作为`binlog cache`
 
-    - 我们可以通过binlog_cache_size参数控制单个线程 binlog cache 大小，如果存储内容超过了这个参数，就要暂存到磁盘（Swap）。
+    - 我们可以通过`binlog_cache_size`参数控制单个线程 `binlog cache` 大小，如果存储内容超过了这个参数，就要暂存到磁盘（Swap）。
+
+        ```sql
+        select @@binlog_cache_size
+        +---------------------+
+        | @@binlog_cache_size |
+        +---------------------+
+        | 32768               |
+        +---------------------+
+        ```
 
         ![image](./Pictures/mysql/binlog写入机制.avif)
 
-        - 上图的 `write`，是指把日志写入到文件系统的 page cache，并没有把数据持久化到磁盘，所以速度比较快
+        - 上图的 `write`：是指把日志写入到文件系统的 `page cache`（页缓存。也就是非直接io），并没有把数据持久化到磁盘，所以速度比较快
 
-        - 上图的 `fsync`，才是将数据持久化到磁盘的操作
+        - 上图的 `fsync`：才是将数据持久化到磁盘的操作
 
-        - 由参数`sync_binlog`控制，默认是0。
-            - 为0的时候，表示每次提交事务都只write，由系统自行判断什么时候执行fsync。
-            - 为了安全起见，可以设置为1，表示每次提交事务都会执行fsync，就如同binlog 日志刷盘流程一样。
+        - 刷盘策略：由参数`sync_binlog`控制
+            ```sql
+            select @@sync_binlog
+            +---------------+
+            | @@sync_binlog |
+            +---------------+
+            | 1             |
+            +---------------+
+            ```
+            - `0`（默认）：每次事务提交时，只进行写操作（write），不执行fsync，具体何时将数据持久化到磁盘由操作系统决定。
+            - `1`：每次事务提交时，先进行写操作（write），然后立即执行fsync，确保日志被持久化到磁盘。
+            - `N`（N > 1）：每次事务提交时只执行写操作（write），但累积N个事务后才会执行fsync，将日志持久化到磁盘。
+
+            - 以上3中刷盘策略：
+                - 在MySQL中，默认的sync_binlog设置为`0`，意味着没有强制性的磁盘刷新操作，这样可以获得最佳的性能，但也伴随较高的风险。如果操作系统发生异常重启，尚未持久化到磁盘的Binlog数据将会丢失。
+                - 当sync_binlog设置为`1`时，系统提供最强的安全性，确保即使发生异常重启，也最多丢失一个事务的Binlog，而已经持久化的数据不会受到影响。然而，这种设置对性能的影响非常大。
+                - 如果能够接受少量事务Binlog丢失的风险，并希望提高写入性能，一般可以将sync_binlog设置为`100`到`1000`之间的某个值，从而在性能和安全性之间找到平衡。
 
     - [爱可生开源社区：MySQL 核心模块揭秘 | 10 期 | binlog 怎么写入日志文件？](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247514251&idx=1&sn=98cf7b9fc9c0116327a0154809b92c33&chksm=fc955a14cbe2d302e3d9deb93b5919163612d8b26de98f818ad48adb4e994bea6ac85f6504aa&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
 
 - binlog日志有3种格式，可以通过`binlog_format`参数指定。
 
     ```sql
+    -- 默认为ROW
     show variables like 'binlog_format';
     +---------------+-------+
     | Variable_name | Value |
@@ -629,14 +1262,18 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
     +---------------+-------+
     ```
 
-    - statement：记录的内容是SQL语句原文`update T set update_time=now() where id=1`
+    - 1.`statement`：记录的内容是SQL语句原文`update T set update_time=now() where id=1`
         ![image](./Pictures/mysql/binlog-statement.avif)
 
-        - 问题：同步数据时，会执行记录的SQL语句，update_time=now()这里会获取当前系统时间，直接执行会导致与原库的数据不一致。
+        - 优点：
+            - 日志不会太大，性能会比较不错。
 
-        - 解决方法：我们需要指定为row：
+        - 缺点：
+            - 使用了sysdate()、now()、 uuid()这类函数， 在恢复数据、主从同步数据时，有时会出现数据不一致的情况
 
-    - row（通常会设置此值）：记录的内容不再是简单的SQL语句了，还包含操作的具体数据
+            - 解决方法：我们需要指定为`row`：
+
+    - 2.`row`（通常会设置此值）：记录的内容不再是简单的SQL语句了。而是记录具体哪一个分区中的、哪一个页中的、哪一行数据被修改了。
         - 记录的内容看不到详细信息，要通过mysqlbinlog工具解析出来。
         ![image](./Pictures/mysql/binlog-row.avif)
 
@@ -644,7 +1281,7 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 
             - 缺点：需要更大的容量来记录，比较占用空间，恢复与同步时会更消耗IO资源，影响执行速度。
 
-    - mixed：前两者的混合。判断这条SQL语句是否可能引起数据不一致，如果是，就用row格式，否则就用statement格式。
+    - 3.`mixed`：前两者的混合。判断这条SQL语句是否可能引起数据不一致，如果是，就用`row`格式，否则就用`statement`格式。
 
 #### 解析binlog
 
@@ -653,6 +1290,9 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 - 准备工作
 
     ```sql
+    -- 创建新的二进制文件
+    flush logs;
+
     -- 创建测试表
     CREATE TABLE `t_binlog` (
       `id` int unsigned NOT NULL AUTO_INCREMENT,
@@ -708,28 +1348,28 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 
         - BEGIN：不会产生 binlog event。
         - INSERT：产生三个 binlog event。
-            - Query_log_event。
-            - Table_map_log_event。
-            - Write_rows_log_event。
+            - `Query_log_event`。
+            - `Table_map_log_event`。
+            - `Write_rows_log_event`。
         - COMMIT：产生 Xid_log_event。
 
     - 按照这些 binlog event 在 binlog 日志文件中的顺序，简化之后的内容如下：
 
-    - 1.Query_log_event
+    - 1.`Query_log_event`
 
         ```sql
         # at 657
         START TRANSACTION
         ```
 
-    - 2.Table_map_log_event
+    - 2.`Table_map_log_event`
 
         ```sql
         # at 800
         Table_map: `test`.`t_binlog` mapped to number 57
         ```
 
-    - 3.Write_rows_log_event
+    - 3.`Write_rows_log_event`
 
         ```sql
         # at 855
@@ -741,7 +1381,7 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
         ###   @3='MySQL 核心模块揭秘' /* VARSTRING(96) meta=96 nullable=1 is_null=0 */
         ```
 
-    - 4.Xid_log_event
+    - 4.`Xid_log_event`
 
         ```sql
         Xid = 31
@@ -750,34 +1390,45 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 
 ##### binlog cache
 
-- 使用 mysqlbinlog 分析 binlog 日志的时候，可以发现这么一个现象：同一个事务产生的 binlog event，在 binlog 日志文件中是连续的。
+- 使用 `mysqlbinlog` 分析 binlog 日志的时候，可以发现这么一个现象：同一个事务产生的 `binlog event`，在 binlog 日志文件中是连续的。
 
-- 保证同一个事务的 binlog event 在 binlog 日志文件中的连续性，不管是 MySQL 从库回放 binlog，还是作为用户的我们，都可以很方便的定位到一个事务的 binlog 从哪里开始，到哪里结束。
+- 保证同一个事务的 `binlog event`在 binlog 日志文件中的连续性，不管是 MySQL 从库回放 binlog，还是作为用户的我们，都可以很方便的定位到一个事务的 binlog 从哪里开始，到哪里结束。
 
-- 问题：一个事务会产生多个 binlog event，很多个事务同时执行，怎么保证同一个事务产生的 binlog event 写入到 binlog 日志文件中是连续的？
-- 解决方法：binlog cache
+- 问题：一个事务会产生多个 `binlog event`，很多个事务同时执行，怎么保证同一个事务产生的 `binlog event`写入到 binlog 日志文件中是连续的？
 
-- 每个事务都有两个 binlog cache：
+    - 解决方法：`binlog cache`
 
-    - stmt_cache：改变（插入、更新、删除）不支持事务的表，产生的 binlog event，临时存放在这里。
-    - trx_cache：改变（插入、更新、删除）支持事务的表，产生的 binlog event，临时存放在这里。
+- 每个事务都有2个 `binlog cache`：
 
-        - 事务执行过程中，产生的所有 binlog event，都会先写入 trx_cache。trx_cache 分为两级：
+    - 1.`stmt_cache`：改变（插入、更新、删除）不支持事务的表，产生的 `binlog event`，临时存放在这里。
+    - 2.`trx_cache`：改变（插入、更新、删除）支持事务的表，产生的 `binlog event`，临时存放在这里。
+        - `trx_cache` 分为两级：
+            - 1.内存，也称为 buffer，它的大小用 buffer_length 表示，由系统变量 binlog_cache_size 控制，默认为 32K。
+            - 2.临时文件，位于操作系统的 tmp 目录下，文件名以 ML 开头。
 
-            - 第一级：内存，也称为 buffer，它的大小用 buffer_length 表示，由系统变量 binlog_cache_size 控制，默认为 32K。
-            - 第二级：临时文件，位于操作系统的 tmp 目录下，文件名以 ML 开头。
+        - 事务执行过程中，产生的所有 `binlog event`，都会先写入 `trx_cache`。
 
-        - buffer_length 加上临时文件中已经写入的 binlog 占用的字节数，也有一个上限，由系统变量 max_binlog_cache_size 控制。
+        - buffer_length 加上临时文件中已经写入的 binlog 占用的字节数，也有一个上限，由系统变量 `max_binlog_cache_size` 控制。
+            ```sql
+            select @@max_binlog_cache_size
+            +-------------------------+
+            | @@max_binlog_cache_size |
+            +-------------------------+
+            | 18446744073709547520    |
+            +-------------------------+
+            ```
 
 ##### 产生 binlog
 
-- 如果一条 SQL 语句改变了（插入、更新、删除）表中的数据，server 层会为这条 SQL 语句产生一个包含表名和表 ID 的 Table_map_log_event。
+- 如果一条 SQL 语句改变了（插入、更新、删除）表中的数据，server 层会为这条 SQL 语句产生一个包含表名和表 ID 的 `Table_map_log_event`。
 
 - 每次调用存储引擎的方法写入一条记录到表中之后，server 层都会为这条记录产生 binlog。
 
     - 这里没有写成 binlog event，是因为记录中各字段内容都很少的时候，多条记录可以共享同一个 binlog event ，并不需要为每条记录都产生一个新的 binlog event。
 
         - 这个 binlog event 最多可以存放多少字节的内容，由系统变量 `binlog_row_event_max_size` 控制
+
+            - 如果一条记录产生的 binlog 超过了 8192 字节，它的 binlog 会独享一个 binlog event，这个 binlog event 的大小就不受系统变量 `binlog_row_event_max_size` 控制了。
             ```sql
             -- 默认为 8192 字节。
             select @@binlog_row_event_max_size
@@ -788,244 +1439,30 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
             +-----------------------------+
             ```
 
-        - 如果一条记录产生的 binlog 超过了 8192 字节，它的 binlog 会独享一个 binlog event，这个 binlog event 的大小就不受系统变量 `binlog_row_event_max_size` 控制了。
-
-
 - 在 binlog 日志文件中
 
-    - 那么，第一步就要为这个事务初始化 binlog cache，包括 stmt_cache 和 trx_cache。初始化完成之后，这两个 cache 都是空的。
+    - 那么，第一步就要为这个事务初始化 `binlog cache`（包括 `stmt_cache` 和 `trx_cache`）。初始化完成之后，这2个 cache 都是空的。
 
-        - 事务执行过程中，所有 binlog event 都会先写入 trx_cache 的 buffer，buffer 大小默认为 32K。
+        - 上面提到`binlog cache`有2个，其中一个`trx_cache` 分为两级：内存（buffer）、临时文件。
 
-    - 1.Query_log_event 为 BEGIN 语句的binlog event。
-    - 2.Table_map_log_event 位于 SQL 语句改变表中数据产生的 binlog event 之前。
-    - 3.Write_rows_log_event 是插入记录对应的 binlog event
-    - 4.Xid_log_event 是 COMMIT 语句时，会产生的binlog event ，并写入 trx_cache。
+        - 事务执行过程中，所有 binlog event 都会先写入 `trx_cache` 的 buffer，buffer 大小默认为 32K。
 
+    - 1.`Query_log_event` 为 BEGIN 语句的binlog event。
+    - 2.`Table_map_log_event` 位于 SQL 语句改变表中数据产生的 binlog event 之前。
+    - 3.`Write_rows_log_event` 是插入记录对应的 binlog event
+    - 4.`Xid_log_event` 是 COMMIT 语句时，会产生的binlog event ，并写入 trx_cache。
 
-- trx_cache 分为两级：内存（buffer）、临时文件。
-
-
-- 写入一个 binlog event 到 trx_cache 的流程：
+- 写入一个 binlog event 到 `trx_cache` 的流程：
 
     - 判断 buffer 剩余空间是否足够写入这个 binlog event。
-    - 如果足够，直接把 binlog event 写入 buffer，流程结束。
-    - 如果不够，用 binlog event 前面的部分内容填满 buffer，然后，把 buffer 中所有内容写入临时文件，再清空 buffer，以备复用。
+        - 如果足够，直接把 binlog event 写入 buffer，流程结束。
+        - 如果不够，清空 buffer，把 buffer 中所有内容写入`临时文件`，以备复用。
+
     - 接着判断 binlog event 剩余内容是否大于等于 4096 字节（IO_SIZE）。
-    - 如果剩余内容大于等于 4096 字节，则把剩余内容前面的 N * 4096 字节写入临时文件。
-    - 对于剩余内容字节数不能被 4096 整除的情况，最后还会剩下不足 4096 字节的内容，这部分内容会写入 buffer。
-    - 如果剩余内容小于 4096 字节，直接把 binlog event 中剩余的所有内容都写入 buffer。
+        - 如果剩余内容大于等于 4096 字节，则把剩余内容前面的 N * 4096 字节写入临时文件。
 
-#### 二阶段提交
-
-- [爱可生开源社区：MySQL 核心模块揭秘 | 07 期 | 二阶段提交 (1) prepare 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513770&idx=1&sn=d7cf4c9ba5acafbe33fab85219692d0b&chksm=fc955435cbe2dd2374ed1d72c332cff16f1d9c10ff8ed01f450d7fa44c4d1f3df7035f00dcef&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
-
-- 二阶段提交是一种用于保证分布式事务原子性的协议。
-
-- 二阶段提交：
-
-    - prepare 阶段：写binlog、redo log
-    - commit 阶段：把binlog、redo log刷盘
-
-- MySQL 把 binlog 也看作一个存储引擎，开启 binlog，SQL 语句改变（插入、更新、删除）InnoDB 表的数据，这个 SQL 语句执行过程中，就涉及到两个存储引擎。
-
-    - 使用二阶段提交，就是为了保证2个存储引擎的数据一致性。
-
-        - 如果没有开启 binlog，SQL 语句改变表中数据，不产生 binlog，不用保证 binlog 和表中数据的一致性，用户事务也就不需要使用二阶段提交了。
-
-- 用户事务提交分为2种场景，如果开启了 binlog，它们都会使用二阶段提交。
-
-    - 1.通过 BEGIN 或其它开始事务的语句，显式开始一个事务，用户手动执行 COMMIT 语句提交事务。
-
-    - 2.没有显式开始的事务，一条 SQL 语句执行时，InnoDB 会隐式开始一个事务，SQL 语句执行完成之后，自动提交事务。
-
-- prepare 阶段
-    - binlog prepare阶段：什么也不会干
-    - InnoDB prepare阶段：主要做五件事
-
-        - 1.把分配给事务的所有 undo 段的状态从 TRX_UNDO_ACTIVE 修改为 TRX_UNDO_PREPARED
-
-            - 进入二阶段提交的事务，都至少改变过（插入、更新、删除）一个用户表的一条记录，最少会分配 1 个 undo 段，最多会分配 4 个 undo 段。
-
-            - 意义：如果数据库发生崩溃，重新启动后，undo 段的状态是影响事务提交还是回滚的因素之一。
-
-        - 2.把事务 Xid 写入所有 undo 段中当前提交事务的 undo 日志组头信息。
-            - InnoDB 给当前提交事务分配的每个 undo 段中，都会有一组 undo 日志属于这个事务，事务 Xid 就写入 undo 日志组的头信息。
-
-        - 对于第 1、2 件事，如果事务改变了用户普通表的数据，修改 undo 段状态、把事务 Xid 写入 undo 日志组头信息，都会产生 redo 日志。
-
-        - 3.把内存中的事务对象状态从 TRX_STATE_ACTIVE 修改为 TRX_STATE_PREPARED。
-            - 前面修改 undo 状态，是为了事务提交完成之前，MySQL 崩溃了，下次启动时，能够从 undo 段中恢复崩溃之前的事务状态。
-
-            - 这里修改事务对象状态，用于 MySQL 正常运行过程中，标识事务已经进入二阶段提交的 prepare 阶段。
-
-        - 4.如果当前提交事务的隔离级别是读未提交（READ-UNCOMMITTED）或读已提交（READ-COMMITTED)，InnoDB 会释放事务给记录加的共享、排他 GAP 锁。
-            - 虽然读未提交、读已提交隔离级别一般都只加普通记录锁，不加 GAP 锁，但是，外键约束检查、插入记录重复值检查这两个场景下，还是会给相应的记录加 GAP 锁。
-
-        - 5.调用 trx_flush_logs()，处理 事务产生的 redo 日志刷盘的相关逻辑。
-
-- 二阶段提交的 commit 阶段，分为三个子阶段。
-
-    - 1.flush 子阶段，要干两件事：
-
-        - 1.触发操作系统把 prepare 阶段及之前产生的 redo 日志刷盘。
-
-            - 事务执行过程中，改变（插入、更新、删除）表中数据产生的 redo 日志、prepare 阶段修改 undo 段状态产生的 redo 日志，都会由后台线程先写入 page cache，再由操作系统把 page cache 中的 redo 日志刷盘。
-
-            - 等待操作系统把 page cache 中的 redo 日志刷盘，这个时间存在不确定性，InnoDB 会在需要时主动触发操作系统马上把 page cache 中的 redo 日志刷盘。
-
-        - 2.把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
-
-            - 这个写入操作，也是先写入 page cache，至于操作系统什么时候把 page cache 中的 binlog 日志刷盘，flush 子阶段就不管了。
-
-    - 2.sync 子阶段，根据系统变量 sync_binlog 的值决定是否要触发操作系统马上把 page cache 中的 binlog 日志刷盘。
-
-    - 3.commit 子阶段，完成 InnoDB 的事务提交。
-
-- 组提交与重复刷盘
-
-    - 小事务：TP 场景，比较常见的情况是事务只改变（插入、更新、删除）表中少量数据，产生的 redo 日志、binlog 日志也比较少。
-
-    - 以redo 日志为例，binlog 日志也有同样的问题。一个事务产生的 redo 日志少，操作系统的一个页就有可能存放多个事务产生的 redo 日志。
-
-    - 问题：如果每个事务提交时都把自己产生的 redo 日志刷盘，共享操作系统同一个页存放 redo 日志的多个事务，就会触发操作系统把这个页多次刷盘。
-        - 数据库闲的时候，把操作系统的同一个页多次刷盘，也没啥问题，反正磁盘闲着也是闲着。
-        - 数据库忙的时候，假设某个时间点有 1 万个小事务要提交，每 10 个小事务共享操作系统的一个页用于存放 redo 日志，总共需要操作系统的 1000 个页。
-            - 1 万个事务各自提交，就要触发操作系统把这 1000 个数据页刷盘 10000 次。
-
-
-    - 解决方法：组提交。某个时间点提交的多个事务触发操作系统的同一个页重复刷盘。这样一来，1000 个数据页，只刷盘 1000 次就可以了，刷盘次数只有原来的十分之一。
-
-        - 组提交，就是把一组事务攒到一起提交，InnoDB 使用队列把多个事务攒到一起。
-
-        - commit 阶段的 3 个子阶段都有自己的队列，分别为 flush 队列、sync 队列、commit 队列。
-            - 每个队列都会选出一个队长，负责管理这个队列，选队长的规则很简单，先到先得。
-
-            - 对于每个队列，第一个加入该队列的用户线程就是队长，第二个及以后加入该队列的都是队员。
-                - 队长要多干活：每个子阶段的队长，都会把自己和所有队员在对应子阶段要干的事全都干了。队员只需要在旁边当吃瓜群众就好。
-                - 以 flush 子阶段为例
-                    - 1.我们假设 flush 队列的队长为 A 队长，A 队长收编一些队员之后，它会带领这帮队员从 flush 队列挪走，并且开始给自己和所有队员干活，队员们就在一旁当吃瓜群众。
-                    - 2.A 队长带领它的队员挪走之后，flush 队列就变成空队列了。
-                    - 3.接下来第一个进入 flush 队列的用户线程，又成为下一组的队长，我们称它为 B 队长。
-                    - 4.A 队长正在干活，还没干完呢。B 队长收编了一些队员之后，也带领这帮队员从 flush 子阶段的队列挪走，并且也要开始给自己和所有队员干活了。
-
-                    - 如果 A 队长和 B 队长都把自己和各自队员产生的 binlog 日志写入 binlog 日志文件，相互交叉写入，那是会出乱子的。
-
-                        - 为了避免 flush 子阶段出现两个队长同时干活导致出乱子，InnoDB 给 flush 子阶段引入了一个互斥量，名字是 LOCK_log。
-
-                        - sync 子阶段、commit 子阶段也需要避免出现多个队长同时干活的情况，这两个子阶段也有各自的互斥量，分别是 LOCK_sync、LOCK_commit。
-
-- [爱可生开源社区：MySQL 核心模块揭秘 | 08 期 | 二阶段提交 (2) commit 阶段](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247513864&idx=1&sn=9896ca5bd7cf5d775ee9cb8c65a9ab6c&chksm=fc955597cbe2dc811614bf1d1281831d9e1cb8b04df43127aa43f25bf7f2ef94f341d5e9da20&cur_album_id=3254180525410418690&scene=189#wechat_redirect)
-
-    - 简单总结：
-
-        - 1.flush 子阶段，flush 队长会把自己和队员在 prepare 阶段及之前产生的 redo 日志都刷盘，把事务执行过程中产生的 binlog 日志写入 binlog 日志文件。
-
-        - 2.sync 子阶段，如果 sync_counter + 1 大于等于系统变量 max_binlog_size 的值，sync 队长会把 binlog 日志刷盘。
-
-        - 3.commit 子阶段，如果系统变量 binlog_order_commits 的值为 true，commit 队长会把自己和队员们的 InnoDB 事务都提交，否则，commit 队长和队员各自提交自己的 InnoDB 事务。
-
-
-    - 例子：假设有 30 个事务，它们对应的用户线程编号也从 1 到 30
-
-    - 1.flush 子阶段
-
-        - 用户线程 16 加入 flush 队列，成为 flush 队长，并且通过申请获得 LOCK_log 互斥量。
-
-        - flush 队长收编用户线程 17 ~ 30 作为它的队员，队员们进入 flush 队列之后，就开始等待，收到 commit 子阶段的队长发来的通知才会结束等待。
-
-        - flush 队长开始干活之前，会带领它的队员从 flush 队列挪出来，给后面进入二阶段提交的其它事务腾出空间。
-
-        - 从 flush 队列挪出来之后，flush 队长会触发操作系统，把截止目前产生的所有 redo 日志都刷盘。
-            - 这些 redo 日志，当然就包含了它和队员们在 prepare 阶段及之前产生的所有 redo 日志了。
-
-            - 触发 redo 日志刷盘之后，flush 队长会从它自己开始，把它和队员们产生的 binlog 日志写入 binlog 日志文件。
-
-        - 以队长为例，写入过程是这样的：
-
-            - 从事务对应的 trx_cache 中把 binlog 日志读出来，存放到 trx_cache 的内存 buffer 中。
-                - 每次读取 4096（对应代码里的 IO_SIZE）字节的 binlog 日志，最后一次读取剩余的 binlog 日志（小于或等于 4096 字节）。
-
-            - 把 trx_cache 内存 buffer 中的 binlog 日志写入 binlog 日志文件。
-
-
-        - 队员们产生的 binlog 日志写入 binlog 日志文件的过程，和队长一样。队长把自己和所有队员产生的 binlog 日志都写入 binlog 日志文件之后，flush 子阶段的活就干完了。
-
-            - flush 队长写完 binlog 日志之后，如果发现 binlog 日志文件的大小大于等于系统变量 max_binlog_size 的值（默认为 1G），会设置一个标志（rotate = true），表示需要切换 binlog 日志文件。后面 commit 子阶段会用到。
-
-    - 2.sync 子阶段
-
-        - 假设用户线程 6 ~ 15 此刻还在 sync 队列中，用户线程 6 最先进入队列，是 sync 队长，用户线程 7 ~ 15 都是队员。
-
-        - 用户线程 16（flush 队长）带领队员们来到 sync 子阶段，发现 sync 队列中已经有先行者了。
-            - 有点遗憾，用户线程 16 不能成为 sync 子阶段的队长，它和队员们都会变成 sync 子阶段的队员。
-            - 此时，用户线程 6 是 sync 队长，用户线程 7 ~ 30 是队员。
-            - 进入 sync 子阶段之后，用户线程 16（flush 队长）会释放它在 flush 子阶段获得的 LOCK_log 互斥量，flush 子阶段下一屇的队长就可以获得 LOCK_log 互斥量开始干活了。
-
-        - sync 队长会申请 LOCK_sync 互斥量，获得互斥量之后，就开始准备给自己和队员们干 sync 子阶段的活了。
-            - 队员们依然在一旁当吃瓜群众，等待 sync 队长给它们干活。它们会一直等待，收到 commit 子阶段的队长发来的通知才会结束等待。
-
-        - 就在 sync 队长准备甩开膀子大干一场时，它发现前面还有一个关卡：本次组提交能不能触发操作系统把 binlog 日志刷盘。 sync 队长怎么知道自己能不能过这一关？
-
-            - 它会查看一个计数器的值（sync_counter），如果 sync_counter + 1 大于等于系统变量 `sync_binlog` 的值，就说明自己可以过关。
-
-                - sync_counter：
-
-                    - sync_counter 的值从 0 开始，某一次组提交的 sync 队长没有过关，不会触发操作系统把 binlog 日志刷盘，sync_counter 就加 1。
-
-                    - sync_counter 会一直累加，直到后续的某一次组提交，sync_counter + 1 大于等于系统变量 sync_binlog 的值，sync 队长会把 sync_counter 重置为 0，并且触发操作系统把 binlog 日志刷盘。接着又会开始一个新的轮回。
-
-                - 如果 sync 队长不过关了：用户线程 6 作为队长的 sync 子阶段就到此结束了，它什么都不用干。
-
-                - 如果 sync 队长过关了：
-
-                    - sync 队长会带领队员们继续在 sync 队列中等待，以收编更多队员。这个等待过程是有期限的，满足以下两个条件之一，就结束等待：
-
-                        - 已经等待了系统变量 binlog_group_commit_sync_delay 指定的时间（单位：微妙），默认值为 0。
-                        - sync 队列中的用户线程数量（sync 队长和所有队员加在一起）达到了系统变量 binlog_group_commit_sync_no_delay_count 的值，默认值为 0。
-
-                    - 等待结束之后，sync 队长会带领队员们从 sync 队列挪出来，给后面进入二阶段提交的其它事务腾出空间。
-
-            - 接下来，sync 队长终于可以大干一场了，它会触发操作系统把 binlog 日志刷盘，确保它和队员们产生的 binlog 日志写入到磁盘上的 binlog 日志文件中。
-                - 这样即使服务器突然异常关机，binlog 日志也不会丢失了。
-
-            - 刷盘完成之后，用户线程 6 作为队长的 sync 子阶段，就到此结束。
-
-    - 3.commit 子阶段
-
-        - 假设用户线程 1 ~ 5 此刻还在 commit 队列中，用户线程 1 最先进入队列，是 commit 队长，用户线程 2 ~ 5 都是队员。
-
-            - 用户线程 6（sync 队长）带领队员们来到 commit 子阶段，发现 commit 队列中也已经有先行者了。
-
-            - 用户线程 6 和队员们一起，都变成了 commit 子阶段的队员。
-
-        - 此刻，用户线程 1 是 commit 队长，用户线程 2 ~ 30 是队员。
-
-        - 进入 commit 子阶段之后，用户线程 6（sync 队长）会释放它在 sync 子阶段获得的 LOCK_sync 互斥量，sync 子阶段下一屇的队长就可以获得 LOCK_sync 互斥量开始干活了。
-
-        - commit 队长会申请 LOCK_commit 互斥量，获得互斥量之后，根据系统变量 binlog_order_commits 的值决定接下来的活要怎么干。
-
-            - 值为true：commit 队长会把它和队员们的 InnoDB 事务逐个提交，然后释放 LOCK_commit 互斥量。
-
-                - 提交 InnoDB 事务完成之后，commit 队长会通知它的队员们（用户线程 2 ~ 30）：所有活都干完了，你们都散了吧，别围观了，该干啥干啥去。
-
-                - 队员们收到通知之后，作鸟兽散，它们的二阶段提交也都结束了。
-
-            - 值为false：commit 队长不会帮助队员们提交 InnoDB 事务，它提交自己的 InnoDB 事务之后，就会释放 LOCK_commit 互斥量。
-
-                - 然后，通知所有队员（用户线程 2 ~ 30）：flush 子阶段、sync 子阶段的活都干完了，你们自己去提交 InnoDB 事务。
-
-                - 队员们收到通知之后，就各自提交自己的 InnoDB 事务，谁提交完成，谁的二阶段提交就结束了。
-
-        - 最后，commit 队长还要处理最后一件事。
-
-            - 如果用户线程 16（flush 队长）把 rotate 设置为 true 了，说明 binlog 日志文件已经达到了系统变量 max_binlog_size 指定的上限，需要切换 binlog 日志文件。
-
-            - 切换指的是关闭 flush 子阶段刚写入的 binlog 日志文件，创建新的 binlog 日志文件，以供后续事务提交时写入。
-
-            - 如果需要切换 binlog 日志文件，切换之后，还会根据系统变量 binlog_expire_logs_auto_purge、binlog_expire_logs_seconds、expire_logs_days 清理过期的 binlog 日志。
-
-            - 处理完切换 binlog 日志文件的逻辑之后，commit 队长的工作就此结束，它的二阶段提交就完成了。
+        - 对于剩余内容字节数不能被 4096 整除的情况，最后还会剩下不足 4096 字节的内容，这部分内容会写入 buffer。
+        - 如果剩余内容小于 4096 字节，直接把 binlog event 中剩余的所有内容都写入 buffer。
 
 #### 配置
 
@@ -1036,7 +1473,7 @@ MySQL 8.0 中的二进制日志格式与以前的 MySQL 版本不同
 datadir = /var/lib/mysql/
 
 ##### binlog #####
-# 可以通过show master status;查看
+# 设置binlog的名字，我这里为arch、一般为bin。可以通过show master status;查看。
 log-bin=arch
 log-bin-index=arch.index
 
@@ -1062,7 +1499,7 @@ sync_binlog=1
 随着时间的推移日志文件会越来越多，可以设置日志有效期，自动清理
 
 ```sql
-# 我这里是 0 (表示永不会清理)
+-- 我这里是 0 (表示永不会清理)
 show variables like 'expire_logs_days';
 +------------------+-------+
 | Variable_name    | Value |
@@ -1072,31 +1509,34 @@ show variables like 'expire_logs_days';
 ```
 
 #### 基本命令
+
 ```sql
-# 查看二进制日志
+-- 查看二进制日志
 show binary logs;
 
-# 创建新的二进制文件
+-- 创建新的二进制文件
 flush logs;
 
-# 查看第一个日志(缺点:没有时间显示)
+-- 查看第一个日志(缺点:没有时间显示)
 show binlog events;
 
-# 查看指定日志
+-- 查看指定日志
 show binlog events in 'LogName';
 
-# 删除所有二进制日志
+-- 删除所有二进制日志
 reset master;
 
-# 删除日志centos7.000022前的日志
+-- 删除日志centos7.000022前的日志
 pugre master logs to 'centos7.000022';
 
-# 删除某一天前的日志
+-- 删除某一天前的日志
 pugre master logs before '2020-10-25 00:00:00'
 
-# 删除10天前的日志
+-- 删除10天前的日志
 pugre master logs before current_date - interval 1 day;
 ```
+
+#### [爱可生开源社区：技术分享 | 如何通过 binlog 定位大事务？](https://mp.weixin.qq.com/s/lR3CZyM8_Mz0nGC53MxcKg)
 
 #### 第三方binlog工具
 ##### mysqlbinlog 日志分析
@@ -1107,104 +1547,104 @@ mysqlbinlog /var/lib/mysql/bin.000001
 
 ###### [--flashback 还原被添加、删除、修改的数据](https://mariadb.com/kb/en/flashback/)
 
-日志格式必须设置为:
+- 日志格式必须设置为:
 
-- binlog_format=ROW
-- binlog_row_image=FULL
+    - binlog_format=ROW
+    - binlog_row_image=FULL
 
-创建测试表,并插入数据:
+- 创建测试表,并插入数据:
 
-```sql
-drop table if exists test;
+    ```sql
+    drop table if exists test;
 
-CREATE TABLE test(
-    id int (8),
-    name varchar(50),
-    date DATE
-);
+    CREATE TABLE test(
+        id int (8),
+        name varchar(50),
+        date DATE
+    );
 
-insert into test (id,name,date) values
-(1,'tz1','2020-10-24'),
-(10,'tz2','2020-10-24'),
-(100,'tz3','2020-10-24');
+    insert into test (id,name,date) values
+    (1,'tz1','2020-10-24'),
+    (10,'tz2','2020-10-24'),
+    (100,'tz3','2020-10-24');
 
-commit;
-```
+    commit;
+    ```
 
-有两种闪回还原的方法:
+- 有2种闪回还原的方法:
 
-- 通过 `pos` 还原:
+    - 1.通过 `Position` 还原:
 
-```sql
-# 记下日志名 和 pos 等下还原需要:
+        ```sql
+        -- 记下日志名 和 pos 等下还原需要:
 
-# 查看日志名,我这里为(bin.000016)
-show master status;
-+------------+----------+--------------+------------------+
-| File       | Position | Binlog_Do_DB | Binlog_Ignore_DB |
-+------------+----------+--------------+------------------+
-| bin.000016 |     9074 |              |                  |
-+------------+----------+--------------+------------------+
+        -- 查看日志名,我这里为(bin.000016)
+        show master status;
+        +------------+----------+--------------+------------------+
+        | File       | Position | Binlog_Do_DB | Binlog_Ignore_DB |
+        +------------+----------+--------------+------------------+
+        | bin.000016 |     9074 |              |                  |
+        +------------+----------+--------------+------------------+
 
-# 查看日志,找到删除修改数据前提交的pos(如下图:我这里是7144)
-show binlog events in 'bin.000016'\G;
-```
+        -- 查看日志,找到删除修改数据前提交的pos(如下图:我这里是7144)
+        show binlog events in 'bin.000016'\G;
+        ```
 
-![image](./Pictures/mysql/mysqlbinlog.avif)
+        ![image](./Pictures/mysql/mysqlbinlog.avif)
 
-- 通过 `start-datetime` 还原:
+    - 2.通过 `start-datetime` 还原:
 
-```sql
-# 记下删除修改数据前最后一次的时间
+        ```sql
+        -- 记下删除修改数据前最后一次的时间
 
-# 查看时间
-select current_timestamp();
-+---------------------+
-| current_timestamp() |
-+---------------------+
-| 2020-11-19 16:50:19 |
-+---------------------+
-```
+        -- 查看时间
+        select current_timestamp();
+        +---------------------+
+        | current_timestamp() |
+        +---------------------+
+        | 2020-11-19 16:50:19 |
+        +---------------------+
+        ```
 
-- 先删除,修改,添加数据。方便后面还原
+    - 先删除,修改,添加数据。方便后面还原
 
-```sql
-delete from test
-where id = 1;
+        ```sql
+        delete from test
+        where id = 1;
 
-update test
-set id = 20
-where id = 10;
+        update test
+        set id = 20
+        where id = 10;
 
-insert into test (id,name,date) values
-(1000,'tz4','2020-10-24');
+        insert into test (id,name,date) values
+        (1000,'tz4','2020-10-24');
 
-commit;
+        commit;
 
-select * from test;
-```
+        select * from test;
+        ```
 
-通过 `--start-position` 进行还原:
+    - 1.通过 `position` 进行还原:
 
-```sh
-mysqlbinlog /var/lib/mysql/bin.000016 -vv -d china -T test \
-   --start-position="7144" --flashback > /tmp/flashback.sql
+        ```sh
+        mysqlbinlog /var/lib/mysql/bin.000016 -vv -d china -T test \
+           --start-position="7144" --flashback > /tmp/flashback.sql
 
-sudo mysql -uroot -p china < /tmp/flashback.sql
-```
+        sudo mysql -uroot -p china < /tmp/flashback.sql
+        ```
 
-![image](./Pictures/mysql/mysqlbinlog.gif)
+        ![image](./Pictures/mysql/mysqlbinlog.gif)
 
-通过 `--start-datetime` 进行还原:
+    - 2.通过 `--start-datetime` 进行还原:
 
-```sh
-mysqlbinlog /var/lib/mysql/bin.000016 -vv -d china -T test \
-   --start-datetime="2020-11-19 16:50:19" --flashback > /tmp/flashback.sql
+        ```sh
+        mysqlbinlog /var/lib/mysql/bin.000016 -vv -d china -T test \
+           --start-datetime="2020-11-19 16:50:19" --flashback > /tmp/flashback.sql
 
-sudo mysql -uroot -p china < /tmp/flashback.sql
-```
+        sudo mysql -uroot -p china < /tmp/flashback.sql
+        ```
 
-![image](./Pictures/mysql/mysqlbinlog1.gif)
+        ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
 ##### [binlog2sql](https://github.com/danfengcao/binlog2sql)
 
@@ -1279,54 +1719,64 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
 
 - [DBA实战：mysql reverse_sql数据闪回工具](https://mp.weixin.qq.com/s/c06rQ26l1yNAE-ifU4Jz4g)
 
-### redo log (重做日志)
+### Redo Log (重做日志)
 
-- redo log是InnoDB存储引擎独有的
+- redo log是InnoDB存储引擎独有的，保证事务的持久性
+
+- redo log记录了事务对数据的修改操作，用于在系统崩溃后恢复**已提交事务**的修改，确保事务的持久性。
+
+- Undo Log对比Redo Log
+    - 若事务在**提交前**发生崩溃，则可以通过Undo Log回滚事务。
+    - 若事务在**提交后**发生崩溃，则可以通过Redo Log来恢复事务。
+
+#### 写入机制
+
+- Redo Log利用`WAL`（Write-Ahead Logging）机制来保证故障恢复的安全性（crash-safe）。
+
+    - WAL的核心思想是`先写日志，再写磁盘`；目的是将随机写转变为了顺序写
+        - MySQL真正使用WAL的原因是：机械磁盘的性能。日志是顺序写io，而数据页是随机写io。
+        - 顺序写的性能更高，所以先把日志归档。
+            - 由于顺序写入大概率是在一个磁盘块内，这样产生的IO次数也大大降低。
 
     - 先将事务的变更写入redo log，并且保证redo log持久化到磁盘上，才能认为事务提交成功。这样即使在数据库发生故障时，也能够根据redo log来恢复未写入数据文件的数据，确保已经提交的事务不会丢失。
 
-- 为什么不直接把修改后的数据页刷盘，还有redo log什么事？
+        - 为什么不直接把修改后的数据页刷盘，还有redo log什么事？
 
-    - 问题：
-        - 数据页大小是16KB，刷盘比较耗时，可能就修改了数据页里的几Byte数据，有必要把完整的数据页刷盘吗？
-        - 而且数据页刷盘是随机写，因为一个数据页对应的位置可能在硬盘文件的随机位置，所以性能是很差。
+        - 问题：
+            - 数据页大小是16KB，刷盘比较耗时，可能就修改了数据页里的几Byte数据，有必要把完整的数据页刷盘吗？
+            - 而且数据页刷盘是随机写，因为一个数据页对应的位置可能在硬盘文件的随机位置，所以性能是很差。
 
-    - 如果是写redo log，一行记录可能就占几十Byte，只包含表空间号、数据页号、磁盘文件偏移 量、更新值，再加上是顺序写，所以刷盘速度很快。
+            - 如果是写redo log，一行记录可能就占几十Byte，只包含表空间号、数据页号、磁盘文件偏移 量、更新值，再加上是顺序写，所以刷盘速度很快。
 
-- 写入机制：
+    - 具体来说：当缓存页被修改（即变成脏页）后，相关的操作会先记录到`Redo Log Buffer`中。在事务提交（commit）时，后台线程会将`Redo Log Buffer`中的内容刷新到磁盘上（事务提交是Redo Log默认刷盘的时机）。此时，虽然脏页还没有写回磁盘，但只要Redo Log成功写入磁盘的`redo log file`（重做日志文件），就可以认为此次修改操作已完成。这是因为，即使发生故障导致脏页丢失，我们也可以通过磁盘上的Redo Log来恢复数据。
+
+- 当一个更新事务到达时，Redo Log的处理过程如下：
 
     ![image](./Pictures/mysql/redo-log.avif)
 
-    - MySQL中数据是以页为单位，你查询一条记录，会从硬盘把一页的数据加载出来，加载出来的数据叫数据页，会放入到Buffer Pool中。
-    - 后续的查询都是先从Buffer Pool中找，没有命中再去硬盘加载，减少硬盘IO开销，提升性能。
-    - 更新表数据的时候，也是如此，发现Buffer Pool里存在要更新的数据，就直接在Buffer Pool里更新。
-    - 然后会把“在某个数据页上做了什么修改”记录到重做日志缓存（redo log buffer）里，接着刷盘到redo log文件里。
+    - 1.首先，从磁盘读取原始数据到`Buffer Pool`（内存中），然后在内存中对数据进行修改，修改后的数据将被标记为脏页。
 
-        - 每条 redo 记录由“表空间号+数据页号+偏移量+修改数据长度+具体修改的数据”组成
+        - MySQL中数据是以页为单位，你查询一条记录，会从硬盘把一页的数据加载出来，加载出来的数据叫数据页，会放入到`Buffer Pool`中。
+            - 后续的查询都是先从`Buffer Pool`中找，没有命中再去硬盘加载，减少硬盘IO开销，提升性能。
+            - 更新表数据的时候，也是如此，发现`Buffer Pool`里存在要更新的数据，就直接在`Buffer Pool`里更新。
 
-        - 理想情况，事务一提交就会进行刷盘操作，但实际上，刷盘的时机是根据策略来进行的。
+    - 2.把`脏页`（修改过的数据页）记录到`redo log buffer`（重做日志缓存）里，日志内容记录的是数据修改后的新值。
 
-        - InnoDB存储引擎有一个后台线程，每隔1秒，就会把redo log buffer中的内容写到文件系统缓存（page cache），然后调用fsync刷盘。
+        - 每条 redo 记录：由“表空间号+数据页号+偏移量+修改数据长度+具体修改的数据”组成
+
+    - 3.当事务提交（commit）时：`redo log buffer`中的内容会被刷新到`redo log file`中，并采用追加写的方式将日志记录写入文件。
+
+    - 4.定期会将内存中修改过的数据刷新回磁盘，以保证数据持久性。
+
+        - 刷盘策略：理想情况，事务一提交就会进行刷盘操作，但实际上，刷盘的时机是根据策略来进行的。
+
+        - InnoDB存储引擎有一个后台线程，每隔1秒，就会把`redo log buffer`中的内容写到`page cache`（页缓存），然后调用`fsync`刷盘。
 
             - 一个没有提交事务的redo log记录，也可能会后台线程刷盘。
 
             ![image](./Pictures/mysql/redo-log后台线程刷盘.avif)
 
-        - 另外，redo log的刷盘策略提供了`innodb_flush_log_at_trx_commit`参数，它支持三种策略：
-
-            - `0`:表示每次事务提交时不进行刷盘操作
-                - 为0时，如果MySQL挂了或宕机可能会有1秒数据的丢失。
-                ![image](./Pictures/mysql/redo-log刷盘策略值为0.avif)
-
-            - `1`（默认值）:表示每次事务提交时都将进行刷盘操作
-                - 为1时， 只要事务提交成功，redo log记录就一定在硬盘里，不会有任何数据丢失。
-                - 如果事务执行期间MySQL挂了或宕机，这部分日志丢了，但是事务并没有提交，所以日志丢了也不会有损失。
-                ![image](./Pictures/mysql/redo-log刷盘策略值为1.avif)
-
-            - `2`:表示每次事务提交时都只把 redo log buffer 内容写入 page cache
-                - 为2时， 只要事务提交成功，redo log buffer中的内容只写入文件系统缓存（page cache）。
-                - 如果仅仅只是MySQL挂了不会有任何数据丢失，但是宕机可能会有1秒数据的丢失。
-                ![image](./Pictures/mysql/redo-log刷盘策略值为2.avif)
+        - redo log的刷盘策略提供了`innodb_flush_log_at_trx_commit`参数，支持3种策略：
 
             ```sql
             show variables like 'innodb_flush_log_at_trx_commit'
@@ -1337,16 +1787,50 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
             +--------------------------------+-------+
             ```
 
-- 日志文件组
+            ![image](./Pictures/mysql/redo-log刷盘策略.avif)
 
-    - 硬盘上存储的redo log日志文件不只一个，而是以一个日志文件组的形式出现的，每个的redo日志文件大小都是一样的。
+            - 数据安全性：参数 `1` > 参数 `2` > 参数 `0`
+            - 写入性能：参数 `0` > 参数 `2`> 参数 `1`
 
-        - redo log 以 **块(block)** 为单位进行存储的,每个块的大小为 **512** Bytes
-        - redo log 文件的组合大小 = (`innodb_log_file_size` \* `innodb_log_files_in_group`)
-        - 例子：可以配置为一组4个文件，每个文件的大小是1GB，整个redo log日志文件组可以记录4G的内容。
+            - `0`:表示每次事务提交时不进行刷盘操作
+                ![image](./Pictures/mysql/redo-log刷盘策略值为0.avif)
+
+                - 刷盘时机：会把缓存在 `redo log buffer` 中的 redo log ，通过调用 `write()` 写到操作系统的 `Page Cache`，然后调用 `fsync()` 持久化到磁盘。所以参数为 0 的策略，MySQL 进程的崩溃会导致上一秒钟所有事务数据的丢失;
+
+            - `1`（默认值）:表示每次事务提交时都将进行刷盘操作
+                ![image](./Pictures/mysql/redo-log刷盘策略值为1.avif)
+
+                - 刷盘时机：每当事务提交时，InnoDB会将日志缓冲区的内容写入到文件系统缓存中，并立即使用fsync将其刷新到磁盘。
+                - 持久性：这种设置提供了最高级别的持久性，确保每次事务提交后日志已持久化到磁盘。如果发生崩溃，最多会丢失尚未提交的事务。
+                - 性能：性能较差，因为每次事务提交都需要进行磁盘写入操作。在高并发写入的环境中，频繁的磁盘I/O可能会成为系统的性能瓶颈。
+
+            - `2`:表示每次事务提交时都只把 redo log buffer 内容写入 `page cache`（页缓存)，也就是刷盘操作由操作系统来负责。
+                ![image](./Pictures/mysql/redo-log刷盘策略值为2.avif)
+
+                - 刷盘时机：在每次事务提交时，InnoDB会将日志缓冲区的内容写入操作系统的文件系统缓存（Page Cache），此时并不会执行fsync操作，日志的实际写入磁盘由操作系统决定。
+                - 持久性：如果数据库发生崩溃，但服务器没有崩溃，数据不会丢失。如果服务器也发生崩溃，Page Cache默认保留最近5秒的数据，最多丢失最近5秒内的事务。但与`innodb_flush_log_at_trx_commit=0`不同，日志至少会写入文件系统缓存，这为数据安全性提供了一定保障。
+                - 性能：性能较高，因为每次事务提交时，只需将日志写入操作系统的内存缓存，而不需要立即执行磁盘I/O操作，从而减少了磁盘操作的频率。
+
+            - 以上三种策略中：
+
+                - 如果是对数据安全性要求比较高的场景，则需要将参数设置为`1`，因为1的安全性最高。
+                - 如果是在一些可以容忍数据库崩溃时丢失 1s 数据的场景，我们可以将该值设置为 `0`，这样可以明显地减少日志同步到磁盘的 I/O 操作。
+                - 如果是需要安全性和性能折中的方案，可以将参数设置为`2`，虽然参数 2 没有参数 0 的性能高，但是数据安全性方面比参数 0 强，因为参数 2 只要操作系统不宕机，即使数据库崩溃了，也不会丢失数据，同时性能方便比参数 1 高。
+
+#### redo log file日志文件组
+
+- `redo log file`
+
+    - 以一个日志文件组的形式出现，每个的redo日志文件大小都是一样的。
+
+    - 以 **块(block)** 为单位进行存储的,每个块的大小为 **512** Bytes
+
+    - `redo log file`的大小 = (`innodb_log_file_size` \* `innodb_log_files_in_group`)
+        - `innodb_log_file_size`：设置大小
+        - `innodb_log_files_in_group`：设置文件个数。
 
         ```sql
-        # redo log文件大小
+        -- redo log文件大小
         show variables like 'innodb_log_file_size';
         +----------------------+-----------+
         | Variable_name        | Value     |
@@ -1354,71 +1838,63 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
         | innodb_log_file_size | 100663296 |
         +----------------------+-----------+
 
-        # redo log文件数量
+        -- redo log文件个数
         show variables like 'innodb_log_files_in_group';
         +---------------------------+-------+
         | Variable_name             | Value |
         +---------------------------+-------+
-        | innodb_log_files_in_group | 1     |
+        | innodb_log_files_in_group | 2     |
         ```
 
-    - 日志文件组采用的是环形数组形式，从头开始写，写到末尾又回到头循环写
+        - 默认情况下存储在data目录下`ib_logfile0`和`ib-logfile1`2个文件中
+        - 可以配置为一组4个文件`ib_logfile0`到`ib_logfile3`，每个文件的大小是 1GB，整个redo log 日志文件组可以记录4G的内容。
 
-        ![image](./Pictures/mysql/redo-log日志文件组.avif)
+- 日志文件组采用的是`环形数组`形式，从头开始写，写到末尾又回到头循环写
 
-        - 有两个重要的属性
-            - write pos是当前记录的位置，一边写一边后移
-            - checkpoint（刷脏）是当前要擦除的位置，也是往后推移
+    > 这样的设计是因为Redo Log记录的是数据页的修改，而一旦Buffer Pool中的数据页被刷写到磁盘，之前的Redo Log记录就不在有效。新的日志会覆盖这些过时的记录。
 
-        - 每次刷盘redo log记录到日志文件组中，write pos位置就会后移更新。
-        - 每次MySQL加载日志文件组恢复数据时，会清空加载过的redo log记录，并把checkpoint后移更新。
-        - write pos和checkpoint之间的还空着的部分可以用来写入新的redo log记录。
-            ![image](./Pictures/mysql/redo-log日志文件组1.avif)
+    ![image](./Pictures/mysql/redo-log日志文件组.avif)
 
-        - 如果write pos追上checkpoint，表示日志文件组满了，这时候不能再写入新的redo log记录，MySQL得停下来，清空一些记录，把checkpoint推进一下。
-            ![image](./Pictures/mysql/redo-log日志文件组2.avif)
+    - 在写入数据的同时，也需要执行擦除操作。Redo Log成功刷盘到磁盘后，才可以进行擦除。因此，我们使用2个指针来管理这一过程：
+        - 1.`write pos`：当前日志记录写入的位置，即当前Redo Log文件已写到哪里。一边写一边后移。
+        - 2.`checkpoint`（刷脏）：当前可以擦除的位置，即Redo Log文件中哪些记录已不在需要，可以被新的日志覆盖。也是往后推移。位于nnoDB存储引擎内部，分为2种
+            - 1.`Sharp Checkpoint`
+            - 2.`Fuzzy Checkpoint`
 
-#### [一树一溪：Redo 日志从产生到写入日志文件](https://mp.weixin.qq.com/s/kMdD7jUaouWnHxjdmKSV4A)
+        - 每次刷盘redo log记录到日志文件组中，`write pos`位置就会后移更新。
 
-### binlog和redo log
+        - 每次MySQL加载日志文件组恢复数据时，会清空加载过的redo log记录，并把`checkpoint`后移更新。
 
-- binlog是逻辑日志，记录内容是语句的原始逻辑，类似于“给 ID=2 这一行的 c 字段加 1”，属于MySQL Server层。
+    - `write pos`和`checkpoint`之间的还空着的部分可以用来写入新的redo log记录。
+        ![image](./Pictures/mysql/redo-log日志文件组1.avif)
 
-    - 不管用什么存储引擎，只要发生了表数据更新，都会产生binlog日志。
+    - 如果`write pos`追上`checkpoint`，表示日志文件组满了。这时候不能再写入新的redo log记录，MySQL得停下来，清空一些记录。
+        - 此时必须强制执行`checkpoint`操作，刷新Buffer Pool中的脏页并将其写入磁盘。随后，`checkpoint`指针会被移动，这样就可以继续向Redo Log文件中写入新的数据。
+        ![image](./Pictures/mysql/redo-log日志文件组2.avif)
 
-    - 只记录对数据库更改的所有操作，不包括 `select`，`show` 等这类操作不修改数据的语句
+##### [一树一溪：Redo 日志从产生到写入日志文件](https://mp.weixin.qq.com/s/kMdD7jUaouWnHxjdmKSV4A)
 
-- redo log它是物理日志，记录内容是“在某个数据页上做了什么修改”，属于InnoDB存储引擎。
+### Undo Log（回滚日志）
 
-    ![image](./Pictures/mysql/binlog_and_redolog.avif)
+- Undo Log对比Redo Log
+    - 若事务在**提交前**发生崩溃，则可以通过Undo Log回滚事务。
+    - 若事务在**提交后**发生崩溃，则可以通过Redo Log来恢复事务。
 
-- 虽然它们都属于持久化的保证，但是则重点不同。
-
-    - 在执行更新语句过程，会记录redo log与binlog两块日志，以基本的事务为单位，redo log在事务执行过程中可以不断写入，而binlog只有在提交事务时才写入，所以redo log与binlog的写入时机不一样。
-
-    ![image](./Pictures/mysql/binlog_and_redolog1.avif)
-
-- redo log与binlog两份日志之间的逻辑不一致，会出现什么问题？
-
-    - 假设执行过程中写完redo log日志后，binlog日志写期间发生了异常，会出现什么情况呢？
-
-        ![image](./Pictures/mysql/binlog_and_redolog2.avif)
-        ![image](./Pictures/mysql/binlog_and_redolog3.avif)
-
-    - 解决方法：两阶段提交——将redo log的写入拆成了两个步骤prepare和commit，这就是两阶段提交。
-        ![image](./Pictures/mysql/binlog_and_redolog4.avif)
-
-        - 使用两阶段提交后，写入binlog时发生异常也不会有影响，因为MySQL根据redo log日志恢复数据时，发现redo log还处于prepare阶段，并且没有对应binlog日志，就会回滚该事务。
-        ![image](./Pictures/mysql/binlog_and_redolog5.avif)
-
-### undo log（回滚日志）
-
+- Undo Log记录了事务在修改数据之前的原始状态，用于在事务回滚时撤销未完成的修改，确保事务的**原子性**和**隔离性**。
 
 - redo 日志只有崩溃恢复的时候才能派上用场，undo 日志不一样，它承担着多重职责，MySQL 崩溃恢复、以及正常提供服务期间，都有它的身影。
 
-    - 职责 1：为 MVCC 服务，减少读写事务之间的相互影响，提升数据库的并发能力。
-    - 职责 2：保证数据库运行过程中的数据一致性。事务回滚时，把事务中被修改的数据恢复到修改之前的状态。
-    - 职责 3：保证数据库崩溃之后的数据一致性。崩溃恢复过程中，恢复没有完成提交的事务，并根据事务的状态和 binlog 日志是否写入了该事务的 xid 信息，共同决定事务是提交还是回滚。
+- Undo Log主要的功能有2个：
+    - 1.MVCC：减少读写事务之间的相互影响，提升数据库的并发能力。
+    - 2.事务回滚：
+        - 保证数据库运行过程中的数据一致性。事务回滚时，把事务中被修改的数据恢复到修改之前的状态。
+        - 保证数据库崩溃之后的数据一致性。崩溃恢复过程中，**恢复没有完成提交的事务**，并根据事务的状态和 binlog 日志是否写入了该事务的 xid 信息，共同决定事务是提交还是回滚。
+
+- 事务如何通过Undo Log进行回滚操作呢？
+    - 其实很简单，只需要在Undo Log日志中记录事务中的反向操作即可，发生回滚时直接通过Undo Log中记录的反向操作进行恢复。例如：
+    - 事务进行insert操作，Undo Log记录delete操作。
+    - 事务进行delete操作，Undo Log记录insert操作。
+    - 事务进行update操作（value1 改为value2 ），Undo Log记录update操作（value2 改为value1 ）。
 
 - undo log 逻辑日志：
     - 事务未提交的时候,所有事务进行的修改都会先先记录到这个回滚日志中，并持久化到磁盘上。
@@ -1430,7 +1906,9 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
     - 每个事务都维护着各自独立的 undo 日志序号，和其它事务无关。
     - InnoDB 的 savepoint 结构中会保存创建 savepoint 时事务对象的 undo_no 属性值。
 
-### undo log的存储结构
+#### Undo Tablespace（表空间）
+
+![image](./Pictures/mysql/undo-log-存储结构.avif)
 
 - undo 日志需要为数据一致性和 MVCC 服务，除了要支持多事务同时写入日志，还要支持多事务同时读取日志。
 
@@ -1440,11 +1918,27 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
 
     ![image](./Pictures/mysql/undo-log-存储结构.avif)
 
-    - 以下的undo log组成部分，从下（被管理）往上（管理）讲
+    > 以下的undo log组成部分：从下（被管理）往上（管理）讲
 
-    - undo log header：一个事务可能产生多条 undo 日志，也可能只产生一条 undo 日志，不管事务产生了多少条 undo 日志，这些日志都归属于事务对应的日志组，日志组由 undo log header 负责管理。
+    - undo log 保存的是一个版本的链路，使用`roll_pointer`这个字段来连接的。多个事务的undo log 日志组成了一个版本链，如图：
+
+        ![image](./Pictures/mysql/undo-log-存储结构-undo_log1.avif)
+        ![image](./Pictures/mysql/undo-log-存储结构-undo_log.avif)
+
+        - `trx_id`：事务id。记录了这一系列事务操作是基于哪个事务。
+
+        - `roll_pointer`：回滚指针。就是当要发生rollback回滚操作时，就通过roll_pointer进行回滚。并且将这些 undo log 串成一个链表，这个链表称为版本链。
+            - 在事务执行过程中，如果发生错误或主动回滚，Undo Log 会将数据恢复到事务开始前的状态，确保事务的所有操作要么全部完成，要么全部撤销，从而实现原子性。
+
+        - `undo log header`：一个事务可能产生多条 undo 日志，也可能只产生一条 undo 日志。不管事务产生了多少条 undo 日志，这些日志都归属于事务对应的日志组，日志组由 undo log header 负责管理。
 
     - undo 页：undo log header 和 undo 日志都存储于 undo 页中。
+
+        - Undo页还存在于`Buffer Pool`中
+            - `Buffer Pool` 是 InnoDB 的内存缓存，用于存储数据页和索引页，以便快速访问。
+            - 它通过减少磁盘 I/O，提高数据库的整体性能。将Undo页放在缓存中，可以加速事务的回滚和数据恢复。
+
+        - 当事务commit之后，不会立即删除，会保留至所有快照读完成。后续会通过后台线程中的Master Thread或Purge Thread进行Undo Page的回收工作。
 
     - undo 段：为了多个事务同时写 undo 日志不相互影响，undo 日志也使用了无锁设计，InnoDB 会为每个事务分配专属的 undo 段，每个事务只会往自己专属 undo 段的 undo 页中写入日志。
 
@@ -1465,6 +1959,189 @@ reverse_sql 是一个用于解析和转换 MySQL 二进制日志（binlog）的�
         - InnoDB 还能够最多支持 127 个 undo 表空间，这样算起来，所有回滚段总共能够管理的 undo 段数量是：1024 * 128 * 127 = 16646144。
 
 - [详情请看。一树一溪：Undo 日志用什么存储结构支持无锁并发写入？](https://mp.weixin.qq.com/s/pzVMnsOPpAqxbttaTuwWnQ)
+
+##### 历史演变
+
+- [爱可生开源社区：技术分享 | MySQL Undo 工作机制历史演变（文末活动）](https://mp.weixin.qq.com/s/_XV9Y67Y1UMjJn8isxFy8g)
+
+- UNDO 表空间管理发展史
+
+- MySQL 5.6 版本之前
+    - `Undo Tablespace`（表空间） 是在 `ibdata` 中与系统表空间一起。比较常见的问题是由于大事务不提交导致 ibdata 膨胀，而且事务提交之后不能回收空间，进而浪费大量的空间甚至把磁盘打爆，同时也增加了数据库物理备份的时间。
+
+    - 解决方法：重建数据库是唯一的
+
+- MySQL 5.6 版本
+
+    - InnoDB 支持设置独立的 Undo Tablespace，也即 Undo Log 可以存储于 ibdata 文件之外。但是该特性存在一定的限制：
+
+        - 使用者必须在 初始化实例的时候，通过设置 `innodb_undo_tablespaces` 的值来实现 Undo Tablespace 独立，而且在初始化完成后不可更改。默认值为 `0`，表示不独立设置 Undo 的 Tablespace，默认记录到 ibdata 中。
+            ```sql
+            show variables like 'innodb_undo_tablespaces';
+            +-------------------------+-------+
+            | Variable_name           | Value |
+            +-------------------------+-------+
+            | innodb_undo_tablespaces | 3     |
+            +-------------------------+-------+
+            ```
+            - 修改  `innodb_undo_tablespaces` 的值会导致数据库无法启动。
+        - Undo Tablepsace 的 Space ID 必须从 1 开始，无法增加或者删除 Undo Tablespace。
+
+- MySQL 5.7 版本
+
+    - 引入一个 让 DBA 开心的功能 -- 在线 Truncate Undo Tablespace。该功能通过  `innodb_undo_log_truncate` 参数来控制。
+
+    ```sql
+    show variables like 'innodb_undo_log_truncate';
+    +--------------------------+-------+
+    | Variable_name            | Value |
+    +--------------------------+-------+
+    | innodb_undo_log_truncate | OFF   |
+    +--------------------------+-------+
+    ```
+
+- MySQL 8.0 版本
+
+    - MySQL 对 Undo Tablespace 进一步优化。
+
+    - 在 8.0 版本中，独立 Undo Tablespace 特性默认打开。从 8.0.3 版本开始，默认 Undo Tablespace 的个数从 0 调整为 2。
+
+    - 支持动态在线增加/删除 Undo Tablespace 。
+
+    - Undo Tablespace 的命名从 `undoNNN` 修改为 `undo_NNN` 。
+
+    - 在 8.0 之前只能创建 128个 回滚段，而在 8.0 版本开始，每个 Undo Tablespace 可以创建 128 个回滚段。共有 `innodb_rollback_segments` * `innodb_undo_tablespaces` 个回滚段。在高并发下可以显著的减少因为分配到同一个回滚段内的事务间产生的锁冲突，从而提高系统并行性能。
+
+    - `innodb_undo_truncate` 参数默认打开， Undo Tablespace 大小超过 `innodb_max_undo_log_size` 来控制时，就会触发 Online Truncate。
+
+        ```sql
+        show variables like 'innodb_max_undo_log_size';
+        +--------------------------+----------+
+        | Variable_name            | Value    |
+        +--------------------------+----------+
+        | innodb_max_undo_log_size | 10485760 |
+        +--------------------------+----------+
+        ```
+
+    - 支持 Undo Tablespace 加密。
+
+##### 配置和维护
+
+- 相关参数：
+
+    - `innodb_undo_directory`：存储 Undo 文件的目录。
+    - `innodb_undo_log_truncate`：用于打开/关闭 Truncate Undo 特性，可动态调整。MySQL  8.0 默认开启。
+    - `innodb_undo_tablespaces`：默认为 2，用于初始化实例时设置 Undo Tablespace 的个数，该参数可以动态调整。要实现在线 Truncate Undo，该参数需要大于等于 2，因为在 Truncate 一个 Undo Log 文件时，需要保证另外一个是可用的。手动维护的时候可以设置为 3 或者更大。
+    - `innodb_purge_rseg_truncate_frequency`：默认最大值 128，用于控制 purge 回滚段的频率。也就是 128 次后才会触发一次 Undo 的 Truncate，而每次清理的 Undo Page 由 `innodb_purge_batch_size` 参数决定。`innodb_purge_batch_size` 默认为 300，也即 300×128 个 Undo 批次清理后才会触发 Undo 表空间的收缩操作。该参数越小，Undo 表空间被尝试 Truncate 的频率越高。
+    - `innodb_max_undo_log_size`：控制 Undo 表空间文件的大小，超过这个阈值时才会去尝试 Truncate。Truncate 后的大小默认为 10M。
+
+- 我们通过模拟 Undo 文件增大、手动添加 Undo 表空间和文件的过程，来学习 Undo 表空间的管理操作。基本思路是：
+
+    - 1.一般默认 MySQL 实例有 2 个 Undo Tablespace。
+    - 2.添加新的 Undo 表空间 A。
+    - 3.设置老的 Undo 表空间 B 为 inactive，系统基于 `innodb_undo_log_truncate =ON` 自动回收 Undo 文件空间。
+    - 4.设置老的 Undo 表空间 B 为 active。
+    - 5.此时可以保留新的 Undo 表空间 A 或者设置 Undo 表空间 A 为 inactive ，然后删除。
+
+- 接下来我们根据以上的思路进行测试。
+
+- 1.查看当前 Undo 表空间和状态
+    ```sql
+    SELECT NAME, STATE
+    FROM INFORMATION_SCHEMA.INNODB_TABLESPACES
+    WHERE NAME LIKE '%undo%';
+    +-----------------+--------+
+    | NAME            | STATE  |
+    +-----------------+--------+
+    | innodb_undo_001 | active |
+    | innodb_undo_002 | active |
+    +-----------------+--------+
+    ```
+
+- 2.添加新的 Undo 表空间
+
+    - 系统默认会分配 2 个 innodb 开头的表空间。如果手工新增 Undo 表空间，创建 innodb 开头的表空间名称会报错，提示以 innodb 开头的表空间名称被系统占用。
+
+        ```sql
+        -- 文件必须是 .ibu 结尾，否则也是会报错。
+        create undo tablespace innodb_undo_003 add datafile 'undo_003.ibu';
+        ERROR 3119 (42000): InnoDB: Tablespace names starting with `innodb_` are reserved.
+        ```
+
+- 3.创建 Undo Tablespace
+
+    - 创建 Undo Tablespace 文件 `undo_003`。
+
+        ```sql
+        create undo tablespace undo_003 add datafile 'undo_003.ibu';
+        SELECT NAME, STATE
+         FROM INFORMATION_SCHEMA.INNODB_TABLESPACES
+         WHERE NAME LIKE '%undo%';
+        +-----------------+--------+
+        | NAME            | STATE  |
+        +-----------------+--------+
+        | innodb_undo_001 | active |
+        | innodb_undo_002 | active |
+        | undo_003        | active |
+        +-----------------+--------+
+        ```
+
+- 4.自动回收 Undo 文件空间
+
+    - 设置 `innodb_undo_002` 为 inactive ，让系统自动收缩 Undo 文件。
+
+        ```sql
+        ALTER UNDO TABLESPACE innodb_undo_002 SET INACTIVE;
+        SELECT NAME, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME LIKE '%undo%';
+        +-----------------+--------+
+        | NAME            | STATE  |
+        +-----------------+--------+
+        | innodb_undo_001 | active |
+        | innodb_undo_002 | empty  | -- 状态为 empty 时即可触发系统 undo表空间回收
+        | undo_003        | active |
+        +-----------------+--------+
+        ```
+
+    - 我们不能删除系统默认创建 innodb 开头的 Undo 表空间，系统会提示 该空间为系统保留空间。
+
+        ```sql
+        DROP UNDO TABLESPACE  innodb_undo_002;
+        ERROR 3119 (42000): InnoDB: Tablespace names starting with `innodb_` are reserved.
+        ALTER UNDO TABLESPACE innodb_undo_002 SET ACTIVE;
+        ```
+
+- 5.删除新的 Undo 表空间
+
+    ```sql
+    ALTER UNDO TABLESPACE undo_003 SET INACTIVE;
+    SELECT NAME, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME LIKE '%undo%';
+    +-----------------+--------+
+    | NAME            | STATE  |
+    +-----------------+--------+
+    | innodb_undo_001 | active |
+    | innodb_undo_002 | active |
+    | undo_003        | empty  |
+    +-----------------+--------+
+
+    DROP UNDO TABLESPACE undo_003;
+    SELECT NAME, STATE FROM INFORMATION_SCHEMA.INNODB_TABLESPACES WHERE NAME LIKE '%undo%';
+    +-----------------+--------+
+    | NAME            | STATE  |
+    +-----------------+--------+
+    | innodb_undo_001 | active |
+    | innodb_undo_002 | active |
+    +-----------------+--------+
+    ```
+#### MVCC
+
+- MVCC 是通过 ReadView + undo log 实现的。
+    - 对于「读提交」和「可重复读」隔离级别的事务来说，它们的快照读（普通 select 语句）是通过 Read View  + undo log 来实现的，它们的区别在于创建 Read View 的时机不同：
+        - 「读提交」隔离级别是在每个 select 都会生成一个新的 Read View，也意味着，事务期间的多次读取同一条数据，前后两次读的数据可能会出现不一致，因为可能这期间另外一个事务修改了该记录，并提交了事务。
+        - 「可重复读」隔离级别是启动事务时生成一个 Read View，然后整个事务期间都在用这个 Read View，这样就保证了在事务期间读到的数据都是事务启动前的记录。
+
+        - 这两个隔离级别实现是通过「事务的 Read View 里的字段」和「记录中的两个隐藏列（trx_id 和 roll_pointer）」的比对，如果不满足可见行，就会顺着 undo log 版本链里找到满足其可见性的记录，从而控制并发事务访问同一个记录时的行为，这就叫 MVCC（多版本并发控制）。
+
+- 当事务 A 读取某一行记录时，若该记录已经被其他事务 B 占用，当前事务 A 可以通过 Undo Log 读取之前的行版本信息，以此实现非锁定读取（如果有长时间的查询，会导致历史的 Undo 不能及时清理，进而导致 Undo Log 膨胀）。
 
 ### 其他日志工具
 
@@ -1491,17 +2168,54 @@ mysqlsla --log-type error /var/log/mysql/mysql_error.log
 
     - 如果是只有某条查询变慢, 则可能是查询问题
 
-### profile 记录查询响应时间
+### profile 记录每条查询的具体时间
 
 ```sql
-# 开启profile
-set profile = 1
+-- 查看profile是否开启
+show variables like 'profiling';
 
-# 查看所有查询的响应时间
-show profiles
+-- 开启profile
+set profile = 1:
+-- or
+set profiling=ON;
 
-# 查看上一次查询每个步骤的响应时间
-show profile
+-- 正常执行语句
+
+-- 查看所有查询的响应时间
+show profiles;
++----------+------------+---------------------------------------------------+
+| Query_ID | Duration   | Query                                             |
++----------+------------+---------------------------------------------------+
+|        1 | 0.06811025 | select * from user where age>=60                  |
+|        2 | 0.00151375 | select * from user where gender = 2 and age = 80  |
+|        3 | 0.00230425 | select * from user where gender = 2 and age = 60  |
+|        4 | 0.00070400 | select * from user where gender = 2 and age = 100 |
+|        5 | 0.07797650 | select * from user where age!=60                  |
++----------+------------+---------------------------------------------------+
+
+-- 上面的select * from user where age>=60对应的query_id是1，如果你想查看这条SQL语句的具体耗时，那么可以执行以下的命令。
+-- 可以看出Sending data的耗时最大，这个是指执行器开始查询数据并将数据发送给客户端的耗时，因为我的这张表符合条件的数据有好几万条，所以这块耗时最大，也符合预期。
+-- 一般情况下，我们开发过程中，耗时大部分时候都在Sending data阶段，而这一阶段里如果慢的话，最容易想到的还是索引相关的原因。
+show profile for query 1;
++----------------------+----------+
+| Status               | Duration |
++----------------------+----------+
+| starting             | 0.000074 |
+| checking permissions | 0.000010 |
+| Opening tables       | 0.000034 |
+| init                 | 0.000032 |
+| System lock          | 0.000027 |
+| optimizing           | 0.000020 |
+| statistics           | 0.000058 |
+| preparing            | 0.000018 |
+| executing            | 0.000013 |
+| Sending data         | 0.067701 |
+| end                  | 0.000021 |
+| query end            | 0.000015 |
+| closing tables       | 0.000014 |
+| freeing items        | 0.000047 |
+| cleaning up          | 0.000027 |
++----------------------+----------+
 ```
 
 ### 记录计数器
@@ -4087,6 +4801,59 @@ docker 主从复制测试:
 
 - [爱可生开源社区：第四期话题：MySQL Group Replication 能否在生产环境中大规模使用？](https://mp.weixin.qq.com/s/gYb3yE8IfiOFqkTvMYfjQA)
 
+- [自学Oracle：Keepalived+Router+Innodb_Cluster部署](https://mp.weixin.qq.com/s/qyhjOnc9eiakVYDO8sYQCQ)
+
+#### [AustinDatabases：MySQL Innodb Cluster 高可用推广“失败” 了？](https://mp.weixin.qq.com/s/DVF2Fc3EGAkyGYANFkawlA)
+
+- innodb cluster/group replication为什么没干起来说起。
+
+    - 一句话，MySQL Innodb cluster是一场彻头彻尾的开源数据库产品力上典型的失败案例。
+
+- 1.MySQL的启动Innodb cluster的动机是什么！
+
+    - MySQL 启动 group replication的主要动机是为了ORACLE Cloud的MySQL 云服务或私有云系列而准备的，或者为MySQL Enterprise 版本服务器的，对于开源的部分MySQL或许希望使用者成为小白鼠或者实验者的想法可能更多。 现在大家都非常清楚甲骨文在云上发力，且Oracle已经作为世界4大云厂商，数据库的盈利对他来说未来越来越不重要，而云上的环境中如果使用MySQL要求会更严苛，他们需要一套坚固的，在云环境中可以完美实现高可用切换且使用完善的高可用协议实现的产品。产品都需要进行打造，那么MySQL开源的部分就是他们要用户去尝试，去找问题，去反馈，更多的用户反馈更有利于产品的发展，而MySQL的ORACLE 云并不是每个用户都能用到，尤其中国的客户。所以推出这样的产品，**让更多的客户用到，并且为企业版私有云部署提供标准化统一的方案，这才是甲骨文对于MySQL Innodb cluster部分的最大目的。**
+
+- 2.Innodb cluster可见成本不友好
+
+    - MySQL流行的主要原因是成本低，（当然这个部分我不是太认可，只是部分人认为他成本低，实际上不低）。一般我们做MySQL都是主从的方式，而innodb cluster 在使用中要求的是至少3台主机，这无形中提高了MySQL使用的成本。我们来算一笔账。
+
+        - 如果我们有10套MySQL的数据库，如果是主从的方式那么我仅仅是需要20台主机，而如果使用了innodb cluster 的方式，我们且不说你的mysql router 或者proxysql的代理需求，仅仅说你的集群方式必须3台，那么你将多出来10台的主机。
+
+        - 10台的主机的钱谁来出，甲骨文给你出吗？ 公司会问到你，原来的主从模式挺好，为什要用innodb cluster的模式来做高可用。大部分使用MySQL的企业，都还是比较在乎成本的，小企业在乎，大企业也在乎，MySQL的数据量越多，越在乎成本。
+
+        - 这里我们还没有提到，对网络要求的严苛，我们可能还要更换交换机满足大量MySQL数据库产品的上线应对的网络流量的问题，和网络稳定性的问题，至少需要冗余一套网络设备防止数据库解体。
+
+- 3.Innodb cluster的要求高，导致收益不匹配
+
+    - 这句话从何而来，MySQL我是从5.1开始用起来的，当初MySQL数据库的目的是为了小型应用而服务的，最早的初衷也不是为大型应用而服务的。基于MySQL的应用在早期都是小型的应用，早期数据库的类型还不丰富，基于阿里集团更换oracle数据库为目的，选择了MySQL后才有了MySQL在中国的辉煌。
+
+    - 应运而生了分库分表的组件等等，Innodb cluster 的出现对于一个管理小型应用的数据库产品，拔高了他在高可用上的要求。
+
+        - 1.至少3台服务器，且三台服务器的配置需要相同 
+        - 2.网络环境的要求，相对于之前的复制协议，有了更严苛的稳定性要求，同时带宽的要求也变得更加重要。 
+        - 3.更复杂的参数配置，NTP时间维度的要求 
+        - 4.事务大小的变得更加敏感
+
+    - MySQL本来就是一个灵活性较高的产品，而在使用innodb cluster后整体的要求变高了，可收益没有提高，单体的MySQL依然无法存储更高数据量的表，相对于其他的数据库产品，可能我2-3套能Hold住的情况，MySQL需要更多的数量来完成这些项目的建立，收益非常的不匹配。
+
+    - 尤其现在有了PostgreSQL,这让MySQL的性价比更低了。
+
+- 4.技术的硬伤与缺陷，与人设不符
+
+    - MySQL 的复制机制（基于二进制日志）本身就存在一定的延迟。虽然 Group Replication 在一定程度上通过并行复制等技术缓解了延迟问题，但在高并发、大事务的场景下，延迟仍然可能比较明显。
+
+    - 同时这和MySQL高并发，高吞吐的人设与innodb cluster 本身产生了冲突，更高的并发导致冲突检测和解决问题的复杂性。在高并发场景下，冲突可能会更加频繁，影响性能。 本身是为了提高性能，最后成了拖后腿的。组复制在处理大事务时可能存在一些限制，例如可能导致集群性能下降或阻塞。这使得一些需要处理大事务的应用不太适合使用 InnoDB Cluster。
+
+- 5.早期的版本稳定性和匆忙推出产品，导致口碑差
+
+    - 1.脑裂的问题 早期版本的 Group Replication 协议在处理网络分区等故障时不够健壮，更容易出现脑裂问题。虽然后续版本通过改进协议和引入 Paxos 协议等方式大大降低了脑裂的风险，但口碑已经形成了，这就不太容易改变了。
+    - 2.成员管理问题 早期版本在处理成员加入和退出集群时可能存在一些问题，例如加入速度慢、退出不干净等。这些问题可能导致集群短暂的不可用或性能下降。
+    - 3.错误处理和日志信息 早期版本在出现错误时，提供的错误信息不够清晰，难以定位问题，这也是早期使用吐槽的地方，日志信息不详细，出现问题根本不知道哪里出现了问题。
+
+- 平心而论，当前的MySQL的innodb cluster 已经走向的成熟，其实现在使用作为一个稳定的高可用形式，还是不错的，可既定的影响已经产生，人的观念很难改变，同时还存在一个问题，innodb replicaiton的方式也不错，相对innodb cluster更加的皮实，且学习的知识也不是太多。
+
+- 最重要的灵一个问题是，当今MySQL的高速发展期已经过去了，现在数据库对于MySQL来说是存量市场，新兴的市场被 OceanBase,Tidb,PostgreSQL,等商业产品和开源产品逐渐霸占，更多的人不是不想研究，是没有动力研究。
+
 ## 中间件
 
 - [爱可生开源社区：第六期话题：MySQL 中间件的选择，ProxySQL、Spider、MyCAT、DBLE 怎么选？](https://mp.weixin.qq.com/s/Q7rd47eZI1A5Cq3ZfvQV2g)
@@ -4195,7 +4962,7 @@ docker 主从复制测试:
 
 - 备份的方法可以分为：
 
-    - 1.逻辑备份：MySQL的逻辑备份可以通过SQL语句、mysqldump、mydumper、XtraBackup以及MySQL5.7以后出现的mysqlpump 多线程备份，但由于mysqlpump使用的较少且不安全，不在此次讲述范围之内。
+    - 1.逻辑备份：MySQL的逻辑备份可以通过SQL语句、`mysqldump`、`mydumper`、`XtraBackup`，以及MySQL5.7以后出现的`mysqlpump` 多线程备份，但由于`mysqlpump`使用的较少且不安全，不在此次讲述范围之内。
 
         - 优点：
 
@@ -4216,9 +4983,9 @@ docker 主从复制测试:
             - 创建备份时，要求MySQL服务器必须运行。
             - 备份期间应用程序可以执行只读操作。
             - 服务器通过读取正在备份的表的结构和内容来创建文件，然后将结构和数据转换为SQL语句或文本文件。
-            - 利用InnoDB 的MVCC可以实现热备份，使用“REPEATABLE READ”隔离级别实现一致的时间点备份。
+            - 利用InnoDB 的MVCC可以实现热备份，使用`REPEATABLE READ`隔离级别实现一致的时间点备份。
 
-    - 2.物理备份：主要是指复制数据文件。用户可以使用标准的“tar”，“cp”等命令操作，也可以通过物理镜像、块操作，及快照文件等实现。
+    - 2.物理备份：主要是指复制数据文件。用户可以使用标准的`tar`，`cp`等命令操作，也可以通过物理镜像、块操作，及快照文件等实现。
         - 优点：
             - 物理备份的优势在于执行备份和恢复时远超逻辑备份的速度，其快速的原因是其作为一个文件或文件系统进行复制
             - 备份文件的大小与数据文件的实际大小相同。
@@ -4268,7 +5035,33 @@ docker 主从复制测试:
 
     ![image](./Pictures/mysql/备份策略.avif)
 
-### 备份工具性能对比
+### 备份工具优缺点梳理
+
+- mysqldump 缺点：单线程备份，串行地从数据库中一张张导出表中的记录，备份速度是该工具最大的问题。
+
+- mydumper 一种并行的逻辑备份工具，极大解决了逻辑备份的速度问题。
+    - 缺点：但随着单个实例数据库容量的不断增长，单实例500G、1T已经不再少见，通过逻辑备份工具备份和恢复 MySQL 速度依然难以让生产用户满意，特别是在克隆一个新的 MySQL 节点时。
+
+- Xtrabackup 备份的缺点
+
+    - 在 Xtrabackup 备份的过程中，可能遇到的最大的问题在于拷贝 Redo Log 的速度跟不上线上生产 Redo Log 的速度。
+
+        - 因为 Redo Log 是会循环利用的，当 CK 过后旧的 Redo Log 可能会被新的 Redo Log 覆盖，而此时如果 Xtrabackup 没有完成旧的 Redo Log 的拷贝，那么没法保证备份过程中的数据一致性。
+
+    - 使用中翻车的情况也不少
+
+    - 不可否认，在 Xtrabackup 中也可以实现流式物理备份到远程服务器，但其需打通 ssh 的免密登录，这在生产环境是很难被允许的操作，往往会触发安全红线。
+
+        - Clone Plugin 的一大优势是远程备份。通过 MySQL 通信协议，可直接将物理备份文件备份到远程 MySQL 实例，甚至直接恢复出一个实例，这在做节点 Clone 时，简直太香了！
+
+- Clone Plugin有比较多的限制：如
+    - 捐献者和接收者必须运行相同的操作系统、mysql版本、字符集、校验集。
+    - Clone Plugin 不备份 MySQL 配置文件，而 Xtrabackup 是备份的。
+    - 具体看对应章节
+
+### 逻辑备份
+
+- 备份工具性能对比
 
 | 导出             | 导入                           | 优点         | 推荐度（效率）    |
 |------------------|--------------------------------|--------------|-------------------|
@@ -4290,29 +5083,29 @@ docker 主从复制测试:
 - mydumper
     - 在数据量大于 50G 的场景中，更推荐 mydumper。
 
-### 导出不同文件格式
-
-```sh
-# \G格式导出数据
-mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
-
-# html
-mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
-
-# xml
-mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
-```
-
-```sql
-# csv
-SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
-FIELDS TERMINATED BY ',' ENCLOSED BY '"'
-LINES TERMINATED BY '\r\n';
-```
-
-### LOAD DATA/OUTFILE 导入/导出文件
+#### LOAD DATA/OUTFILE 导入/导出文件
 
 - [爱可生开源社区：技术分享 | MySQL Load Data 的多种用法](https://mp.weixin.qq.com/s/WNXRshkvC3bFcc5NDaWlrw)
+
+- 导出不同文件格式
+
+    ```sh
+    # \G格式导出数据
+    mysql -uroot -p --vertical --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+    # html
+    mysql -uroot -p --html --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+
+    # xml
+    mysql -uroot -p --xml --execute="select * from cnarea_2019;" china > /tmp/cnarea_2019.html
+    ```
+
+    ```sql
+    -- csv
+    SELECT * FROM cnarea_2019 INTO OUTFILE '/tmp/cnarea_2019.csv'
+    FIELDS TERMINATED BY ',' ENCLOSED BY '"'
+    LINES TERMINATED BY '\r\n';
+    ```
 
 ```sql
 -- 创建源数据表
@@ -4412,53 +5205,49 @@ LOAD DATA INFILE '/tmp/test'
           data=upper(@C2); -- 转换为大写
     ```
 
-### mysqldump 备份和恢复
+#### mysqldump 备份和恢复
 
-- mysqldump 可以保证数据一致性且不影响业务的运行，所产生的备份，最终是要结合 binlog 进行恢复。备份的过程是先从 buffer 中找到需要备份的数据进行备份，如果 buffer 中没有，则去磁盘的数据文件中查找并调回到 buffer 里面在备份，最后形成一个可编辑的以 .sql 结尾的备份文件。
+- mysqldump 可以保证数据一致性且不影响业务的运行，所产生的备份，最终是要结合 binlog 进行恢复。备份的过程是先从 buffer 中找到需要备份的数据进行备份，如果 buffer 中没有，则去磁盘的数据文件中查找并调回到 buffer 里面在备份，最后形成一个可编辑的以 `.sql` 结尾的备份文件。
 
 - 单线程
 
-- 它可以执行逻辑备份，如果执行备份的对象是InnoDB存储引擎，则可以执行热备份，默认情况下，它对所有的引擎执行温备份。
-
-- 备份的基本流程如下：
-    - 1.调用 FTWRL(flush tables with read lock)，全局禁止读写
-    - 2.开启快照读，获取此时的快照(仅对 innodb 表起作用)
-    - 3.备份非 innodb 表数据(*.frm,*.myi,*.myd等)
-    - 4.非 innodb 表备份完毕后，释放 FTWRL锁
-    - 5.逐一备份 innodb 表数据
-    - 6.备份完成。
+- 它可以执行逻辑备份，如果执行备份的对象是InnoDB存储引擎，则可以执行**热备份**，默认情况下，它对所有的引擎执行**温备份**。
 
 - 注意事项：
 
     - 有删除表，建立表的语句，小心导入目标库时，删除表的语句，造成数据误删。
 
-    - INSERT 语句没有字段名称，导入时表结构要一致。
+    - `INSERT` 语句没有字段名称，导入时表结构要一致。
 
     - 导入过程中有 `lock table write` 操作，导入过程中相关表不可写。
 
-    - `ALTER TABLE 表 DISABLE KEYS` 此语句将禁用该表的所有非唯一索引，这可以提高插入大量数据时的性能。 对应的文件末尾有 `ALTER TABLE 表 ENABLE KEYS;` 重新构建索引
+    - `ALTER TABLE <table-name> DISABLE KEYS` 此语句将禁用该表的所有非唯一索引，这可以提高插入大量数据时的性能。 对应的文件末尾有 `ALTER TABLE <table-name> ENABLE KEYS;` 重新构建索引
 
+    - 在备份开始时，如果有元数据锁存在或者尚未完成的 ddl 语句，那么 mysqldump 会在获取 `flush tables` 卡住，一直等待。在此期间对于存在元数据锁涉及的表，其他 session 都会被阻塞，查询也不行。
 
-- 参数
+        - mysqldump 在遇到如上等待时，`show processlist` 中 state 会有 waiting for table flush 字样。
+        - 此时要么停止备份，要么释放元数据锁。
 
-    - --hex-blob：是 mysqldump 工具的一个选项，它的作用是将 BLOB 类型的数据导出为十六进制字符串。这对于存储二进制数据（如图片、文件等）非常有用
+##### 参数
 
-    - `--routines`、`--event`，`--trigger`：分别用于转储存储例程、事件调度器的事件，及触发器。
+- --hex-blob：是 mysqldump 工具的一个选项，它的作用是将 BLOB 类型的数据导出为十六进制字符串。这对于存储二进制数据（如图片、文件等）非常有用
 
-    - `--opt`选项是以下语句的简写：`--add-drop-table --add-locks --create-options --disable-keys --extended-insert --lock-tables --quick--set-charset`。它提供了一个快速的转储操作，并产生一个可以快速重新加载到MySQL服务器的转储文件。
+- `--routines`、`--event`，`--trigger`：分别用于转储存储例程、事件调度器的事件，及触发器。
 
-    - 用于创建对象的选项：
+- `--opt`选项是以下语句的简写：`--add-drop-table --add-locks --create-options --disable-keys --extended-insert --lock-tables --quick--set-charset`。它提供了一个快速的转储操作，并产生一个可以快速重新加载到MySQL服务器的转储文件。
 
-        - `--no-create-db`：不写入`CREATE DATABASE`语句。
-        - `--no-create-info`：不写入`CREATE DATABASE`语句。
-        - `--no-data`：创建数据库和表的结构，但是不包含数据。
-        - `--no-tablespaces`：不写入`CREATE LOGFILE GROUP`或`CREATE TABLESPACE`。
-        - `--quick`：快速从表中查询一条记录，不使用表的缓冲集。
+- 用于创建对象的选项：
 
-    - 用于删除对象的选项：
+    - `--no-create-db`：不写入`CREATE DATABASE`语句。
+    - `--no-create-info`：不写入`CREATE DATABASE`语句。
+    - `--no-data`：创建数据库和表的结构，但是不包含数据。
+    - `--no-tablespaces`：不写入`CREATE LOGFILE GROUP`或`CREATE TABLESPACE`。
+    - `--quick`：快速从表中查询一条记录，不使用表的缓冲集。
 
-        - `--add-drop-database`：在创建数据语句之前增加`DROP DATABASE`语句。
-        - `--add-drop-table`：在创建表语句之前增加`DROP TABLE`语句。
+- 用于删除对象的选项：
+
+    - `--add-drop-database`：在创建数据语句之前增加`DROP DATABASE`语句。
+    - `--add-drop-table`：在创建表语句之前增加`DROP TABLE`语句。
 
 - 部分遇到的问题可以使用下面参数解决。
 
@@ -4491,22 +5280,26 @@ LOAD DATA INFILE '/tmp/test'
 
 - 单表导出。保证数据一致性
 
-    - `--master-data=2` ：在备份期间对所有表加锁 FLUSH TABLES WITH READ LOCK，并执行 SHOW MASTER STATUS 语句以获取二进制日志信息。该参数有 1 和 2 两个值
-        - 如果值等于 1，就会在备份出来的文件中添加一个 CHANGE MASTER 的语句（搭建主从复制架构）
-        - 如果值等于 2，就会在备份出来的文件中添加一个 CHANGE MASTER 的语句，并在语句前面添加注释符号（后期配置搭建主从架构）。
-            - 如果您不需要进行主从复制，则可以考虑不使用 --master-data=2 参数。
+    - `--master-data=2`（mysql8 为 `--source-date`） ：在备份文件中保留或者注释二进制日志的名称和位点。
+        - 在备份期间对所有表加锁 `FLUSH TABLES WITH READ LOCK`，并执行 `SHOW MASTER STATUS` 语句以获取二进制日志信息。该参数有 1 和 2 两个值
+            - 如果值等于1：就会在备份出来的文件中添加一个 `CHANGE MASTER` 的语句（搭建主从复制架构）
+            - 如果值等于2：就会在备份出来的文件中添加一个 `CHANGE MASTER` 的语句，并在语句前面添加注释符号（后期配置搭建主从架构）。
+                - 如果您不需要进行主从复制，则可以考虑不使用 `--master-data=2` 参数。
 
     - `--dump-slave`： 该参数用于在从库端备份数据，在线搭建新的从库时使用。该参数也有 1 和 2 两个值。
-        - 值为 1 时，也是在备份文件中添加一个 CHANGE MASTER 的语句
-        - 值为 2 时，则会在 CHANGE MASTER 命令前增加注释信息。
+        - 值为 1 时：也是在备份文件中添加一个 `CHANGE MASTER` 的语句
+        - 值为 2 时：则会在 `CHANGE MASTER` 命令前增加注释信息。
 
-    - `--single-transaction`：用于保证 InnoDB 备份数据时的一致性，配合可重复读 RR（repetable read）隔离级别使用，当发生事务时，读取一个事务的快照，直到备份结束时，都不会读取到事务开始之后提交的任何数据。
+    - `--single-transaction`：它的作用是在备份期间启动一个事务，并在事务中读取数据。
+        - 用于保证 InnoDB 备份数据时的一致性，配合可重复读 RR（repetable read）隔离级别使用，当发生事务时，读取一个事务的快照，直到备份结束时，都不会读取到事务开始之后提交的任何数据。
 
     - `--master-data`和`--single-transaction`：同时使用两个选项时，InnoDB无需锁表并能够保证一致性，在备份操作开始之前，取得全局锁以获得一致的二进制日志位置。当事务的隔离级别为`repeatable read`时，开启`--single-transaction`选项读取InnoDB的数据，可以获得非锁定的数据一致性。[必须有]
 
-    ```sql
+    ```sh
     # 备份china数据库中的tz表
     mysqldump --master-data=2 --single-transaction china tz > tz-table.sql
+    # or from MySQL 8.0.26:
+    mysqldump --source-data=2 --single-transaction china tz > tz-table.sql
     ```
 
     - 导出的`tz-table.sql`内容如下
@@ -4538,42 +5331,105 @@ LOAD DATA INFILE '/tmp/test'
     /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
     ```
 
+##### 备份的基本流程
 
-- 基本使用
+- [数据库运维札记：mysql | mysqldump 和 PXB 分别备份的是什么时间点的数据？](https://mp.weixin.qq.com/s/Ind2i0FbZh3G6Yy39Ep-gQ)
+
+- 为了进一步观察和确认在 mysqldump 期间 mysql 做了什么，我们先打开 general log。
 
     ```sql
-    # 备份 china 数据库
-    mysqldump -uroot -pYouPassward --single-transaction china > china.sql
-
-    # 通过pv命令显示进度
-    mysqldump -uroot -pYouPassward --single-transaction china | pv > china.sql
-
-    # 复制到另一台mysql服务器
-    mysqldump -uroot -pYouPassward --single-transaction orig-db | mysql -uroot -pYouPassward copy-db
-
-    # 备份 china 数据库里的 tz 表
-    mysqldump -uroot -pYouPassward --single-transaction china tz > tz-table.sql
-
-    # where语句
-    mysqldump -uroot -pYouPassward --single-transaction china tz --where="date>'2020-10-24'" > tz-table.sql
-
-    # 备份所有数据库
-    mysqldump -uroot -pYouPassward --single-transaction --all-databases > all.sql
-
-    # -d 只备份所有数据库表结构(不包含表数据)
-    mysqldump -uroot -pYouPassward --single-transaction -d --all-databases > mysqlbak-structure.sql
-
-    # 恢复到 china 数据库
-    mysql -uroot -pYouPassward china < china.sql
-
-    # 恢复所有数据库
-    mysql -uroot -pYouPassward < all.sql
-
-    # 使用mysql客户端处理.sql文件，使用mysqlimport处理.txt文件。
-    mysqlimport -uroot -pYouPassward database table.txt
+    set global general_log = on;
     ```
 
-### [mydumper：比mysqldump更快](https://github.com/maxbube/mydumper)
+    - 看看 `mysqldump --single-transaction --source-data` 如何备份
+        - MySQL 8.0.26之后使用`--source-data`代替`--master-data`
+
+        ```sh
+        mysqldump -uroot -pSz12004! test
+        --single-transaction --source-data=2 >1226.sql
+        ```
+
+        ![image](./Pictures/mysql/mysqldump-备份流程.avif)
+
+    - 看看 `mysqldump --single-transaction`
+
+        ```sh
+        mysqldump -uroot -pSz12004! test
+        --single-transaction  >1226.sql
+        ```
+        ![image](./Pictures/mysql/mysqldump-备份流程1.avif)
+
+    - 看看 `mysqldump --source-data=2`
+
+        - MySQL 8.0.26之后使用`--source-data`代替`--master-data`
+
+        ```sh
+        mysqldump -uroot -pSz12004! test --source-data=2 >1226.sql
+        ```
+        ![image](./Pictures/mysql/mysqldump-备份流程2.avif)
+
+    - 由上面比对可知，对于InnoDB表，使用 mysqldump 时加上参数 `--single-transaction` 和 `--source-data` 会生成一致性备份。
+
+- `mysqldump --single-transaction --source-data` 的备份流程
+
+    ![image](./Pictures/mysql/mysqldump-备份流程3.avif)
+
+    - 1.flush tables 刷新表，关闭实例上所有打开的表
+    - 2.flush tables with read lock 加全局读锁，获取数据库一致性状态
+    - 3.set session transaction isolation level repeatable read 设置事务的隔离级别为会话级可重复读
+    - 4.start transaction with consistent snapshot 开启一致性快照备份事务
+    - 5.show master status 获取当时 gtid 和 binlog ，pos 信息
+    - 6.unlock tables 备份数据字典等信息，非innodb表备份完成后，释放flush tables with read lock
+    - 7.设置回滚点然后逐一备份 innodb 数据表
+    - 8.提交备份事务，备份完成
+
+    - 由此可知在备份 innodb 表之前，mysqldump 就已经将锁（FTWRL）释放掉了，这实际上是利用了 innodb 引擎 mvcc 机制，开启快照读后，事务会获取开始时间点的一致性数据，无论备份持续多久，直到事务 commit 结束为止。启动一个事务来获取一致性视图。这样，即使你在备份期间更新表，这个更新也不会影响正在进行的备份，因为备份操作会看到事务开始时刻的数据快照。
+    ![image](./Pictures/mysql/mysqldump-备份流程4.avif)
+
+- 对一个表的备份流程，简单来说就是先查找表的定义语句，再查询表里的数据，然后生成对应的 insert 语句。
+    ![image](./Pictures/mysql/mysqldump-备份流程5.avif)
+
+    - 对此，因为逻辑备份表是一个一个进行的，如果在备份某个表之前，这个表进行了DDL操作，此时备份事务尚未给表加元数据读锁，等DDL操作结束，后续再备份这个表的时候，就会因为表定义不一致而报错。
+        ![image](./Pictures/mysql/mysqldump-备份流程6.avif)
+
+##### 基本使用
+
+```sh
+# MySQL 8.0.26之后使用`--source-data`代替`--master-data`
+# 如果您不需要进行主从复制，则可以考虑不使用 `--source-data=2` 参数。
+
+# 备份 china 数据库
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction china > china.sql
+
+# 通过pv命令显示进度
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction china | pv > china.sql
+
+# 复制到另一台mysql服务器
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction orig-db | mysql -uroot -pYouPassward copy-db
+
+# 备份 china 数据库里的 tz 表
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction china tz > tz-table.sql
+
+# where语句
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction china tz --where="date>'2020-10-24'" > tz-table.sql
+
+# 备份所有数据库
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction --all-databases > all.sql
+
+# -d 只备份所有数据库表结构(不包含表数据)
+mysqldump -uroot -pYouPassward --source-data=2 --single-transaction -d --all-databases > mysqlbak-structure.sql
+
+# 恢复到 china 数据库
+mysql -uroot -pYouPassward china < china.sql
+
+# 恢复所有数据库
+mysql -uroot -pYouPassward < all.sql
+
+# 使用mysql客户端处理.sql文件，使用mysqlimport处理.txt文件。
+mysqlimport -uroot -pYouPassward database table.txt
+```
+
+#### [mydumper：比mysqldump更快](https://github.com/maxbube/mydumper)
 
 - 支持多线程导入/导出
 
@@ -4650,9 +5506,11 @@ LOAD DATA INFILE '/tmp/test'
     --verbose=3
     ```
 
-### [go-mydumper：比mysqldump更快](https://github.com/xelabs/go-mydumper)
+#### [go-mydumper：比mysqldump更快](https://github.com/xelabs/go-mydumper)
 
-### [MySQL解决方案工程师：InnoDB的物理备份方法](https://mp.weixin.qq.com/s/TkFzpIdZQ5gGF5PbSJZ-ag)
+### 物理备份
+
+- [MySQL解决方案工程师：InnoDB的物理备份方法](https://mp.weixin.qq.com/s/TkFzpIdZQ5gGF5PbSJZ-ag)
 
 - 为了保证一致性，进行文件复制时，必须停掉MySQL服务器，因此，该方法是冷备份的方法。
 
@@ -4672,10 +5530,10 @@ LOAD DATA INFILE '/tmp/test'
 
     - 2.复制InnoDB全部的数据、日志，及配置文件。包括：
 
-        - 数据文件：“ibdata”和“*.ibd”
-        - 重做日志：“ib_logfile*”
-        - 撤销日志：“undo_*”
-        - 全部的配置文件，例如，“my.cnf”
+        - 数据文件：`ibdata`和`*.ibd`
+        - 重做日志：`ib_logfile*`
+        - 撤销日志：`undo_*`
+        - 全部的配置文件，例如，`my.cnf`
 
     - 3.重新启动服务器
 
@@ -4690,7 +5548,7 @@ LOAD DATA INFILE '/tmp/test'
     - 将共享表空间和独立表空间文件作为一组进行复制
     - 复制对应的重做日志和撤销日志
 
-### [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](https://mp.weixin.qq.com/s/tdVSYP862XgDUZBfqjm_Kg)
+#### [MySQL解决方案工程师：使用可移动表空间执行InnoDB备份](https://mp.weixin.qq.com/s/tdVSYP862XgDUZBfqjm_Kg)
 
 - 备份InnoDB的表时，可以使用可移动表空间执行部分备份，可以备份单独的表，也可以备份具有相同业务功能的多个表。
 
@@ -4729,11 +5587,20 @@ LOAD DATA INFILE '/tmp/test'
 
     - 注意，如果进行备份的表是带有分区的InnoDB表，则需要对每个分区导出元数据文件，并需要将每个分区的“.ibd”文件和“.cfg”文件执行导出、导入的操作。
 
-### XtraBackup 热备份
+#### XtraBackup（PXB）
 
 - [爱可生开源社区：图解MySQL | [原理解析] XtraBackup全量备份还原](https://zhuanlan.zhihu.com/p/73632725)
-- [爱可生开源社区：图解MySQL | [原理解析] XtraBackup增量备份还原](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247484425&idx=1&sn=a3c70d67676af1c8290b089887d8e4d3&chksm=fc96e696cbe16f80120fbebd0749362fa5501e7a33dbb34ab71c4a5947c57c28dd8496850c6b&scene=21#wechat_redirect)
+
 - [爱可生开源社区：图解MySQL|[原理解析]XtraBackup备份恢复时为什么要加apply-log-only参数](https://zhuanlan.zhihu.com/p/84716636)
+
+- 版本
+    - Xtrabackup 2.4 适用于 MySQL 5.6 和 MySQL 5.7。
+    - Xtrabackup 8.0 适用于 MySQL 8.0。
+    - Xtrabackup 8.1 适用于 MySQL 8.1。
+
+    - 从 XtraBackup 8.0.34 版本开始，ZSTD 压缩算法 成为 `--compress` 选项的默认压缩算法；QuickLZ 压缩算法 已被删除
+
+- XtraBackup：能对innodb和xtradb存储引擎进行热备份。也能对MyISAM存储引擎进行备份，只不过对于MyISAM的备份需要加表锁，会阻塞写操作。
 
 - XtraBackup：属于物理备份
     - 在备份时复制所有MySQL的数据文件以及一些事务日志信息
@@ -4747,16 +5614,20 @@ LOAD DATA INFILE '/tmp/test'
     - 5.还原速度快
     - 6.可以流传将备份传输到另外一台机器上
     - 7.在不增加服务器负载的情况备份数据
+    - 8.支持热备份
 
-- XtraBackup备份原理：
+##### 备份流程
+
+- 全量：
 
     - 全量备份的过程：
 
+        ![image](./Pictures/mysql/XtraBackup全量备份1.avif)
         ![image](./Pictures/mysql/XtraBackup全量备份.avif)
 
-        - 1.首先开启一个后台检测进程，复制已有的redo log，然后监听redo log变化，一旦发现redo中有新的日志写入，立刻将日志记入后台日志文件xtrabackup_log中。
+        - 1.首先fork一个后台测进程，复制已有的redo log，然后监听redo log变化，一旦发现redo中有新的日志写入，立刻将日志记入后台日志文件xtrabackup_log中。
 
-        - 2.之后复制innodb的数据文件和系统表空间文件ibdata1
+        - 2.之后复制ibd的数据文件和系统表空间文件ibdata1
 
             - 为什么要先复制redo log，而不是直接开始复制数据文件？因为XtraBackup是基于InnoDB的crash recovery机制进行工作的。由于是热备操作，在备份过程中可能有持续的数据写入，直接复制出来的数据文件可能有缺失或被修改的页，而redo log记录了InnoDB引擎的所有事务日志
 
@@ -4764,17 +5635,20 @@ LOAD DATA INFILE '/tmp/test'
             - 非事务引擎数据文件较多时，全局读锁的时间会较长。
             - 加锁：全局读锁的作用？在加锁期间，没有新数据写入，XtraBackup会复制此时的binlog位置信息，frm表结构，MyISAM等非事务表。
 
-        - 4.复制.frm，MYI，MYD，等文件
+        - 4.复制非InnoDB文件`.frm`、`MYI`、`MYD`等文件
         - 5.获取binlog点位信息等元数据
         - 6.最后会发出unlock tables
         - 7.停止xtrabackup_log。
 
-    - 恢复的过程：
+
+    - 恢复的过程：
         - 1.模拟MySQL进行recover，将redo log回放到数据文件中
         - 2.等到recover完成
         - 3.重建redo log，为启动数据库做准备
         - 4.将数据文件复制回MySQL数据目录
         - 5.恢复完成
+
+- 增量：
 
     - 增量备份：只针对增量备份过程中的”增量”进行处理，主要是相对innodb而言，对myisam和其他存储引擎而言，它仍然是全量备份。
 
@@ -4795,7 +5669,21 @@ LOAD DATA INFILE '/tmp/test'
         - 6.重建redo log，为启动数据库做准备。
         - 7.将临时目录中的文件，拷贝到MySQL的数据目录中。
 
-- XtraBackup：能对innodb和xtradb存储引擎进行热备份。也能对MyISAM存储引擎进行备份，只不过对于MyISAM的备份需要加表锁，会阻塞写操作。
+- 执行全备，查看流程
+    ```sh
+    xtrabackup --backup -uroot -p --target-dir=/xtrabackup/full/backup_`date +"%F_%H_%M_%S"`
+    ```
+
+    - 观察下 xtrabackup 日志输出
+    ![image](./Pictures/mysql/xtrabackup日志.avif)
+    - 看到最后有 completed OK! 则说明备份完成
+    ![image](./Pictures/mysql/xtrabackup日志1.avif)
+    - 查看下备份目录
+    ![image](./Pictures/mysql/xtrabackup日志2.avif)
+
+##### 基本使用
+
+- [IT 邦德：恢复MySQL！是我的条件反射，PXB开源的力量...](https://mp.weixin.qq.com/s/6Nw2Ga8CeBn4qRa3M1coPQ)
 
 - 有2个工具
     - `xtrabackup`：只能备份innodb和xtradb存储引擎数据表
@@ -4803,12 +5691,564 @@ LOAD DATA INFILE '/tmp/test'
         - 由于MyISAM不支持事务，在对MyISAM表备份之前，需要对全库进行加读锁，阻塞写操作。如果在从库进行的话，还会影响主从同步，从而造成延迟。
         - 备份时是根据配置文件`my.cnf`获取备份文件的信息
 
-#### 安装
+- 安装
 
-```sh
-rpm -ivh
-yum install -y percona-xtrabackup
-```
+    ```sh
+    # 下载地址：
+    https://www.percona.com/downloads/
+    https://github.com/percona/percona-xtrabackup/tags
+    rpm -ivh percona-xtrabackup-80-8.0.35-30.1.el7.x86_64.rpm --nodeps --force
+
+    # yum 安装
+    yum install -y percona-xtrabackup
+    ```
+
+- 参数
+    ```sh
+    --host     指定主机
+    --user     指定用户名
+    --password    指定密码
+    --port     指定端口
+    --databases     指定数据库
+    --incremental    创建增量备份
+    --incremental-basedir   指定包含完全备份的目录
+    --incremental-dir      指定包含增量备份的目录
+    --apply-log        对备份进行预处理操作
+    --defaults-file   指定默认配置文件，默认是读取/etc/my.cf
+    ```
+
+- 全量：
+
+    - 全量备份
+        ```sh
+        # 创建目录
+        mkdir -p /bk/
+
+        # 全量备份
+        xtrabackup -uroot -proot \
+        -S/var/lib/mysql/mysql.sock \
+        --backup --target-dir=/bk/full_$(date +%Y%m%d)
+        ```
+
+    - 全备的恢复
+        ```sh
+        # 第一步：
+        xtrabackup --prepare --target-dir=/bk/full
+
+        # 第二步：此时关闭数据库
+        systemctl stop mysqld
+        mysqladmin shutdown -uroot -proot
+
+        # 第三步：copy-back
+        cd /var/lib
+        tar -cf mysql.tar mysql
+        mv mysql.tar /opt
+        rm -rf /var/lib/mysql/*
+
+        xtrabackup --copy-back --target-dir=/bk/full --datadir=/var/lib/mysql
+
+        # 第四步：重启验证数据
+        # 重启MySQL
+        chown -R mysql:mysql /var/lib/mysql
+        mysqld_safe &  --二进制环境
+        systemctl start mysqld  --rpm环境
+        ```
+
+- 增量备份和恢复：
+    ![image](./Pictures/mysql/xtrabackup-增量.avif)
+    - 需要注意的是，增量备份仅能应用于 InnoDB 或 XtraDB 表，
+    - 对于 MyISAM 表而言，执行增量备份时其实进行的是完全备份。
+    - 准备(prepare)增量备份与完全备份有着一些不同，
+
+    - 尤其要注意的是：
+        - 1.需要在每个备份(包括完全和各个增量备份)上，
+            - 将已经提交的事务进行“重放”。“重放”之后，
+            - 所有的备份数据将合并到完全备份上。
+
+        - 2.基于所有的备份将未提交的事务进行“回滚”。
+            - 在增量备份命令中，
+            - `--incremental-basedir` 指的是上一次的增量备份所在的目录。
+            - 若是一级增量备份，则指向全备的目录
+
+- 差异备份和恢复
+    > 差异备份跟增量备份其实差不多，只不过增量备份每次的参照物是前一个，而差异备份的参照物就是全备
+    ![image](./Pictures/mysql/xtrabackup-差异.avif)
+
+- 压缩备份与还原
+    ```sh
+    # 解释：
+    # 如果要加速压缩，可以使用--compress-threads=4 ，
+    # 使用四个线程同时进行压缩
+    # compress就是压缩的命令，因为数据库的备份的数据比较大，
+    # 占用的空间也比较多，而压缩就能减少文件大小
+    xtrabackup -uroot -proot \
+    -S/var/lib/mysql/mysql.sock \
+    --backup --parallel=4 --compress \
+    --compress-threads=4 --stream=xbstream \
+    > /bk/jeames_full_backup.qp \
+    --no-server-version-check
+    ```
+
+    ```sh
+    # 解压工具是qpress
+    tar -xvf qpress-11-linux-x64.tar
+    mv qpress /usr/bin/qpress
+
+    xbstream -x < /bk/jeames_full_backup.qp -C /bk
+
+    # 安装zstd压缩算法
+    rpm -ivh zstd-1.5.5-1.el7.x86_64.rpm
+
+    # 解压操作
+    xtrabackup --parallel 4 --decompress --target-dir=/bk
+
+    # 删除原来的压缩包
+    find /bk/ -name '*.qp' | xargs rm -f
+
+    # 解压的原来的文件不会被删除，可以使用 --remove-original选项清除
+
+    # 恢复操作
+    xtrabackup --prepare --target-dir=/bk/full
+    # 此时关闭数据库 systemctl stop mysqld
+    xtrabackup --copy-back --target-dir=/bk/full --datadir=/var/lib/mysql
+    chown -R mysql:mysql /var/lib/mysql
+    ```
+
+###### --stream流备份、远程备份
+
+- [爱可生开源社区：技术分享 | 满足多场景需求的 MySQL 物理备份实践](https://mp.weixin.qq.com/s/tvk-EO4yRY-5bI7r2MRdqg)
+
+- XtraBackup 工具支持支持流备份，将备份数据以数据流的方式输出，使用 `--stream` 选项可以实现流备份
+    - xtrabackup 支持 `tar`、`xbstream` 格式的流备份2种流备份。
+
+- 通过以下测试，可以得到下列清晰的结论：
+
+    - 在现场允许配置机器远程免密访问或者对端机器操作系统用户密码的场景下，推荐使用跨机备份，总体耗费时间会更少。
+    - 进行备份时 `–stream=xbstream` 模式下备份文件大小和备份耗费时长两者都用得到较好的兼顾，较为推荐。
+    - 如果磁盘空间极为紧张且能容忍备份耗费时间较长，可选择 `–stream=tar + gzip` 命令组合的压缩备份方式。
+
+- 本地备份，备份时压缩文件
+
+    ```sh
+    # 备份命令:
+    innobackupex --defaults-file=/opt/mysql/etc/3310/my.cnf --host=localhost --port=3310 --user=root --password='xxx' --socket=/opt/mysql/data/3310/mysqld.sock --stream=xbstream --parallel=8 --compress --compress-threads=8 /data/ >/data/backup/data20240714.xbstream
+
+    # 释放流文件
+    xbstream -x -C /data/restore/ < /data/backup/data20240714.xbstream
+
+    # 解压备份集文件
+    innobackupex --decompress --remove-original /data/restore
+    ```
+
+- 跨机备份，备份时压缩文件，不释放流文件:详细操作如下:
+
+    ```sh
+    # 备份命令:
+    innobackupex --defaults-file=/opt/mysql/etc/3310/my.cnf   --host=localhost  --port=3310 --user=root --password='xxx'  --socket=/opt/mysql/data/3310/mysqld.sock  --stream=xbstream --parallel=8 --compress  --compress-threads=8 /data/  | sshpass -p 'xxx' ssh root@xxx "cat - >/data/backup/data20240714.xbstream"
+    ```
+
+- 跨机备份，备份时压缩文件，同时释放流文件:详细操作如下:
+
+    ```sh
+    # 备份命令
+    innobackupex --defaults-file=/opt/mysql/etc/3310/my.cnf   --host=localhost  --port=3310 --user=root --password='xxx'  --socket=/opt/mysql/data/3310/mysqld.sock  --stream=xbstream --parallel=8 --compress  --compress-threads=8 /data/  | sshpass -p 'xxx' ssh root@xxx "/root/backup/percona-xtrabackup-2.4.26-Linux-x86_64.glibc2.12/bin/xbstream -x -C /data/restore/"
+    ```
+
+#### clone插件
+
+- [MySQL解决方案工程师：MySQL克隆插件](https://mp.weixin.qq.com/s/kqiXv4_2ruX4RIn5jkA01w)
+
+- [InsideMySQL：全网最完整的 MySQL Clone Plugin 实现原理解析](https://mp.weixin.qq.com/s/7pif4M6ZNJ0SJ66o4L4NCw)
+
+- [vivo互联网技术：MySQL 8 新特性之Clone Plugin](https://mp.weixin.qq.com/s/_HqRXhQX_6e0boACzcAH8g)
+
+- 从 MySQL 8.0.17 版本开始，官方实现了 Clone 的功能，允许用户通过简单的 SQL 命令把远端或本地的数据库实例拷贝到其他实例后，快速拉起一个新的实例。
+    - 而这之前，仅收费的 MySQL Enterprise 版本才独享物理备份的功能。
+
+- 克隆有2种方式：
+
+    - 本地克隆：克隆数据至一个其他的路径。
+    - 远程克隆：从远程的MySQL服务器实例上克隆数据。
+
+##### 备份流程
+
+- Clone 实现的基本原理:三个重要阶段
+
+    ![image](./Pictures/mysql/clone三个重要阶段.avif)
+
+    - 1.`INIT`：初始化一个克隆对象。
+
+    - 2.`FILE COPY` ：跟 Xtrabackup一样，会物理的拷贝所有的 InnoDB 表空间文件，同时会启动一个 Page Tracking 进程监控从 CLONE START LSN 开始监控所有 InnoDB PAGE 的改动。
+
+    - 3.`PAGE COPY` ：在 Xtrabackup 中没有的一个阶段。主要完成 2 个工作：
+        - 1.在完成数据库库文件拷贝之后，会开启 Redo Archiving，同时停止 Page Tracking 进程（PS 开始前会做一次 checkpoint）。
+            - Redo Archiving会在后台开启一个归档线程将Redo文件中的内容按Chunk拷贝到归档文件中。
+                - 通常来说，归档线程的拷贝速度会快于Redo日志的生成速度。即使慢于，在写入新的Redo日志时，也会等待归档线程完成拷贝，不会出现还未拷贝的Redo日志被覆盖的情况。当所有修改的页拷贝完毕后，会获取实例的一致性位置点信息，此时的LSN记为“CLONE LSN”。
+
+        - 2.将 Page Tracking 记录的脏页（“CLONE START LSN”和“CLONE FILE END LSN”之间的页)复制到指定位置，为了保持高效，复制之前会基于 spaceid 和 page id 进行排序，尽可能确保磁盘读写的顺序性。
+
+    - 4.`Redo Copy` ：这个阶段，会加锁获取 Binlog 文件及当前偏移位置和 gtid_executed 信息并停止 Redo Archiving 进程。之后将所有归档的 Redo Log 日志文件发往目标端。
+
+    - 5.`Done`：调用snapshot_end()销毁克隆对象。
+
+- 与XtraBackup的对比
+
+    - 1.在实现上，两者都有FILE COPY和REDO COPY阶段，但Clone Plugin比XtraBackup多了一个`PAGE COPY`，由此带来的好处是，Clone Plugin的恢复速度比XtraBackup更快。
+    - 2.XtraBackup没有Redo Archiving特性，有可能出现未拷贝的Redo日志被覆盖的情况。
+    - 3.GTID下建立复制，无需额外执行`set global gtid_purged`操作。
+
+- 远程克隆会依次进行以下操作：
+
+    - 1.获取备份锁。备份锁和DDL互斥。注意，不仅仅是Recipient，Donor上的备份锁同样会获取。
+    - 2.DROP用户表空间。注意，DROP的只是用户数据，不是数据目录，也不包括mysql，ibdata等系统表空间。
+    - 3.从Donor实例拷贝数据。对于用户表空间，会直接拷贝，如果是系统表空间 ，则会重命名为xxx.#clone，不会直接替代原文件。
+        ```sh
+        # ll /data/mysql/3306/data/
+        ...
+        -rw-r----- 1 mysql mysql     3646 May 25 07:20 ib_buffer_pool
+        -rw-r----- 1 mysql mysql     3646 May 27 07:31 ib_buffer_pool.#clone
+        -rw-r----- 1 mysql mysql 12582912 May 27 07:31 ibdata1
+        -rw-r----- 1 mysql mysql 12582912 May 27 07:31 ibdata1.#clone
+        -rw-r----- 1 mysql mysql 50331648 May 27 07:32 ib_logfile0
+        -rw-r----- 1 mysql mysql 50331648 May 27 07:31 ib_logfile0.#clone
+        ...
+        -rw-r----- 1 mysql mysql 25165824 May 27 07:31 mysql.ibd
+        -rw-r----- 1 mysql mysql 25165824 May 27 07:31 mysql.ibd.#clone
+        ...
+        ```
+
+    - 4.重启实例。在启动的过程中，会用xxx.#clone替换掉原来的系统表空间文件。
+
+
+##### 参数
+
+- clone_autotune_concurrency：是否自动调节克隆过程中并发线程数的数量，默认为ON，此时，最大线程数受clone_max_concurrency参数控制。若设置为OFF，则并发线程数的数量将是固定的，同clone_max_concurrency参数一致。该参数的默认值为16。
+
+- clone_buffer_size：本地克隆时，中转缓冲区的大小，默认4M。缓冲区越大，备份速度越快，相应的，对磁盘IO的压力越大。
+
+- clone_ddl_timeout：克隆操作需要获取备份锁（Backup Lock）。如果在执行CLONE命令时，有DDL在执行，则CLONE命令会被阻塞，等待获取备份锁（Waiting for backup lock）。等待的最大时长由clone_ddl_timeout参数决定，默认300（单位秒）。如果在这个时间内还没获取到锁，CLONE命令会失败，且提示“ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction”。
+
+    - 需要注意的是，如果在执行DDL时，有CLONE命令在执行，DDL同样会因获取不到备份锁被阻塞，只不过，DDL操作的等待时长由lock_wait_timeout参数决定，该参数的默认值为31536000s，即365天。
+
+- clone_enable_compression：远程克隆，在传输数据时，是否开启压缩。开启压缩能节省网络带宽，但相应的，会增加CPU消耗。
+
+- clone_max_data_bandwidth：远程克隆时，可允许的最大数据拷贝速率（单位MiB/s）。默认为0，不限制。注意，这里限制的只是单个线程的拷贝速率，如果存在多个线程并行拷贝，实际最大拷贝速率=clone_max_data_bandwidth*线程数。
+
+- clone_max_network_bandwidth：远程克隆时，可允许的最大网络传输速率（单位MiB/s）。默认为0，不限制。如果网络带宽存在瓶颈，可通过该参数进行限速。
+
+- clone_valid_donor_list：设置Donor白名单，只能克隆白名单中指定的实例。
+
+- clone_ssl_ca，clone_ssl_cert，clone_ssl_key：SSL相关。
+
+##### 基本命令
+
+- 运行远程克隆时，需要满足下列条件：
+    - 捐献者和接收者必须运行相同的操作系统、mysql版本、字符集、校验集、innodb_page_size。
+        - 主机的操作系统和位数（32位，64位）必须一致。两者可根据`version_compile_os`，`version_compile_machine`参数获取。
+        - 进行远程克隆的两个 MySQL 实例版本号必须完全一样。5.7 和 8.0 显然不行，8.0.19 和 8.0.20 小版本不同也不行。
+        - 字符集（character_set_server），校验集（collation_server），character_set_filesystem必须一致。
+        - 捐献者和接收者的`innodb_page_size`和`innodb_data_file_path`的配置必须相同。
+
+    - 接收者必须具有足够的磁盘容量。
+    - 如果捐献者的表空间文件在数据路径之外，克隆操作必须能够写入这些路径。
+    - 如果捐献者上面有激活的插件，接收者的插件也必须激活。
+    - 捐献者和接收者必须具有相同的字符串和排序。
+    - 如果克隆加密或者压缩的数据，要求捐献者和接收者具有一致的文件系统块大小。
+    - 克隆加密数据时，要求使用安全连接。
+    - `clone_valid_donor_list`中必须包含捐献者的主机地址。
+    - 克隆时，不允许其他的克隆操作。
+    - `max_allowed_packet`值至少为2MB。
+    - Recipient需要重启，所以其必须通过mysqld_safe或systemd等进行管理。如果是通过mysqld进行启动，实例关闭后，需要手动启动。
+
+- 克隆插件的限制
+    - 克隆操作中，MySQL 8.0.27 版本前不允许 DDL 操作，DDL 操作会被阻塞，甚至影响后续的 SELECT查询操作；MySQL 8.0.27 版本已经可以在备份过程中进行并发的 DDL 操作。
+    - 克隆操作仅支持InnoDB表，其他引擎表会被克隆为空表。
+    - Clone Plugin 不备份 MySQL 配置文件和二进制日志，而 Xtrabackup 会备份的配置文件。
+    - 本地克隆无法克隆使用绝对路径创建的通用表空间。
+    - 远程克隆不支持X协议端口。
+    - 无法通过MySQL Router连接捐献者MySQL服务器实例。
+
+- 注意：捐献者和接收者的MySQL服务器上都必须安装克隆插件、并授予相关权限。
+
+    - 安装：
+
+        - 1.配置文件安装：可以通过`plugin-load`或`plugin-load-add`两个启动选项加载`mysql_clone.so`
+            - 这里的clone，严格来说，不是参数名，而是插件名，可加可不加，可以控制插件的行为。
+                - ON（开启插件）
+                - OFF（禁用插件），
+                - FORCE（强制开启。如果插件初始化失败，MySQL将不会启动）
+                - FORCE_PLUS_PERMANENT（在FORCE的基础上，不允许通过UNINSTALL PLUGIN命令卸载插件）。
+
+            ```ini
+            [mysqld]
+            plugin-load-add=mysql_clone.so
+            clone=FORCE_PLUS_PERMANENT
+            ```
+
+            ```sql
+            -- 查看是否安装成功
+            -- clone状态显示为”ACTIVE“代表插件加载成功。
+            show plugins;
+            ...
+            | clone                           | ACTIVE   | CLONE              | mysql_clone.so | GPL     |
+            ...
+            ```
+
+        - 2.在MySQL服务器正在运行的时候：利用`INSTALL PLUGIN`语句安装克隆插件
+
+            ```sql
+            -- 安装后的插件将注册到“mysql.plugins”系统表中，将在后续的每次服务器重启时进行加载。
+            INSTALL PLUGIN clone SONAME 'mysql_clone.so'
+            ```
+
+    - 权限
+
+        - 本地克隆操作：需要具备`BACKUP_ADMIN`权限。
+            ```sql
+            GRANT BACKUP_ADMIN ON *.* 'username';
+            ```
+
+        - 执行远程克隆操作时
+            - 用户在接收服务器上需要具有`CLONE_AMDIN`权限
+                - 该权限具有置换数据、克隆期间阻挡DDL操作，及自动重启服务器的能力。
+            - 用户在发送服务器上需要`BACKUP_ADMIN`权限
+                - 用于访问和传输数据、阻挡DDL操作。
+
+- 本地克隆
+
+    ```sql
+    -- 本地克隆。克隆目录必须是绝对路径，“/data/mysql”必须存在，且MySQL对其有可写权限。
+    CLONE LOCAL DATA DIRECTORY = '/data/mysql/3307';
+    ```
+
+    - 例子
+        - 创建克隆用户
+            ```sql
+            -- 创建克隆用户，并赋予BACKUP_ADMIN权限
+            create user 'clone_user'@'%' identified by 'clone_pass';
+            grant backup_admin on *.* to 'clone_user'@'%';
+            ```
+
+
+        - 创建本地目录
+            ```sh
+            mkdir /data/mysql
+            chown -R mysql.mysql /data/mysql
+
+            # 登陆
+            mysql -uclone_user -pclone_pass
+            ```
+
+        - 本地克隆
+            ```sql
+            -- 本地克隆。克隆目录必须是绝对路径，“/data/mysql”必须存在，且MySQL对其有可写权限。
+            CLONE LOCAL DATA DIRECTORY = '/data/mysql/3307';
+            ```
+
+        - 查看克隆目录的内容
+            ```sh
+            ll /data/mysql/3307
+            total 172996
+            drwxr-x--- 2 mysql mysql       89 May 24 22:37 #clone
+            -rw-r----- 1 mysql mysql     3646 May 24 22:37 ib_buffer_pool
+            -rw-r----- 1 mysql mysql 12582912 May 24 22:37 ibdata1
+            -rw-r----- 1 mysql mysql 50331648 May 24 22:37 ib_logfile0
+            -rw-r----- 1 mysql mysql 50331648 May 24 22:37 ib_logfile1
+            drwxr-x--- 2 mysql mysql        6 May 24 22:37 mysql
+            -rw-r----- 1 mysql mysql 25165824 May 24 22:37 mysql.ibd
+            drwxr-x--- 2 mysql mysql       20 May 24 22:37 slowtech
+            drwxr-x--- 2 mysql mysql       28 May 24 22:37 sys
+            -rw-r----- 1 mysql mysql 10485760 May 24 22:37 undo_001
+            -rw-r----- 1 mysql mysql 11534336 May 24 22:37 undo_002
+            ```
+
+        - 相对于Xtrabackup，无需Prepare，直接即可启动使用。
+
+            ```sh
+            /usr/local/mysql/bin/mysqld --no-defaults --datadir=/data/mysql/3307 --user mysql --port 3307 &
+            ```
+
+- 远程克隆
+
+    - 远程克隆涉及两个实例，其中，待克隆的实例是`Donor（捐献者）`，接受克隆数据的实例是`Recipient（接收者）`。克隆命令需在`Recipient（接收者）`上发起
+
+        - 在`Recipient（接收者）``上需要在全局变量`clone_valid_donor_list`中配置捐献者的主机和端口。
+
+            ```sql
+            SET GLOBAL clone_valid_donor_list = 'donor_host:3306';
+            ```
+
+        - 远程克隆：在`Recipient（接收者）`上运行`CLONE`语句：
+            ```sql
+            CLONE INSTANCE FORM 'donor_user'@'donor_host:3306' IDENTIFIED BY 'password';
+            ```
+
+    - 例子：
+
+        - 在`Donor（捐献者）`实例上创建克隆用户，加载Clone Plugin。
+
+            ```sql
+            create user 'donor_user'@'%' identified by 'donor_pass';
+            grant backup_admin on *.* to 'donor_user'@'%';
+            install plugin clone soname 'mysql_clone.so';
+            ```
+
+        - 在`Recipient（接收者）`实例上创建克隆用户，加载Clone Plugin。
+
+            ```sql
+            create user 'recipient_user'@'%' identified by 'recipient_pass';
+            grant clone_admin on *.* to 'recipient_user'@'%';
+            install plugin clone soname 'mysql_clone.so';
+            ```
+
+        - 在`Recipient（接收者）`实例上设置Donor白名单。Recipient只能克隆白名单中的实例。
+
+            ```sql
+            set global clone_valid_donor_list = '192.168.244.10:3306';
+            ```
+
+        - 在`Recipient（接收者）`上发起克隆命令
+
+            ```sql
+            # 登陆
+            mysql -urecipient_user -precipient_pass
+
+            -- 远程克隆
+            clone instance from 'donor_user'@'192.168.244.10':3306 identified by 'donor_pass';
+            ```
+
+###### 如何查看克隆操作的进度
+
+- 主要依托于`performance_schema.clone_status`和`performance_schema.clone_progress`这两张表。
+
+- 看看`performance_schema.clone_status`表。
+    ```sql
+    select * from performance_schema.clone_status\G
+    *************************** 1. row ***************************
+                 ID: 1
+                PID: 0
+              STATE: Completed
+         BEGIN_TIME: 2020-05-27 07:31:24.220
+           END_TIME: 2020-05-27 07:33:08.185
+             SOURCE: 192.168.244.10:3306
+        DESTINATION: LOCAL INSTANCE
+           ERROR_NO: 0
+      ERROR_MESSAGE:
+        BINLOG_FILE: mysql-bin.000009
+    BINLOG_POSITION: 665197555
+      GTID_EXECUTED: 59cd4f8f-8fa1-11ea-a0fe-000c29f66609:1-560
+    1 row in set (0.06 sec)
+    ```
+
+    - 顾名思义，该表记录了克隆操作的当前状态。
+        - `PID`：Processlist ID。对应show processlist中的Id，如果要终止当前的克隆操作，执行kill processlist_id命令即可。
+        - `STATE`：克隆操作的状态，Not Started（克隆尚未开始），In Progress（克隆中），Completed（克隆成功），Failed（克隆失败）。如果是Failed状态，ERROR_NO，ERROR_MESSAGE会给出具体的错误编码和错误信息。
+        - `BEGIN_TIME`，END_TIME：克隆操作开始，结束时间。
+        - `SOURCE`：Donor实例的地址。
+        - `DESTINATION`：克隆目录。“LOCAL INSTANCE”代表当前实例的数据目录。
+        - `GTID_EXECUTED`，`BINLOG_FILE`（`BINLOG_POSITION`）：克隆操作结束时，主库已经执行的GTID集合，及一致性位置点。可利用这些信息来搭建从库。
+
+- 看看`performance_schema.clone_progress`表。
+
+    ```sql
+    select * from performance_schema.clone_progress;
+    +------+-----------+-----------+----------------------------+----------------------------+---------+-----------+-----------+-----------+------------+---------------+
+    | ID   | STAGE     | STATE     | BEGIN_TIME                 | END_TIME                   | THREADS | ESTIMATE  | DATA      | NETWORK   | DATA_SPEED | NETWORK_SPEED |
+    +------+-----------+-----------+----------------------------+----------------------------+---------+-----------+-----------+-----------+------------+---------------+
+    |    1 | DROP DATA | Completed | 2020-05-27 07:31:28.581661 | 2020-05-27 07:31:35.855706 |       1 |         0 |         0 |         0 |          0 |             0 |
+    |    1 | FILE COPY | Completed | 2020-05-27 07:31:35.855952 | 2020-05-27 07:31:58.270881 |       2 | 482463294 | 482463294 | 482497011 |          0 |             0 |
+    |    1 | PAGE COPY | Completed | 2020-05-27 07:31:58.271250 | 2020-05-27 07:31:58.719085 |       2 |  10977280 |  10977280 |  11014997 |          0 |             0 |
+    |    1 | REDO COPY | Completed | 2020-05-27 07:31:58.720128 | 2020-05-27 07:31:58.930804 |       2 |    465408 |    465408 |    465903 |          0 |             0 |
+    |    1 | FILE SYNC | Completed | 2020-05-27 07:31:58.931094 | 2020-05-27 07:32:01.063325 |       2 |         0 |         0 |         0 |          0 |             0 |
+    |    1 | RESTART   | Completed | 2020-05-27 07:32:01.063325 | 2020-05-27 07:32:59.844119 |       0 |         0 |         0 |         0 |          0 |             0 |
+    |    1 | RECOVERY  | Completed | 2020-05-27 07:32:59.844119 | 2020-05-27 07:33:08.185367 |       0 |         0 |         0 |         0 |          0 |             0 |
+    +------+-----------+-----------+----------------------------+----------------------------+---------+-----------+-----------+-----------+------------+---------------+
+    7 rows in set (0.00 sec)
+    ```
+
+    - 该表记录了克隆操作的进度信息。
+
+        - `STAGE`：一个克隆操作可依次细分为DROP DATA，FILE COPY，PAGE COPY，REDO COPY，FILE SYNC，RESTART，RECOVERY等7个阶段。当前阶段结束了才会开始下一个阶段。
+        - `STATE`：当前阶段的状态。有三种状态：Not Started，In Progress，Completed。
+        - `BEGIN_TIME`，`END_TIME`：当前阶段的开始时间和结束时间。
+        - `THREADS`：当前阶段使用的并发线程数。
+        - `ESTIMATE`：预估的数据量。
+        - `DATA`：已经拷贝的数据量。
+        - `NETWORK`：通过网络传输的数据量。如果是本地克隆，该列的值为0。
+        - `DATA_SPEED`，`NETWORK_SPEED`：当前数据拷贝的速率和网络传输的速率。注意，是当前值。
+
+###### 如何基于克隆数据搭建从库
+
+- `performance_schema.clone_status`表，该表会记录Donor实例的一致性位置点信息。我们可以利用这些信息来搭建从库。
+    ```sql
+    select * from performance_schema.clone_status\G
+    *************************** 1. row ***************************
+    ...
+    BINLOG_FILE: mysql-bin.000009
+    BINLOG_POSITION: 665197555
+    GTID_EXECUTED: 59cd4f8f-8fa1-11ea-a0fe-000c29f66609:1-560
+    ```
+
+- 这里，区分两种场景，GTID复制和基于位置点的复制。
+
+    - 1.GTID复制
+
+        ```sql
+        CHANGE MASTER TO MASTER_HOST = 'master_host_name', MASTER_PORT = master_port_num,
+            ...
+            MASTER_AUTO_POSITION = 1;
+        START SLAVE;
+        ```
+
+        - 需要注意的是，无需额外执行`set global gtid_purged`操作。通过克隆数据启动的实例，gtid_purged已经初始化完毕。
+
+            ```sql
+            show global variables like 'gtid_purged';
+            +---------------+--------------------------------------------+
+            | Variable_name | Value                                      |
+            +---------------+--------------------------------------------+
+            | gtid_purged   | 59cd4f8f-8fa1-11ea-a0fe-000c29f66609:1-560 |
+            +---------------+--------------------------------------------+
+            ```
+
+    - 2.基于位置点的复制：这里，同样要区分两种场景。
+
+        - 场景1，Recipient（接受者）要作为Donor（捐献者）的从库。
+
+            ```sql
+            SELECT BINLOG_FILE, BINLOG_POSITION FROM performance_schema.clone_status;
+            CHANGE MASTER TO MASTER_HOST = 'master_host_name', MASTER_PORT = master_port_num,
+                ...
+                MASTER_LOG_FILE = 'master_log_name',
+                MASTER_LOG_POS = master_log_pos;
+            START SLAVE;
+            ```
+
+            - 其中
+                - `master_host_name`，`master_port_num`：Donor（捐献者）实例的IP和端口。
+                - `master_log_name`，`master_log_pos`： performance_schema.clone_status 中的 BINLOG_FILE, BINLOG_POSITION。
+
+        - 场景2：Donor（捐献者）本身就是一个从库，Recipient（接受者）要作为Donor（捐献者）主库的从库。
+
+            ```sql
+            SELECT MASTER_LOG_NAME, MASTER_LOG_POS FROM mysql.slave_relay_log_info;
+            CHANGE MASTER TO MASTER_HOST = 'master_host_name', MASTER_PORT = master_port_num,
+                ...
+                MASTER_LOG_FILE = 'master_log_name',
+                MASTER_LOG_POS = master_log_pos;
+            START SLAVE;
+            ```
+
+            - 其中
+
+                - `master_host_name`，`master_port_num`：Donor（捐献者）实例的IP和端口。
+                - `master_log_name`，`master_log_pos`：mysql.slave_relay_log_info中的Master_log_name，Master_log_pos（分别对应 SHOW SLAVE STATUS 中的Relay_Master_Log_File，Exec_Master_Log_Pos）。
+
+            - 在搭建从库时，建议设置`--skip-slave-start`。该参数默认为OFF，实例启动后，会自动执行`START SLAVE`操作。
+
+            - 如果Donor（捐献者）是个从库，Recipient（接受者）会基于mysql.slave_master_info，
+
+            - mysql.slave_relay_log_info中的信息自动建立复制，很多时候，这未必是我们的预期行为。
 
 ### [MySQL解决方案工程师：MySQL的备份工具——MySQL企业版备份](https://mp.weixin.qq.com/s?__biz=MzU1NzkwMjQ2MQ==&mid=2247486683&idx=1&sn=130c6d2a4ed13e6818622fa02b367301&chksm=fc2ff3c9cb587adf8e4e46bd860203c01430db50939f6596718c3bb01cc00e6d4bf8a6bc966f&cur_album_id=2325042420926742528&scene=189#wechat_redirect)
 
@@ -4961,6 +6401,10 @@ yum install -y percona-xtrabackup
     mysqlbackup --incremental-backup-dir=incr-backup-dir --incremental copy-back-and-apply-log
     mysqlbackup --backup-dir=temp-backup-dir --backup-image=image-file --incremental copy-backup-and-apply-log
     ```
+
+### [ibd2sql](https://github.com/ddcw/ibd2sql)
+
+- [DBA札记：超强mysql灾难恢复工具--ibd2sql](https://mp.weixin.qq.com/s/FyTeq9eH7F7I26_5wFw3bQ)
 
 ## OnlineDDL
 
@@ -7877,6 +9321,8 @@ ALTER TABLE table_name ENGINE=INNODB;
 
 ### [爱可生开源社区：技术译文 | 分析 MySQL 中的内存使用情况](https://mp.weixin.qq.com/s/tUXi12PHK6NVQIDqVP_RfA)
 
+### [奇妙的Linux世界：MySQL 数据库监控、管理和可观测性工具 PMM 入门指南](https://mp.weixin.qq.com/s/C9gxLNFzgd8qbFfF1aZHxw)
+
 ## 极限值测试
 
 看看一个表最多是不是 1017 列:
@@ -8049,15 +9495,10 @@ pt-query-digest               \
 > wget https://www.percona.com/downloads/percona-toolkit/3.2.1/binary/redhat/7/x86_64/percona-toolkit-3.2.1-1.el7.x86_64.rpm
 > ```
 
-```sh
-# 分析slow log
-pt-query-digest  --type=slowlog /var/log/mysql/mysql_slow.log > /tmp/pt_slow.log
-cat /tmp/pt_slow.log
-
-# 分析general log
-pt-query-digest  --type=genlog /var/log/mysql/mysql_general.log > /tmp/pt_general.log
-cat /tmp/pt_general.log
-```
+- pt-variable-advisor：可以分析MySQL变量并就可能出现的问题提出建议。
+    ```sh
+    pt-variable-advisor localhost --socket /var/lib/mysql/mysql.sock
+    ```
 
 #### undrop-for-innodb(\*数据恢复)
 

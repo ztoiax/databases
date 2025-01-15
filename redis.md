@@ -2,7 +2,7 @@
 <!-- mtoc-start -->
 
 * [Redis](#redis)
-  * [许可证](#许可证)
+  * [修改许可证风波](#修改许可证风波)
   * [根据qps的架构部署](#根据qps的架构部署)
   * [软件架构](#软件架构)
     * [从单线程Reactor到redis6.0多线程架构演进](#从单线程reactor到redis60多线程架构演进)
@@ -116,7 +116,7 @@
       * [收缩](#收缩)
     * [key的重定向](#key的重定向)
       * [Smart客户端](#smart客户端)
-    * [故障转移](#故障转移)
+    * [故障转移（failover）](#故障转移failover)
       * [日志演示](#日志演示)
       * [手动故障转移](#手动故障转移)
     * [集群倾斜](#集群倾斜)
@@ -146,11 +146,11 @@
       * [如何删除](#如何删除)
       * [vivo例子](#vivo例子)
     * [寻找热key（hotkey）](#寻找热keyhotkey)
+      * [解决热点key：](#解决热点key)
     * [linux相关的性能配置](#linux相关的性能配置)
     * [监控](#监控)
       * [监控指标](#监控指标)
       * [cachecloud](#cachecloud)
-      * [Grafana](#grafana)
     * [生产环境排查案例](#生产环境排查案例)
       * [版本升级实践](#版本升级实践)
       * [腾讯云开发者：Redis：你永远不知道告警和下班，谁先到来](#腾讯云开发者redis你永远不知道告警和下班谁先到来)
@@ -183,7 +183,10 @@
       * [function模式](#function模式)
         * [实践](#实践)
     * [redis-full-check：数据校验工具。redis-shake后使用](#redis-full-check数据校验工具redis-shake后使用)
-* [k8s](#k8s)
+* [故障](#故障)
+  * [爱可生开源社区：故障分析 | Redis 主从复制风暴](#爱可生开源社区故障分析--redis-主从复制风暴)
+  * [爱可生开源社区：故障分析 | Redis 主实例故障后 Sentinel 决策异常 ](#爱可生开源社区故障分析--redis-主实例故障后-sentinel-决策异常-)
+  * [爱可生开源社区：故障分析 | redis cluster 从库无法自动恢复同步案例一则](#爱可生开源社区故障分析--redis-cluster-从库无法自动恢复同步案例一则)
 * [redis 安装](#redis-安装)
   * [centos7 安装 redis6.0.9](#centos7-安装-redis609)
   * [docker install](#docker-install)
@@ -235,7 +238,7 @@
 
 # Redis
 
-## 许可证
+## 修改许可证风波
 
 - Redis从 7.4 起从原来的「BSD 3-Clause 开源协议」改成「RSALv2 和 SSPLv1 双重许可证」
 
@@ -247,11 +250,18 @@
 
     - 当 Redis 宣布更改协议后，马上就有 AWS 员工跳出来 Fork Redis —— “Redis 不开源了，我们的分叉才是真开源！” 然后 AWS CTO 出来叫好，并假惺惺地说：这是我们员工的个人行为 —— 堪称是现实版杀人诛心。
 
-        - 被这样搞过的并非只有 Redis 一家。发明 SSPL 的 MongoDB 也是这个样子 —— 当 2018 年 MongoDB 切换至 SSPL 时，AWS 就搞了一个所谓 “API兼容“ 的 DocumentDB 来恶心它。ElasticSearch 修改协议后，AWS 就推出了 OpenSearch 作为替代。头部 NoSQL 数据库都已经切换到了 SSPL，而 AWS 也都搞出了相应的“开源替代”。
+        - 同一周就冒出了两个基于 BSD-3 旧代码的分支：[Valkey](https://github.com/valkey-io/valkey) 和 [Redict](https://redict.io/)。Valkey 出自 Amazon，但 Google 和 Oracle 的工程师随后也加入了进来。Valkey 项目仅用一周就被 Linux 基金会[19]纳入麾下，一大波大厂转而支持它。
+
+        - 被这样搞过的并非只有 Redis 一家。
+
+            - 发明 SSPL 的 MongoDB 也是这个样子 —— 当 2018 年 MongoDB 切换至 SSPL 时，AWS 就搞了一个所谓 “API兼容“ 的 DocumentDB 来恶心它。ElasticSearch 修改协议后，AWS 就推出了 OpenSearch 作为替代。头部 NoSQL 数据库都已经切换到了 SSPL，而 AWS 也都搞出了相应的“开源替代”。
+
+            - Elasticsearch原因同样是 Amazon 上的 Elasticsearch 托管服务越卖越好，虽然人家从 2015 年就上线了。Amazon 一听这事儿不乐意了，直接搞了个 [OpenSearch](https://opensearch.org/) 分支进行对抗。
+                - 到了 2024 年 8 月，Elastic N.V. 又宣布反悔[27]，不再用双许可证，转而采用 AGPL。他们写博客宣布这个操作时，还引用了 Kendrick Lamar 的歌（比如 Not Like Us）。Amazon 估计不爽被称为“数据库圈的 Drake[30]”，随后在下个月就放了个大招，把 OpenSearch 项目捐给了 Linux 基金会。
+
+        - Andy Pavlo 的看法：归根到底，云时代，开源数据库公司（ISV）能不能活得下去确实很难。云厂商有钱又有资源，只要他们想，把你的开源数据库拿去当个插件就行，比如 AWS 把 InfluxDB v2 协议给移植到他们自己的 Timestream 上，分分钟抢用户。再者，他们还可以像 Bushwick Bill 前女友一样，对着你的眼睛就是一枪，像 AWS 现在直接推出兼容 Valkey 的服务，而且号称比兼容 Redis 的服务便宜 30%，这波釜底抽薪简直太狠。
 
 - 微软发布了一个兼容 Redis 的缓存服务器 [Garnet](https://github.com/microsoft/garnet)
-
-- Redis 现在也被分叉了，诞生了两个全新的项目 [Redict](https://redict.io/) 和 [Valkey](https://github.com/valkey-io/valkey)，目标是成为自由软件版本的 Redis。
 
 ## 根据qps的架构部署
 
@@ -312,9 +322,20 @@
 
                 - 接着，调用 epoll_wait 函数等待事件的到来：
 
-                    - 如果是连接事件到来，则会调用连接事件处理函数，该函数会做这些事情：调用 accpet 获取已连接的 socket ->  调用 epoll_ctl 将已连接的 socket 加入到 epoll -> 注册「读事件」处理函数；
-                    - 如果是读事件到来，则会调用读事件处理函数，该函数会做这些事情：调用 read 获取客户端发送的数据 -> 解析命令 -> 处理命令 -> 将客户端对象添加到发送队列 -> 将执行结果写到发送缓存区等待发送；
-                    - 如果是写事件到来，则会调用写事件处理函数，该函数会做这些事情：通过 write 函数将客户端发送缓存区里的数据发送出去，如果这一轮数据没有发送完，就会继续注册写事件处理函数，等待 epoll_wait 发现可写后再处理 。
+                    - 如果是连接事件到来：则会调用连接事件处理函数：
+                        - 1.调用 accpet 获取已连接的 socket
+                        - 2.调用 epoll_ctl 将已连接的 socket 加入到 epoll
+                        - 3.注册「读事件」处理函数
+
+                    - 如果是读事件到来：则会调用读事件处理函数：
+                        - 1.调用 read 获取客户端发送的数据
+                        - 2.解析命令
+                        - 3.处理命令
+                        - 4.将客户端对象添加到发送队列
+                        - 5.将执行结果写到发送缓存区等待发送
+
+                    - 如果是写事件到来：则会调用写事件处理函数：
+                        - 通过 write 函数将客户端发送缓存区里的数据发送出去，如果这一轮数据没有发送完，就会继续注册写事件处理函数，等待 epoll_wait 发现可写后再处理 。
 
         - 对于一个 DB 来说，CPU 通常不会是瓶颈，因为大多数请求不会是 CPU 密集型的，而是 I/O 密集型，也就是客户端和服务端之间的网络传输延迟。使用单线程的 I/O 多路复用网络模型。能带来更好的可维护性，方便开发和调试。
 
@@ -355,7 +376,7 @@
                             - 1.一个包含100元素的list key, 它的free cost就是100
                             - 2.一个512MB的string key, 它的free cost是1 所以可以看出，redis的lazy free的cost计算主要时间复杂度相关。
 
-    - Redis6.0 多线程 Reactor 网络模型（默认关闭）： I/O 多线程只针对发送响应数据（write client socket），并不会以多线程的方式处理读请求（read client socket）。执行命令仍然是单线程顺序执行。因此不需要担心线程安全问题。
+    - Redis6.0 多线程 Reactor 网络模型（默认关闭）： I/O 多线程只针对发送写请求（write client socket），并不会以多线程的方式处理读请求（read client socket）。执行命令仍然是单线程顺序执行。因此不需要担心线程安全问题。
 
         - Redis的主要瓶颈不在CPU，为什么又要引入IO多线程？
 
@@ -583,6 +604,15 @@
 ## 基本命令
 
 - [Redis 命令参考](http://doc.redisfans.com/)
+
+- 服务端：
+    ```sh
+    # 启动redis
+    redis-server
+
+    # 使用自定义配置（推荐）
+    redis-server redis/redis-6379.conf
+    ```
 
 - 客户端:
 
@@ -969,7 +999,7 @@ redis keys video* | xargs redis-cli del
 
             - 当n=15时，可以观察到：当keys超过32768（2^15）时，内存突然从3.45M涨到了3.70M。
                 ```sh
-                redis - cli - h 127.0 . 0.1 - p 6379 -- stat
+                redis-cli -h 127.0.0.1 -p 6379 --stat
                 keys       mem      clients blocked requests            connections
                 32767 3.45M 2 0 1230010 (+ 2) 13
                 32768 3.45M 2 0 1230012 (+ 2) 13
@@ -3410,6 +3440,32 @@ exec
 discard
 ```
 
+- 事务中出现错误
+```redis
+set a 2
+set b 1
+
+# 开启事务
+multi
+set a 100
+set b 200
+
+# 错误命令
+sett c 300
+known command 'sett', with args beginning with: 'c' '300'
+# 无法保存
+exec                                                         <transaction>
+ansaction discarded because of previous errors.
+# 退出
+discard
+
+# 结果可以看到事务并没有执行
+get a
+"2"
+get b
+"1"
+```
+
 - `watch`(乐观锁) 监视一个(或多个) key ,如果在事务执行之前这个(或这些) key 被其他命令所改动,那么事务将被打断
 
     ![avatar](./Pictures/redis/watch监控.avif)
@@ -3526,7 +3582,7 @@ client pause <time(毫秒)>
 
 `monitor`命令：监听其他客户端正在执行的命令，并记录详细时间戳
 
-    ![avatar](./Pictures/redis/client.avif)
+![avatar](./Pictures/redis/client.avif)
 
 ### client list（客户端连接信息）vs info clients
 
@@ -4290,7 +4346,7 @@ redis-cli -s /var/run/redis/redis.sock
     "PONG"
     ```
 
-    2.将危险命令改名
+    - 2.将危险命令改名
 
         | 危险命令         | 操作                    |
         |------------------|-------------------------|
@@ -4461,7 +4517,7 @@ config get rdbchecksum
 
         - 1.3600 秒内最少有 1 个 key 被改动
         - 2.300 秒内最少有 10 个 key 被改动
-        - 3.60 秒内最少有 1000 个 key 被改动
+        - 3.60 秒内最少有 10000 个 key 被改动
 
         - `save`是性能杀手，所以一般情况下，我们在线上不会用这个功能的
             - 显示配置关闭save：`config set save ""`
@@ -4486,11 +4542,11 @@ config get rdbchecksum
         - 检测是否存在rdb/zof的子进程, 有则直接返回
 
     - 2.fork创建子进程（阻塞）。
-    ```redis
-    # 查看最近一次fork的耗时（单位：微妙）
-    info stats
-    latest_fork_usec:0
-    ```
+        ```redis
+        # 查看最近一次fork的耗时（单位：微妙）
+        info stats
+        latest_fork_usec:0
+        ```
 
     - 3.子进程fork完成。bgsave命令返回"background saving started"，表示不在阻塞主进程，可以继续响应其他命令
 
@@ -5441,6 +5497,7 @@ slaveof no one
         - `runid`：slave保存的master节点id
 
             - master会核对id与自己是否一致。runid重启时重新生成，如果master重启过，会导致全量复制。可以使用`debug reload`进行重启，就不会丢失runid
+            - Redis 4.0 后，master的runid会被写入到 RDB 中持久化保存。
 
         - `offset`：master和slave在写入数据之后，它的 offset 会增加。如果是第一次复制，那么值就是-1，将会引发全量复制
 
@@ -5562,7 +5619,7 @@ slaveof no one
 
 - 问题：slave重启后丢失了master的runid和复制偏移量，这导致重启后需要全量同步
 
-    - Redis 4.0 后，master的编号信息被写入到 RDB 中持久化保存。
+    - Redis 4.0 后，master的runid会被写入到 RDB 中持久化保存。
 
 - 问题：一主两从架构，当master挂掉了，我们将slave2选为master，它是不是能够跟slave1进行一个部分同步？在 PSYNC1 中，它是不可以的，因为master和slave的数据都是不一样的，它的 runid 也都不一样，所以不能进行这种增量同步。
 
@@ -5836,6 +5893,8 @@ slaveof no one
         - 解决方法: 主节点使用`debug reload` 命令(阻塞)重启, 从而保持runid一致, 避免全量复制
 
             - 缺点: 虽然可以避免全量复制, 但`debug reload` 是阻塞命令, 而阻塞期间会生成新的RDB文件, 并加载
+
+        - Redis 4.0 后，master的runid会被写入到 RDB 中持久化保存。
 
 - 部分复制退化为全量复制：
 
@@ -6185,11 +6244,11 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
 
     - 1.Twemproxy、Codis的代理方案：Proxy 会把你的请求根据路由规则，转发到对应的 Redis 节点上，当集群实例不足以支撑更大的流量请求时，还可以横向扩容，添加新的 Redis 实例提升性能，这一切对于你的客户端来说，都是透明无感知的。
 
-            ![avatar](./Pictures/redis/cluster-proxy.avif)
+        ![avatar](./Pictures/redis/cluster-proxy.avif)
 
     - 2.官方的Redis cluster：无需部署哨兵集群，集群内 Redis 节点通过 Gossip 协议互相探测健康状态，在故障时可发起自动切换。
 
-            ![avatar](./Pictures/redis/cluster-redis_cluster.avif)
+        ![avatar](./Pictures/redis/cluster-redis_cluster.avif)
 
 - 数据分布理论
 
@@ -6290,10 +6349,12 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
 
             ```
             253e27e0d617bb3c9cdbede1468ecc23e54e4ee9 :0@0 myself,master - 0 0 0 connected
-    vars currentEpoch 0 lastVoteEpoch 0
+            vars currentEpoch 0 lastVoteEpoch 0
             ```
+
             - 最重要的是节点id（40位16进制字符串），用于标识集群内的唯一性，很多操作需要借助节点id来完成。
-                - 节点id不同于runid，节点id在集群初始化时只创建1次，重启后重用；runid重启是会重置，因此master节点重启会触发全量备份
+                - 节点id不同于runid，节点id在集群初始化时只创建1次，重启后重用；runid重启是会重置，因此master节点重启会触发全量备份，Redis 4.0 后，master的runid会被写入到 RDB 中持久化保存。
+
 
     - 开启后检测节点日志是否正确
 
@@ -6312,6 +6373,7 @@ sentinel monitor YouMasterName 127.0.0.1 6379 1
         - 3.之后6379和6380定期通过`PING/PONG`小学进行节点通信
 
     - 在6379和6380分别执行`cluster nodes`命令（等同于nodes-6379.conf配置文件），可以看到双方已经建立集群
+
         ![avatar](./Pictures/redis/cluster-meet1.avif)
 
         ```redis
@@ -6644,7 +6706,7 @@ redis-cli --cluster rebalance 127.0.0.1:6379
     Source node #2: done
     ```
 
-    - 从6385迁移到6380
+    - 从6385迁移到6381
     ```sh
     redis-cli --cluster reshard 127.0.0.1:6385
     # 以下为输出
@@ -6718,7 +6780,7 @@ redis-cli --cluster rebalance 127.0.0.1:6379
 
 - jedis客户端需要自行修改
 
-### 故障转移
+### 故障转移（failover）
 
 - 故障发现：
 
@@ -6855,7 +6917,7 @@ redis-cli --cluster rebalance 127.0.0.1:6379
 
 - 在slave执行`cluster failover`命令，slave会变为master（默认情况下，客户端会有短暂阻塞，但不会丢失数据）
 
-    - 1.slave统治master停止处理所有客户端请求
+    - 1.slave通知master停止处理所有客户端请求
     - 2.master发送对应slave延迟复制的数据
     - 3.slave接受处理延迟复制的数据，知道主从复制的偏移量一致为止，保证复制数据不丢失
 
@@ -8346,15 +8408,18 @@ slowlog reset
     - 3.服务端：
 
         - `redis-cli --hotkeys`命令
+
+            - Redis-cli通过向Redis-server节点发送scan + object freq命令以遍历的方式分析Redis实例中所有key，然后返回实例中热key信息。
+
             ```sh
-            # maxmemory-policy参数必须为allkeys-lfu和volatile-lfu（redis4.0以上支持）
             # 返回所有Key的被访问次数，它的缺点同样为不可定制化输出报告
             redis-cli --hotkeys
             ```
 
             - 问题：
-                - 如果键值较多，执行较慢，和热点的概念的有点背道而驰
-                - 热度定义的不够准确
+                - maxmemory-policy参数必须为allkeys-lfu和volatile-lfu（redis4.0以上支持）
+                - 实时性差。由于需要扫描整个keyspace，实时性较差，扫描时间与key数量正相关，如果key数量比较多，耗时可能会非常长。
+                - 信息不够丰富。首先记录的访问频率是一个与访问次数的对数成比例的相关近似值，不能够很直观的看出来热key的访问频率；另外，返回的信息中也没有key的类型和热key出现的时间等。
 
             - 原理：
                 - [redis4.0之基于LFU的热点key发现机制](https://developer.aliyun.com/article/278922)
@@ -8471,58 +8536,179 @@ slowlog reset
 
         - 此种方法对于Redis客户端和服务端来说毫无侵入，是比较完美的方案
 
+        - Redis客户端使用TCP协议与服务端进行交互，并且通信协议采用自定义的RESP协议，可以使用libpcap库对Redis-server监听端口抓包，然后按照RESP协议解析数据，并统计抓包期间内访问的热key。
+
         - 问题：
-            - 需要一定的开发成本，但是一些开源方案实现了该功能，例如ELK(ElasticSearch Logstash Kibana)体系下的packetbeat[2] 插件，可以实现对Redis、MySQL等众多主流服务的数据包抓取、分析、报表展示
-            - 对于高流量的机器抓包，对机器网络可能会有干扰，同时抓包时候会有丢包的可能性
+            - 需要一定的开发成本，但是一些开源方案实现了该功能，例如ELK(ElasticSearch Logstash Kibana)体系下的packetbeat插件，可以实现对Redis、MySQL等众多主流服务的数据包抓取、分析、报表展示
+
+            - 同样只能统计开启抓包期间的访问热key情况，无法获取过去的热key。
+
+            - 开启期间对访问Redis-server性能有一定的损耗，而且ECS一般会部署多个Redis-server，全量开启会对系统负载有一定影响，因此无法长时间开启进行实时处理
+
             - 维护成本过高
 
         - 不过确实有公司利用上述思路，开发了对应的系统
 
-- 解决热点key：
+#### 解决热点key：
 
-    - 1.拆分复制数据结构：如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
+- 1.拆分复制数据结构：如果是类似hash这样的二级数据结构，元素个数过多时，可以进行拆分为多个key，并分布到不同的redis节点上
 
-        - 例子：一个key名字叫做"good_100"，那就可以把它拆成四份，“good_100_copy1”、“good_100_copy2”、“good_100_copy3”、“good_100_copy4”，每次更新和新增时都需要去改动这N个key
+    - 例子：一个key名字叫做"good_100"，那就可以把它拆成四份，“good_100_copy1”、“good_100_copy2”、“good_100_copy3”、“good_100_copy4”，每次更新和新增时都需要去改动这N个key
 
-        - 如何给即将访问的热key上加入后缀？几种办法，根据本机的ip或mac地址做hash，之后的值与拆key的数量做取余，最终决定拼接成什么样的key后缀，从而打到哪台机器上；服务启动时的一个随机数对拆key的数量做取余。
+    - 如何给即将访问的热key上加入后缀？几种办法，根据本机的ip或mac地址做hash，之后的值与拆key的数量做取余，最终决定拼接成什么样的key后缀，从而打到哪台机器上；服务启动时的一个随机数对拆key的数量做取余。
 
-    - 2.迁移热点key：cluster为例，热点key所在的slot，迁移到新的redis节点上
+- 2.迁移热点key：cluster为例，热点key所在的slot，迁移到新的redis节点上
 
-    - 3.本地缓存+热点数据的发现与存储：将热点key放在proxy本地缓存。当数据更新时，数据会不一致，可以使用发布订阅机制解决
+- 3.本地缓存+热点数据的发现与存储：将热点key放在proxy本地缓存。当数据更新时，数据会不一致，可以使用发布订阅机制解决
 
-        - [京东技术：Redis数据倾斜与JD开源hotkey源码分析揭秘](https://cloud.tencent.com/developer/article/2205845)
+    - 目前，比如，有赞自研分布式缓存系统zanKV、京东零售开源的热key探测框架（JD-hotkey）、得物热点探测框架（Burning）都是类似这种方案，在客户端进行收集，在聚合中心worker节点上进行热key统计，统计出来的热key可以推送到客户端进行本地缓存。
 
-        - 首先 Client 也会访问 SLB，并且通过 SLB 将各种请求分发至 Proxy 中，Proxy 会按照基于路由的方式将请求转发至后端的 Redis 中。
+    - [京东技术：Redis数据倾斜与JD开源hotkey源码分析揭秘](https://cloud.tencent.com/developer/article/2205845)
 
-          - 在热点 key 的解决上是采用在服务端增加缓存的方式进行。具体来说就是在 Proxy 上增加本地缓存，本地缓存采用 LRU 算法来缓存热点数据，后端节点增加热点数据计算模块来返回热点数据。
+    - 首先 Client 也会访问 SLB，并且通过 SLB 将各种请求分发至 Proxy 中，Proxy 会按照基于路由的方式将请求转发至后端的 Redis 中。
 
-            ![avatar](./Pictures/redis/proxy本地缓存.avif)
+      - 在热点 key 的解决上是采用在服务端增加缓存的方式进行。具体来说就是在 Proxy 上增加本地缓存，本地缓存采用 LRU 算法来缓存热点数据，后端节点增加热点数据计算模块来返回热点数据。
 
-            - 优点：
-                - Proxy 本地缓存热点，读能力可水平扩展
-                - DB 节点定时计算热点数据集合
-                - DB 反馈 Proxy 热点数据
-                - 对客户端完全透明，不需做任何兼容
+        ![avatar](./Pictures/redis/proxy本地缓存.avif)
 
-        - 热点数据的发现与存储
+        - 问题：
 
-            - 对于热点数据的发现，首先会在一个周期内对 Key 进行请求统计，在达到请求量级后会对热点 Key 进行热点定位，并将所有的热点 Key 放入一个小的 LRU 链表内，在通过 Proxy 请求进行访问时，若 Redis 发现待访点是一个热点，就会进入一个反馈阶段，同时对该数据进行标记。
+            - 在客户端收集的方案对客户端代码有一定的侵入，而且每种语言的SDK都需要进行开发，后期开发维护成本较高。
 
-            ![avatar](./Pictures/redis/热点数据的发现与存储.avif)
+            - 框架比较复杂，开发成本高。由于同一个key的访问可能同时出现在多个不同的客户端或者Proxy上，因此，在单个客户端或者Proxy上是无法统计热key的，因此，该方案需要一个聚合中心计算平台，收集不同Client/Proxy上访问的key，然后计算热key信息。
 
-            - 可以使用一个etcd或者zk集群来存储反馈的热点数据，然后本地所有节点监听该热点数据，进而加载到本地JVM缓存中。
+        - 优点：
+            - Proxy 本地缓存热点，读能力可水平扩展
+            - DB 节点定时计算热点数据集合
+            - DB 反馈 Proxy 热点数据
+            - 对客户端完全透明，不需做任何兼容
 
-        - 热点数据的获取
+    - 热点数据的发现与存储
 
-            - 在热点 Key 的处理上主要分为写入跟读取两种形式，在数据写入过程当 SLB 收到数据 K1 并将其通过某一个 Proxy 写入一个 Redis，完成数据的写入。
-            - 假若经过后端热点模块计算发现 K1 成为热点 key 后， Proxy 会将该热点进行缓存，当下次客户端再进行访问 K1 时，可以不经 Redis。
+        - 对于热点数据的发现，首先会在一个周期内对 Key 进行请求统计，在达到请求量级后会对热点 Key 进行热点定位，并将所有的热点 Key 放入一个小的 LRU 链表内，在通过 Proxy 请求进行访问时，若 Redis 发现待访点是一个热点，就会进入一个反馈阶段，同时对该数据进行标记。
 
-            ![avatar](./Pictures/redis/热点数据读写示例图.avif)
+        ![avatar](./Pictures/redis/热点数据的发现与存储.avif)
 
-        - 最后由于 proxy 是可以水平扩充的，因此可以任意增强热点数据的访问能力。
+        - 可以使用一个etcd或者zk集群来存储反馈的热点数据，然后本地所有节点监听该热点数据，进而加载到本地JVM缓存中。
 
-        - [京东hotkey中间件：proxy缓存+热点数据的发现与存储]()
+    - 热点数据的获取
 
+        - 在热点 Key 的处理上主要分为写入跟读取两种形式，在数据写入过程当 SLB 收到数据 K1 并将其通过某一个 Proxy 写入一个 Redis，完成数据的写入。
+        - 假若经过后端热点模块计算发现 K1 成为热点 key 后， Proxy 会将该热点进行缓存，当下次客户端再进行访问 K1 时，可以不经 Redis。
+
+        ![avatar](./Pictures/redis/热点数据读写示例图.avif)
+
+    - 最后由于 proxy 是可以水平扩充的，因此可以任意增强热点数据的访问能力。
+
+- 基于内核的Redis热key统计方案
+
+    - [得物技术：基于Redis内核的热key统计实现方案｜得物技术](https://mp.weixin.qq.com/s/RWQzLZq6X7B5ThaKX6U4SQ)
+
+
+    - 在Redis-server端实现：
+        - 热key统计模块
+            - 基于LRU队列实现统计key每秒内访问次数，当访问次数达到设置的热key阈值时，被判定为热key，热key加入热key队列用于提供实时查询。
+        - 热key通知模块
+        - 另外提供热key日志记录查询与重置命令。
+
+    - 基于内核的Redis热key统计方案提供热key订阅与主动通知功能，提供读热key、写热key、热key失效三个订阅通道channel，可用于Client/Proxy订阅热key消息，当key被判定为热key时，Redis-server主动向对应的消息通道广播热key消息。
+        ![avatar](./Pictures/redis/基于内核的Redis热key统计方案-实现原理图.avif)
+        ![avatar](./Pictures/redis/基于内核的Redis热key统计方案-实现流程图.avif)
+
+    - 优点：
+        - 实时性强：可实时统计热key信息，统计粒度为每秒
+        - 热key信息详细：热key信息包含热key出现的时间、访问次数、key类型、读操作或写操作等信息
+        - 支持订阅与查询：支持读热key、写热key、热key失效三种类型通知，可查询热key日志记录
+
+    - 热key统计
+
+        - 为了能够高效进行热key统计，并且不消耗过多内存资源，在Redis中使用一个固定大小的LRU队列（大小可配置）来进行热key统计，记录数据结构采用了非常紧凑的格式设计，每个key的统计操作都是O(1)时间复杂度，保证高效统计的同时，统计工作消耗的内存资源不会随着Redis中存储的key数量增长而增长。
+
+        - LRU队列中用于统计key访问记录的数据结构如下：
+
+            ```c
+            #define HOTKEY_NOTIFIED_BIT 1
+            #define ACCESS_COUNT_BITS 16
+            #define ACCESS_TIME_BITS 46
+
+            typedef struct hotkeyRecord {
+                uint64_t notified:HOTKEY_NOTIFIED_BIT;      // 热key是否通知或记录日志
+                uint64_t same_period:HOTKEY_NOTIFIED_BIT;   // 每秒一个统计周期，同一个key每秒最多发送一次热key通知
+                uint64_t count:ACCESS_COUNT_BITS;           // 热key计数
+                uint64_t access_time:ACCESS_TIME_BITS;      // 热key计数记录起始时间，单位：毫秒
+            } hotkeyRecord;
+            ```
+
+            - 热key统计默认以每秒一个周期，统计每个key在每秒时间内的访问次数，当每秒访问次数达到一定的阈值（阈值大小可配置）时，认定为是热key；同时，同一个时间周期内（即同一秒内）同一个key只记录一次热key，连续多次的不同时间周期内，同一个key连续出现热key现象会多次记录，同时，记录热key出现的时间与访问次数。
+
+            - 热key统计区分读热key与写热key，方便业务进行缓存或者其他相关处理。
+
+            - 被判定为热key的记录，会加入热key队列记录日志，可供查询，管控平台通过查询热key日志队列可以展示Redis-server节点实时热key信息；热key日志记录包括热key出现的时间、访问次数、key类型、读操作还是写操作等信息。
+
+        - 热key日志队列记录数据结构如下所示：
+            ```c
+            #define HOTKEY_NOTIFIED_BIT 1
+            #define ACCESS_COUNT_BITS 16
+            #define LOG_TIME_BITS 46
+
+            typedef struct hotkeyLogEntry {
+                uint64_t notified:HOTKEY_NOTIFIED_BIT;
+                uint64_t access_count:ACCESS_COUNT_BITS; // 热key计数
+                uint64_t access_time:LOG_TIME_BITS;   // 热key计数记录起始时间，单位：毫秒
+
+                unsigned type;
+
+                void *key;
+            } hotkeyLogEntry;
+            ```
+
+    - 热key通知
+
+        - Redis-server提供读热key、写热key、热key失效三个订阅通道channel，可用于Client或者Proxy订阅热key相关消息；当出现读写热key时，Redis-server主动向对应的订阅通道广播热key消息；当一个热key出现写操作时，会向热key失效订阅通道广播key失效消息。
+
+        - 热key类型定义数据结构如下所示：
+
+            ```c
+            /* hotkey type */
+            #define READ_HOTKEY_NOTIFY 0
+            #define READ_HOTKEY_INVALID 1
+            #define WRITE_HOTKEY_NOTIFY 2
+            ```
+
+
+    - 热key记录查询与重置命令
+
+        - 除了通过订阅通道主动通知外，Redis-server提供热key日志记录查询与重置命令，可供平台查询进行展示或者操作。
+
+        - 读命令热key查询与重置
+
+            - 可以查询指定长度的日志、或者从指定位置查询指定长度的日志：
+
+                ```redis
+                // 查询读热 key 日志长度
+                readHotkeyLog len
+                // 重置清空读热 key 日志
+                readHotkeyLog reset
+                // 查询读热 key 日志
+                readHotkeyLog get                   // 查询默认长度，从日志队列头部开始查询数据
+                readHotkeyLog get [len]             // 查询指定长度，从日志队列头部开始查询数据
+                readHotkeyLog get [index] [len]     // 从指定 index 开始查询指定长度
+                ```
+
+        - 写命令热key查询与重置
+
+            - 可以查询指定长度的日志、或者从指定位置查询指定长度的日志：
+
+            ```redis
+            // 查询写热 key 日志长度
+            writeHotkeyLog len
+            // 重置清空写热 key 日志
+            writeHotkeyLog reset
+            // 查询写热 key 日志
+            writeHotkeyLog get                   // 查询默认长度，从日志队列头部开始查询数据
+            writeHotkeyLog get [len]             // 查询指定长度，从日志队列头部开始查询数据
+            writeHotkeyLog get [index] [len]     // 从指定 index 开始查询指定长度
+            ```
 ### linux相关的性能配置
 
 - [Redis开发运维实战：Redis在Linux系统的配置优化]()
@@ -8565,7 +8751,9 @@ slowlog reset
     free -h
 
     # 实时查看swap的使用。si和so表示swap in swap on
-    dstat --vmstat 1
+    vmstat 1
+    # 更好的vmstat
+    dool --vmstat 1
 
     # 查看redis进程的swap使用情况，求和可以得出总的swap量
     cat /proc/$(pidof redis-server)/smaps | grep -i swap
@@ -8662,59 +8850,6 @@ slowlog reset
 #### [cachecloud](https://github.com/sohutv/cachecloud)
 
 - [安装文档](https://github.com/sohutv/cachecloud/blob/main/cachecloud-web/src/main/resources/static/wiki/quickstart/index.md)
-
-#### Grafana
-
-- reference:
-
-    - [微信: 颜值爆表！Redis 官方可视化工具来啦，功能真心强大！](https://mp.weixin.qq.com/s?src=11&timestamp=1647579448&ver=3683&signature=eBTCSdLn*naHlqkuDmQucrXvHgXpwLEv3BahbB-ilkt5VbUqtLNq25y1tWSu2Q9uIBgd0s1qJzFbKljphryyn9MNx7XcXlwvx-ERZ6cQ33wQ-S9Qy3TA-Y9NIJgwKwxB&new=1)
-
-- 安装grafana
-```sh
-docker pull grafana/grafana
-docker run -p 3000:3000 --name grafana \
--d grafana/grafana
-```
-
-- 写入以下配置文件: `/home/tz/prometheus.yml`
-```yml
-global:
-  scrape_interval: 5s
-```
-
-- 安装prometheus, 并导入配置文件
-```sh
-docker pull prom/prometheus
-docker run -p 9090:9090 --name prometheus \
--v /home/tz/prometheus.yml:/etc/prometheus/prometheus.yml \
--d prom/prometheus
-```
-
-- 安装redis插件
-```sh
-# 进入grafana
-docker exec -it grafana /bin/bash
-# 安装redis插件
-grafana-cli plugins install redis-datasource
-
-# 退出grafana
-exit
-# 安装插件后, 需要重启grafana容器
-docker container restart b9c68aec9425
-```
-
-- 查看redismod容器的ip地址
-```sh
-docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a25cf3c110
-```
-
-- 进入grafana
-
-    - 浏览器打开`http://127.0.0.1:3000/` 输入帐号秘密`admin:admin`
-
-    - 进入设置, 选择redis数据库, 输入刚才获取的redismod容器的ip地址
-
-        ![avatar](./Pictures/redis/grafana-redis.avif)
 
 ### 生产环境排查案例
 
@@ -9254,7 +9389,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
     | 策略                 | 一致性 | 维护成本 |
     |----------------------|--------|----------|
     | LRU/LFU/FIFO算法剔除 | 最差   | 最低     |
-    | 超市剔除             | 较差   | 较低     |
+    | 超时剔除             | 较差   | 较低     |
     | 主动更新             | 强     | 高       |
 
     - 1.LRU/LFU/FIFO算法剔除：超过`maxmemory-policy`内存最大值时启用
@@ -9333,7 +9468,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
 
             - 问题：有一定的误识别率和删除困难
 
-- 缓存雪崩：缓存中没有但数据库中有的数据。大量缓存集中在一段时间内失效，发生大量的缓存穿透。和缓存击穿不同的是，缓存击穿指并发查同一条数据，缓存雪崩是不同数据都过期了，很多数据都查不到从而查数据库。
+- 缓存雪崩：缓存中没有，但数据库中有的数据。大量缓存集中在一段时间内失效，发生大量的缓存穿透。和缓存击穿不同的是，缓存击穿指并发查同一条数据，缓存雪崩是不同数据都过期了，很多数据都查不到从而查数据库。
 
     ![avatar](./Pictures/redis/缓存雪崩.avif)
 
@@ -9357,7 +9492,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
             - 降级机制在高并发系统非常普遍，如推荐服务中的个性化推荐不可用，可以降级补充热点数据，不至于造成前端页面开天窗。
 
 
-- 缓存击穿：缓存中没有但数据库中有的数据。热点key（大并发集中对这一个点进行访问），当这个 Key 在失效的瞬间，持续的大并发线程就穿破缓存，直接请求数据库，造成数据库宕机。
+- 缓存击穿：缓存中没有，但数据库中有的数据。热点key（大并发集中对这一个点进行访问），当这个 Key 在失效的瞬间，持续的大并发线程就穿破缓存，直接请求数据库，造成数据库宕机。
 
     ![avatar](./Pictures/redis/缓存击穿.avif)
 
@@ -9517,7 +9652,7 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
             | T1 | 删除缓存     |                                     |                          |
             | T2 |              | 读取缓存，缓存丢失，从数据库读取100 | 线程B读取到旧值          |
             | T3 |              | 更新缓存100                         |                          |
-            | T4 | 更新数据库99 |                                     | 缓存是100，数据库是99 |
+            | T4 | 更新数据库99 |                                     | 缓存是新值，数据库是旧值 |
 
             或者
 
@@ -9975,8 +10110,8 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
         | id   | name                          | author         |
         +------+-------------------------------+----------------+
         |    1 | The Ruby Programming Language | Mark Pilgrim   |
-        |    1 | Ruby on rail                  | David Flanagan |
-        |    1 | Programming Erlang            | Joe Armstrong  |
+        |    2 | Ruby on rail                  | David Flanagan |
+        |    3 | Programming Erlang            | Joe Armstrong  |
         +------+-------------------------------+----------------+
 
         mysql> select * from tag;
@@ -10413,9 +10548,14 @@ docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 38a2
         ```sh
         sqlite3 result.db.5
         ```
-# k8s
 
-- [字节跳动技术团队：火山引擎 Redis 云原生实践]()
+# 故障
+
+## [爱可生开源社区：故障分析 | Redis 主从复制风暴](https://mp.weixin.qq.com/s/b208R2UQjj5t4yM1qgQBHA)
+
+## [爱可生开源社区：故障分析 | Redis 主实例故障后 Sentinel 决策异常 ](https://mp.weixin.qq.com/s/syr-cOSt5zm6-2af_17rpA)
+
+## [爱可生开源社区：故障分析 | redis cluster 从库无法自动恢复同步案例一则](https://mp.weixin.qq.com/s/qKx4FFSwGlX9S33wctIppg)
 
 # redis 安装
 

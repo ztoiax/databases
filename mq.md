@@ -467,6 +467,8 @@
 
 - [java技术爱好者：超详细的RabbitMQ入门，看这篇就够了！](https://developer.aliyun.com/article/769883)
 
+- [崔亮的博客：一文带你入门RabbitMQ消息队列](https://mp.weixin.qq.com/s/8B2zev06zSeLj7aVy5TdUg)
+
 # RocketMQ
 
 - [小白debug：RocketMQ 为什么性能不如 Kafka？](https://mp.weixin.qq.com/s/4ZTqvsLzg6-kJFJez4Zkqw)

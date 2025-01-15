@@ -154,6 +154,10 @@
 
 # mongodb
 
+- [AustinDatabases：MongoDB 大俗大雅，高端的知识讲“低俗” -- 1 什么叫多模](https://mp.weixin.qq.com/s/NhY3hMQ0VZQxiTbXrk8Rcw)
+
+- [AustinDatabases：MongoDB 大俗大雅，高端的知识讲“通俗” -- 2 嵌套和引用](https://mp.weixin.qq.com/s/hTtcdxq-fSWQNbQzVK3h3g)
+
 ## 适合业务
 
 - 高并发web应用

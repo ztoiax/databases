@@ -15,6 +15,7 @@
     * [sqlite](#sqlite)
       * [sqlite个人笔记](#sqlite个人笔记)
     * [dolt: git 命令的数据库](#dolt-git-命令的数据库)
+      * [mysql vs postgresql](#mysql-vs-postgresql)
   * [NOSQL(非关系数据库)](#nosql非关系数据库)
     * [基本理论](#基本理论)
     * [key-value](#key-value)
@@ -69,6 +70,7 @@
 * [ER模型](#er模型)
 * [dba行业](#dba行业)
   * [学习](#学习)
+    * [白鳝的洞穴：没有一个天才不勤奋](#白鳝的洞穴没有一个天才不勤奋)
     * [白鳝的洞穴：DBA的变与不变](#白鳝的洞穴dba的变与不变)
   * [管理](#管理)
     * [白鳝的洞穴：被KPI扭曲的运维](#白鳝的洞穴被kpi扭曲的运维)
@@ -76,12 +78,18 @@
   * [销售](#销售)
     * [AustinDatabases：临时工访谈：金牌 “女” 销售从ORACLE 转到另类国产数据库 到底 为什么？](#austindatabases临时工访谈金牌-女-销售从oracle-转到另类国产数据库-到底-为什么)
   * [云数据库](#云数据库)
+    * [非法加冯：你怎么还在招聘DBA?](#非法加冯你怎么还在招聘dba)
+    * [非法加冯：DBA还是一份好工作吗？](#非法加冯dba还是一份好工作吗)
+    * [AustinDatabases：临时工说：云DBA 该做什么，云灭了DBA 不可能，完全不可能](#austindatabases临时工说云dba-该做什么云灭了dba-不可能完全不可能)
+    * [非法加冯：云计算泥石流：下云合订本](#非法加冯云计算泥石流下云合订本)
 * [业务](#业务)
 * [第三方工具](#第三方工具)
   * [sql](#sql)
+  * [客户端tui](#客户端tui)
   * [AI](#ai)
   * [画图](#画图)
   * [gui客户端工具](#gui客户端工具)
+  * [BI数据可视化工具](#bi数据可视化工具)
 * [数据迁移](#数据迁移)
   * [数据迁移案例](#数据迁移案例)
     * [爱可生开源社区：技术分享 | 一次数据库迁移](#爱可生开源社区技术分享--一次数据库迁移)
@@ -401,6 +409,14 @@ Port:3306
 #### [sqlite个人笔记](./sqlite.md)
 
 ### [dolt: git 命令的数据库](https://github.com/dolthub/dolt)
+
+#### mysql vs postgresql
+
+- [非法加冯：PZ：MySQL还有机会赶上PostgreSQL吗？](https://mp.weixin.qq.com/s/xveP91NMYF4NFlIX_JcpYA)
+
+- [红石PG：Postgres 和 MySQL，到底应该怎么选？](https://mp.weixin.qq.com/s/kT-AhModeJwTjh-UA5LHPQ)
+
+- [红石PG：MySQL 和 PG 性能 PK，基准测试跑起来！](https://mp.weixin.qq.com/s/rgCn_uY9Dol_8DZ0cIJvuw)
 
 ## NOSQL(非关系数据库)
 
@@ -1275,6 +1291,14 @@ http://127.0.0.1:3000
 
 ## 学习
 
+### [白鳝的洞穴：没有一个天才不勤奋](https://mp.weixin.qq.com/s/Ntgv67aXd4S_rveO-eXFgg)
+
+- 一个程序员，35岁还只是拷贝粘贴程序员，对应用架构、数据架构、数据库、服务器、业务逻辑还懵懵懂懂，这时候想要发愤图强，可能周边的环境也无法支撑你了吧。项目经理把你当累赘，只给你脏活累活，领导也不可能提拔你。你靠什么来改变自己的命运呢？跳槽到其他公司？现在这种竞争环境，可能一面你都过不去。如果早五年，30岁的你虽然技术不怎么样，你的项目经理可能还能把你当成新手来试试有没有培养的潜力，这样你的机会还能大一些。如果你真是天才，那么35岁的你无法得到别人的赏识，自己创业可能还有点机会，否则只能看运气了。
+
+- DBA比码农的情况会好很多，DBA的成熟年龄一般都是在35左右。我差不多也是33岁才开始从程序员、架构师改行做专职DBA的。之前的研发经历让我更好地理解数据库和应用的关系，也让我能够更深地理解数据库的内在逻辑。但是**DBA是十分讲究实战的职业，光有理论是无法提升能力的**，必须要通过实战来提升自己，你必须不断去挑战自己的能力极限才能不断突破。
+
+- 在DBA成长的道路上，你需要不断学习各种理论知识（数据库，硬件，操作系统，应用系统，等等），看别人的经验分享，尝试通过实验来验证知识或者别人的经验。做这些工作都是需要付出时间和精力的，因此想做一个优秀的DBA你，更要勤奋。你要成为一个优秀DBA可能需要付出比成为一个优秀程序员更多的辛劳。
+
 ### [白鳝的洞穴：DBA的变与不变](https://mp.weixin.qq.com/s/Ne5jGv29A_4XODpHwTktJw)
 
 - 大佬竖立终生方向的历程
@@ -1486,7 +1510,13 @@ http://127.0.0.1:3000
 
 ## 云数据库
 
-- [AustinDatabases：临时工说：云DBA 该做什么，云灭了DBA 不可能，完全不可能](https://mp.weixin.qq.com/s/rJmHVdlr42-rBcnCijFo4A)
+- [云数据库技术：云数据库价格一瞥](https://mp.weixin.qq.com/s/EJTH_RLLPHQ98yt2dp65zg)
+
+### [非法加冯：你怎么还在招聘DBA?](https://mp.weixin.qq.com/s?__biz=MzU5ODAyNTM5Ng==&mid=2247485292&idx=2&sn=5b08790e3d481833e11b95da476341d5&scene=21#wechat_redirect)
+
+### [非法加冯：DBA还是一份好工作吗？](https://mp.weixin.qq.com/s?__biz=MzU5ODAyNTM5Ng==&mid=2247485064&idx=1&sn=6225a044d8f145cdb07a21a1e0c54ad8&scene=21#wechat_redirect)
+
+### [AustinDatabases：临时工说：云DBA 该做什么，云灭了DBA 不可能，完全不可能](https://mp.weixin.qq.com/s/rJmHVdlr42-rBcnCijFo4A)
 
 - 基于云的特性，对比线下的数据库产品
     - 优点：基于云维护的方便和安全
@@ -1505,7 +1535,7 @@ http://127.0.0.1:3000
     - 然后你就和那些所答非所问的云客服，搅和一天，最终你还是明白不了这些都是为什么，实际上那些客服有的自己也不明白，说句大言不惭的话，我还教授过一些知识给这些客服，这些客服还拿着我的文章在给我解释某些数据库的故障，当我告诉他，你有点搞笑，拿着我写的文章 告诉我怎么回事，最后我们双方都笑了好尴尬呀 ！
         - 这就透露了另一个问题，你要不专业，那么云客服玩弄你，分分钟的事情，此时那些领导们，你还认为 你手里没有一个厉害的DBA 被人欺骗玩弄是一件，非常赏心悦目的事情吗？
 
-- [云数据库技术：云数据库价格一瞥](https://mp.weixin.qq.com/s/EJTH_RLLPHQ98yt2dp65zg)
+### [非法加冯：云计算泥石流：下云合订本](https://mp.weixin.qq.com/s?__biz=MzU5ODAyNTM5Ng==&mid=2247488410&idx=1&sn=e44705fce4221458244e7705258ca254&chksm=fe4b2641c93caf57cc46069b82827da873af95b3e157e7e8d2943977bdd1cbb547d79bc16373&scene=21#wechat_redirect)
 
 # 业务
 
@@ -1546,22 +1576,24 @@ http://127.0.0.1:3000
 
 - [qstudio：分析sql执行结果的桌面工具](https://github.com/timeseries/qstudio)
 
-- 客户端
+## 客户端tui
 
-    - [harlequin：sql tui](https://github.com/tconbeer/harlequin)
-        ```sh
-        // sqlite
-        harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
+- [harlequin：sql tui](https://github.com/tconbeer/harlequin)
+    ```sh
+    // sqlite
+    harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
 
-        // DuckDB
-        harlequin "path/to/duck.db" "another_duck.db"
+    // DuckDB
+    harlequin "path/to/duck.db" "another_duck.db"
 
-        // mysql
-        pip install harlequin-mysql
-        harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
-        ```
+    // mysql
+    pip install harlequin-mysql
+    harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
+    ```
 
-    - [lazysql](https://github.com/jorgerojas26/lazysql)
+- [lazysql：支持MySQL、 PostgreSQL、 SQLite、 MSSQL、 MongoDB](https://github.com/jorgerojas26/lazysql)
+
+- [peepdb：支持MySQL, PostgreSQL, MariaDB, SQLite, MongoDB and Firebase.](https://github.com/PeepDB-dev/peepdb)
 
 ## AI
 
@@ -1608,6 +1640,12 @@ http://127.0.0.1:3000
 - [FastoNoSQL](https://github.com/fastogt/fastonosql)支持Redis, Memcached, SSDB, LevelDB, RocksDB, UnQLite, LMDB, ForestDB, Pika, Dynomite, KeyDB
 
 - [Chat2DB](https://github.com/chat2db/Chat2DB)集成了AI和BI报表功能的新一代数据库管理系统。支持MySQL, PostgreSQL, H2, Oracle, SQLServer, SQLite, MariaDB, ClickHouse, DM, Presto, DB2, OceanBase, Hive, KingBase, MongoDB, Redis, Snowflake
+
+- [whodb](https://github.com/clidey/whodb?tab=readme-ov-file)一个基于浏览器的数据库管理工具，支持 Postgres、MySQL、SQLite、MongoDB、 Redis。
+
+## BI数据可视化工具
+
+- [dataease：人人可用的开源 BI 工具，Tableau、帆软的开源替代。](https://github.com/dataease/dataease)
 
 # 数据迁移
 

@@ -5,6 +5,7 @@
   * [安装](#安装)
     * [集成PostgreSQL Docker镜像，已集成热门插件和工具](#集成postgresql-docker镜像已集成热门插件和工具)
   * [插件](#插件)
+    * [DuckDB](#duckdb)
     * [nextgres：允许MySQL应用程序在PostgreSQL上无缝运行，无需任何代码更改](#nextgres允许mysql应用程序在postgresql上无缝运行无需任何代码更改)
   * [OLAP](#olap)
   * [隔离级别](#隔离级别)
@@ -54,6 +55,18 @@ psql
 - [FerretDB](https://github.com/FerretDB/FerretDB)
     - 底层采用 PostgreSQL 作为存储引擎，用 Go 语言实现了 MongoDB 协议
 
+### DuckDB
+
+- 就像做在线业务时，首选数据库是 PostgreSQL 一样，如今做分析时的 “默认之王” 就是 DuckDB。以前大家可能还会说用 Pandas，但现在几乎一开口就是“DuckDB 走起”。这货特别轻便，所以很多人想把它塞进那些本身对 OLAP 支持不是特别好的数据库。今年，我们就看到四款把 DuckDB 集成到 Postgres 的扩展相继亮相。
+
+    - 第一枪是 2024 年 5 月，Crunchy Data 宣布做了个专有扩展，把 Postgres 重定向到 DuckDB 来处理 OLAP 查询。随后他们又搞了个更厉害的版本，利用 DuckDB 的空间扩展 来加速 PostGIS 查询。
+
+    - 2024 年 6 月，ParadeDB发布了一个开源扩展（pg_analytics），用 Postgres 的 FDW API 去调用 DuckDB。在此之前，他们用的是 DataFusion（pg_lakehouse），后来改用 DuckDB。
+
+    - 8 月，官方版的 DuckDB-for-Postgres 出炉了（pg_duckdb），托管在 DuckDB Labs 的 GitHub 下，算是名正言顺的 DuckDB 官方插件。原本宣传说这是 MotherDuck、Hydra、Microsoft 和 Neon 联合开发，结果后来据说 Microsoft 和 Neon 因为开发管理问题被“踢出去”了，就跟 阿拉伯王子 离开 NWA 一样。现在只剩 MotherDuck 和 Hydra 继续干。
+
+    - 11 月又来一个 pg_mooncake 插件（博文），这次是 Mooncake Labs 出品。它跟前面三个不太一样，是可以通过 Postgres 把数据写进 Iceberg 表里，还支持事务。
+
 ### nextgres：允许MySQL应用程序在PostgreSQL上无缝运行，无需任何代码更改
 
 ## OLAP
@@ -73,7 +86,11 @@ psql
 
 - [pgbackweb：自动化备份](https://github.com/eduardolat/pgbackweb)
 
-- [rainfrog：tui支持类似 Vim 的快捷键、关键字高亮和历史记录等人性化功能。](https://github.com/achristmascarl/rainfrog)
+- 客户端
+
+    - [rainfrog：tui支持类似 Vim 的快捷键、关键字高亮和历史记录等人性化功能。](https://github.com/achristmascarl/rainfrog)
+
+    - [pgmanage：gui](https://github.com/commandprompt/pgmanage)
 
 # reference
 

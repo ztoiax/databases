@@ -16,7 +16,7 @@
       * [Order by (排序)](#order-by-排序)
       * [regexp (正则表达式)](#regexp-正则表达式)
       * [Group by (分组)](#group-by-分组)
-        * [WITH ROLLUP](#with-rollup)
+        * [WITH ROLLUP（汇总）](#with-rollup汇总)
         * [dbaplus社群：MySQL 中的 distinct 和 group by 哪个效率更高？太刁钻了！](#dbaplus社群mysql-中的-distinct-和-group-by-哪个效率更高太刁钻了)
           * [结论](#结论)
       * [子查询](#子查询)
@@ -28,8 +28,8 @@
         * [UNION(并操作)](#union并操作)
         * [EXCEPT(差操作)](#except差操作)
         * [INTERSECT(交操作)](#intersect交操作)
-      * [聚集函数(aggregation)](#聚集函数aggregation)
-        * [基本聚集函数](#基本聚集函数)
+      * [聚和函数(aggregation)](#聚和函数aggregation)
+        * [基本聚和函数](#基本聚和函数)
         * [加密函数](#加密函数)
         * [rank(): 排名](#rank-排名)
         * [分窗](#分窗)
@@ -47,6 +47,7 @@
     * [CREATE(创建)](#create创建)
       * [数据类型](#数据类型)
         * [dbaplus社群：MySQL中Varchar(50)和varchar(500)有什么区别？](#dbaplus社群mysql中varchar50和varchar500有什么区别)
+        * [爱可生开源社区：技术分享 | MySQL VARCHAR 最佳长度评估实践](#爱可生开源社区技术分享--mysql-varchar-最佳长度评估实践)
         * [爱可生开源社区：技术分享 | MySQL 隐式转换必知必会](#爱可生开源社区技术分享--mysql-隐式转换必知必会)
           * [数据类型的隐式转换](#数据类型的隐式转换)
           * [字符集的隐式转换](#字符集的隐式转换)
@@ -54,7 +55,6 @@
       * [基本使用](#基本使用)
       * [压缩表](#压缩表)
         * [压缩表性能监测](#压缩表性能监测)
-      * [分区表](#分区表)
       * [TEMPORARY临时表](#temporary临时表)
       * [FOREIGN KEY(外键)](#foreign-key外键)
         * [FOREIGN 增删改，修改权限](#foreign-增删改修改权限)
@@ -67,6 +67,19 @@
       * [case语句，在UPDATE多条语句时，可以按顺序执行，避免出错](#case语句在update多条语句时可以按顺序执行避免出错)
     * [Delete and TRUNCATE and Drop (删除)](#delete-and-truncate-and-drop-删除)
       * [删除重复的数据](#删除重复的数据)
+    * [表设计](#表设计)
+      * [范式设计](#范式设计)
+      * [反范式设计](#反范式设计)
+      * [大表处理](#大表处理)
+        * [垂直拆分](#垂直拆分)
+        * [水平拆分](#水平拆分)
+        * [分区表](#分区表)
+          * [爱可生开源社区：第37期：适当的使用 MySQL 原生表分区](#爱可生开源社区第37期适当的使用-mysql-原生表分区)
+          * [爱可生开源社区：第38期：MySQL 时间类分区具体实现](#爱可生开源社区第38期mysql-时间类分区具体实现)
+          * [爱可生开源社区：第39期：MySQL 时间类分区写 SQL 注意事项](#爱可生开源社区第39期mysql-时间类分区写-sql-注意事项)
+          * [爱可生开源社区：第40期：MySQL 分区表案例分享](#爱可生开源社区第40期mysql-分区表案例分享)
+          * [爱可生开源社区：第41期：MySQL 哈希分区表](#爱可生开源社区第41期mysql-哈希分区表)
+          * [爱可生开源社区：第42期：MySQL 是否有必要多列分区](#爱可生开源社区第42期mysql-是否有必要多列分区)
   * [DDL (Data Definition Language) 数据定义语言](#ddl-data-definition-language-数据定义语言)
     * [VIEW (视图)](#view-视图)
     * [Function and Stored Procedure (函数 和 存储过程)](#function-and-stored-procedure-函数-和-存储过程)
@@ -80,21 +93,37 @@
       * [ALTER优化](#alter优化)
   * [INDEX(索引)](#index索引)
     * [SQL语法](#sql语法)
-    * [聚集索引](#聚集索引)
-    * [B+树匹配原则](#b树匹配原则)
-    * [前缀索引](#前缀索引)
-    * [HASH INDEX（哈希索引）](#hash-index哈希索引)
-      * [自适应哈希(adaptive hash index)](#自适应哈希adaptive-hash-index)
-    * [覆盖索引](#覆盖索引)
-    * [Multiple-Column Indexes (多列索引)](#multiple-column-indexes-多列索引)
-    * [空间索引（R-Tree 索引）](#空间索引r-tree-索引)
-    * [主键设计原则](#主键设计原则)
+    * [索引长度限制](#索引长度限制)
+    * [EXPLAIN](#explain)
+      * [select_type各种值的解释](#select_type各种值的解释)
+      * [type各种值的解释](#type各种值的解释)
+      * [Extra各种值的解释](#extra各种值的解释)
+      * [爱可生开源社区：技术分享 | explain format=json 详解](#爱可生开源社区技术分享--explain-formatjson-详解)
+      * [对比有无索引的执行计划](#对比有无索引的执行计划)
+    * [索引的分类](#索引的分类)
+      * [按数据结构分类](#按数据结构分类)
+        * [例子：先创建一张商品表，id 为主键](#例子先创建一张商品表id-为主键)
+        * [为什么 MySQL InnoDB  选择 B+tree 作为索引的数据结构？](#为什么-mysql-innodb--选择-btree-作为索引的数据结构)
+        * [HASH INDEX（哈希索引）](#hash-index哈希索引)
+          * [自适应哈希(adaptive hash index)](#自适应哈希adaptive-hash-index)
+        * [空间索引（R-Tree 索引）](#空间索引r-tree-索引)
+      * [按字段特性分类](#按字段特性分类)
+      * [按字段个数分类](#按字段个数分类)
+        * [联合索引（二级索引）匹配](#联合索引二级索引匹配)
+        * [索引下推（Using index condition）](#索引下推using-index-condition)
+    * [索引优化](#索引优化)
+      * [主键设计原则](#主键设计原则)
+      * [前缀索引](#前缀索引)
+      * [覆盖索引](#覆盖索引)
+      * [防止索引失效](#防止索引失效)
   * [DCL (Data Control Language) 数据控制语言](#dcl-data-control-language-数据控制语言)
     * [帮助文档](#帮助文档)
     * [GRANT 用户权限设置](#grant-用户权限设置)
+      * [爱可生开源社区：技术分享 | MySQL 授权表运维注意事项](#爱可生开源社区技术分享--mysql-授权表运维注意事项)
       * [设置权限允许远程的ip连接mysql](#设置权限允许远程的ip连接mysql)
-    * [配置(varibles)操作](#配置varibles操作)
-  * [TCL（Transaction Control Language）事务控制语言](#tcltransaction-control-language事务控制语言)
+    * [varibles（变量）](#varibles变量)
+      * [sql_mode](#sql_mode)
+  * [TCL（Transaction Control Language）事务](#tcltransaction-control-language事务)
     * [autocommit（自动提交）](#autocommit自动提交)
   * [规范和优化](#规范和优化)
     * [设计规范](#设计规范)
@@ -107,23 +136,24 @@
       * [索引设计规范](#索引设计规范)
       * [行为规范](#行为规范)
       * [流程规范](#流程规范)
-    * [EXPLAIN](#explain)
-      * [对比有无索引的执行计划](#对比有无索引的执行计划)
     * [sql语句优化](#sql语句优化)
+      * [一条查询语句的执行过程](#一条查询语句的执行过程)
       * [select优化](#select优化)
         * [dbaplus社群：MySQL用limit语句性能暴跌，怎么救？](#dbaplus社群mysql用limit语句性能暴跌怎么救)
-      * [索引优化](#索引优化)
+      * [索引优化](#索引优化-1)
+      * [group by 语句优化](#group-by-语句优化)
+        * [无索引情况](#无索引情况)
+        * [有索引的情况](#有索引的情况)
       * [增删改语句优化](#增删改语句优化)
-      * [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](#mysql数据库联盟如何通过chatgpt优化mysql的sql语句)
-      * [MySQL数据库联盟：全网最全MySQL Prompt](#mysql数据库联盟全网最全mysql-prompt)
-      * [美团SQL优化工具SQLAdvisor](#美团sql优化工具sqladvisor)
-    * [查询优化](#查询优化)
-      * [查询过程](#查询过程)
-      * [hint(优化器提示)](#hint优化器提示)
-      * [松散索引(loose index scan)](#松散索引loose-index-scan)
       * [慢查询优化](#慢查询优化)
         * [mysqldumpslow：慢查询工具](#mysqldumpslow慢查询工具)
-      * [pt-query-digest(percona-toolkit)：慢查询工具](#pt-query-digestpercona-toolkit慢查询工具)
+        * [pt-query-digest(percona-toolkit)：慢查询工具](#pt-query-digestpercona-toolkit慢查询工具)
+      * [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](#mysql数据库联盟如何通过chatgpt优化mysql的sql语句)
+      * [MySQL数据库联盟：全网最全MySQL Prompt](#mysql数据库联盟全网最全mysql-prompt)
+      * [第三方优化工具](#第三方优化工具)
+        * [MySQLTuner-perl：性能诊断工具，主要检查参数设置的合理性包括日志文件、存储引擎、安全建议及性能分析。针对潜在的问题，给出改进的建议。是mysql优化的好帮手。](#mysqltuner-perl性能诊断工具主要检查参数设置的合理性包括日志文件存储引擎安全建议及性能分析针对潜在的问题给出改进的建议是mysql优化的好帮手)
+        * [tuning-primer.sh](#tuning-primersh)
+        * [美团SQL优化工具SQLAdvisor](#美团sql优化工具sqladvisor)
 
 <!-- mtoc-end -->
 
@@ -143,7 +173,10 @@
 | -P   | 连接端口             |
 
 ```sh
+
 # 首先要连接进数据库
+mysql -uroot
+# 或者
 mysql -uroot -pYouPassword
 
 # -h 连接192.168.100.208主机的数据库
@@ -171,71 +204,71 @@ mysql -uroot -pYouPassword -e "show databases"
 - 而表(table)是要**区分大小写**的
 
 ```sql
-# 创建名为 tz 的数据库
+-- 创建名为 tz 的数据库
 create database tz;
 
-# 查看数据库
+-- 查看数据库
 show databases;
 
-# 使用tz数据库
+-- 使用tz数据库
 use tz;
 
-# 查看tz数据库里的表
+-- 查看tz数据库里的表
 show tables;
 
-# 查看 information_scema 数据库里的表
-show tables from information_scema;
+-- 查看 information_scema 数据库里的表
+show tables from information_schema;
 
-# 查看数据库状态
+-- 查看数据库状态
 show status;
 
-# 查看上一次查询成本(单位:数据页)
+-- 查看上一次查询成本(单位:数据页)
 show status like 'Last_query_cost'
 
-# 插入次数;
+-- 插入次数;
 show status like "com_insert%";
 
-# 删除次数;
+-- 删除次数;
 show status like "com_delete%";
 
-# 查询次数;
+-- 查询次数;
 show status like "com_select%";
 
-# 服务器运行时间
+-- 服务器运行时间
 show status like "uptime";
 
-# 连接次数
+-- 连接次数
 show status like 'connections';
 
-# 插入次数;
+-- 插入次数;
 show status like "com_insert%";
 
-# 删除次数;
+-- 删除次数;
 show status like "com_delete%";
 
-# 查询次数;
+-- 查询次数;
 show status like "com_select%";
 
-# 服务器运行时间
+-- 服务器运行时间
 show status like "uptime";
 
-# 连接次数
+-- 连接次数
 show status like 'connections';
 
-# 查看数据库队列
+-- 查看数据库队列
 show processlist;
 
-# 查看数据库保存目录
+-- 查看数据库保存目录
 show variables like 'data%';
 
-# SQL FUNCTION
-# 查看当前使用哪个数据库
+-- SQL FUNCTION
+-- 查看当前使用哪个数据库
 select database();
 
-# 查看当前登录用户
+-- 查看当前登录用户
 select user();
 
-# 查看数据库版本
+-- 查看数据库版本
 select version();
 ```
 
@@ -625,51 +658,51 @@ mysql -uroot -pYouPassward china < cnarea20191031.sql
 ---
 
 ```sql
-# 连接数据库后,进入 china 数据库
+-- 连接数据库后,进入 china 数据库
 use china;
 
-# 查看表 cnarea_2019 的字段(列)
+-- 查看表 cnarea_2019 的字段(列)
 desc cnarea_2019
 
-# 将 cnarea_2019 表改名为 ca ,方便输入
+-- 将 cnarea_2019 表改名为 ca ,方便输入
 alter table cnarea_2019 rename ca;
-# 改回来
+-- 改回来
 alter table ca rename cnarea_2019;
 
-# 从表 cnarea_2019 选取所有列(*表示所有列)
+-- 从表 cnarea_2019 选取所有列(*表示所有列)
 select *
 from cnarea_2019;
 
-# 如果刚才将表改成 ca 名,就是以下命令
+-- 如果刚才将表改成 ca 名,就是以下命令
 select *
 from ca;
 
-# 从表 cnarea_2019 选取 name 列
+-- 从表 cnarea_2019 选取 name 列
 select name
 from cnarea_2019;
 
-# 从表 cnarea_2019 选取 name 和 id 列
+-- 从表 cnarea_2019 选取 name 和 id 列
 select id,name
 from cnarea_2019;
 
-# distinct 过滤重复的数据
+-- distinct 过滤重复的数据
 select distinct level
 from cnarea_2019;
 
-# limit 只显示前2行
+-- limit 只显示前2行
 select *
 from cnarea_2019
 limit 2;
 
-# limit 选取所有列,但只显示100到70000行
+-- limit 选取所有列,但只显示100到70000行
 select * from cnarea_2019
 limit 100,70000;
 
-# LEFT() 选取name列, 但只显示前2字符
+-- LEFT() 选取name列, 但只显示前2字符
 SELECT LEFT(name, 2)
 FROM cnarea_2019
 
-# RIGHT() 选取name列, 但只显示后3字符
+-- RIGHT() 选取name列, 但只显示后3字符
 SELECT RIGHT(name, 3)
 FROM cnarea_2019
 ```
@@ -686,7 +719,7 @@ FROM cnarea_2019
 
 
 ```sql
-# 结尾处加入 \G 以列的方式显示
+-- 结尾处加入 \G 以列的方式显示
 select * from cnarea_2019
 where id=1\G;
 
@@ -707,24 +740,24 @@ merger_name: 北京
 ```
 
 ```sql
-# 选取 id 小于10的数据
+-- 选取 id 小于10的数据
 select * from cnarea_2019
 where id < 10;
 
-# 选取 10<=id<=30 的数据
+-- 选取 10<=id<=30 的数据
 select * from cnarea_2019
 where id<=30 and id>=10;
 
-# 选取 id 等于10 和 id等于20 的数据
+-- 选取 id 等于10 和 id等于20 的数据
 select * from cnarea_2019
 where id in (10,20);
 
-# 选取 not null(非空) 和 id 小于 10 的数据
+-- 选取 not null(非空) 和 id 小于 10 的数据
 select * from ca
 where id is not null
 and id < 10;
 
-# 选取 50行到55行的数据
+-- 选取 50行到55行的数据
 SELECT * FROM cnarea_2019
 WHERE id BETWEEN 50 AND 55;
 ```
@@ -742,21 +775,21 @@ WHERE id BETWEEN 50 AND 55;
 ---
 
 ```sql
-# 以 level 字段进行排序
+-- 以 level 字段进行排序
 select * from cnarea_2019
 order by level;
 
-# 选取 id<=10 ,以 level 字段进行排序
+-- 选取 id<=10 ,以 level 字段进行排序
 select * from cnarea_2019
 where id<=10
 order by level;
 
-# desc 降序
+-- desc 降序
 select * from cnarea_2019
 where id<=10
 order by level desc;
 
-# level 降序,再以 id 顺序显示
+-- level 降序,再以 id 顺序显示
 select * from cnarea_2019
 where id<=10
 order by level desc,
@@ -766,11 +799,11 @@ id ASC;
 #### regexp (正则表达式)
 
 ```sql
-# 选取以 '广州' 开头的 name 字段
+-- 选取以 '广州' 开头的 name 字段
 select name from cnarea_2019
 where name regexp '^广州';
 
-# 选取包含 '广州' 的name 字段
+-- 选取包含 '广州' 的name 字段
 select name from cnarea_2019
 where name regexp '.*广州';
 ```
@@ -780,7 +813,7 @@ where name regexp '.*广州';
 - 创建表people, people1
 
 ```sql
-# 创建表people
+-- 创建表people
 create table people(
     `id` int (8) auto_increment,
     `name` varchar(50),
@@ -788,7 +821,7 @@ create table people(
     primary key (`id`)
 );
 
-# 插入数据
+-- 插入数据
 INSERT INTO people (name, salary) VALUES
 ('a1','1000'),
 ('a2','2000'),
@@ -800,7 +833,7 @@ INSERT INTO people (name, salary) VALUES
 ('c2','2000'),
 ('c3','3000');
 
-# 创建表people1
+-- 创建表people1
 CREATE TABLE people1(
     `id` int (8) AUTO_INCREMENT,
     `name` varchar(50),
@@ -808,7 +841,7 @@ CREATE TABLE people1(
     primary key (`id`)
 );
 
-# 插入数据
+-- 插入数据
 INSERT INTO people1 (name, salary) VALUES
 ('c1','1000'),
 ('c2','2000'),
@@ -819,17 +852,32 @@ INSERT INTO people1 (name, salary) VALUES
 (null, null);
 
 
-# 统计salary(工资)大于1000的人数
+-- 统计salary(工资)大于1000的人数
 SELECT salary, COUNT(salary) FROM people
 GROUP BY salary
 HAVING salary > 1000;
++--------+---------------+
+| salary | COUNT(salary) |
++--------+---------------+
+| 2000   | 3             |
+| 3000   | 3             |
++--------+---------------+
 
-# 统计salary为1000的人数
+-- 统计salary为1000的人数
 SELECT COUNT(name) FROM people
 WHERE salary = 1000;
++-------------+
+| COUNT(name) |
++-------------+
+| 3           |
++-------------+
+
+-- LEFT() 选取name列, 但只显示前1字符。统计以开头为a、b、c作为类别的工资
+SELECT LEFT(name,1) ,SUM(salary) FROM people
+GROUP BY LEFT(name, 1)
 ```
 
-##### WITH ROLLUP
+##### WITH ROLLUP（汇总）
 
 ```sql
 CREATE TABLE sales(
@@ -840,7 +888,7 @@ CREATE TABLE sales(
     primary key (`id`)
 );
 
-# 插入数据
+-- 插入数据
 INSERT INTO sales (name, color, quantitty) VALUES
 ('shirt', 'black', 10),
 ('shirt', 'white', 8),
@@ -852,15 +900,53 @@ INSERT INTO sales (name, color, quantitty) VALUES
 ('skirt', 'white', 5),
 ('skirt', 'red', 5);
 
-# name
+-- name
 SELECT name, SUM(quantitty) FROM sales
 GROUP BY name
++-------+----------------+
+| name  | SUM(quantitty) |
++-------+----------------+
+| dress | 24             |
+| shirt | 19             |
+| skirt | 11             |
++-------+----------------+
+-- 使用 WITH ROLLUP 汇总
+SELECT name, SUM(quantitty) FROM sales
+GROUP BY name
+WITH ROLLUP
++--------+----------------+
+| name   | SUM(quantitty) |
++--------+----------------+
+| dress  | 24             |
+| shirt  | 19             |
+| skirt  | 11             |
+| <null> | 54             |
++--------+----------------+
 
-# color
+-- color
 SELECT color, SUM(quantitty) FROM sales
 GROUP BY color
++-------+----------------+
+| color | sum(quantitty) |
++-------+----------------+
+| black | 20             |
+| red   | 11             |
+| white | 23             |
++-------+----------------+
+-- 使用 WITH ROLLUP 汇总
+SELECT color, SUM(quantitty) FROM sales
+GROUP BY color
+WITH ROLLUP
++--------+----------------+
+| color  | SUM(quantitty) |
++--------+----------------+
+| black  | 20             |
+| red    | 11             |
+| white  | 23             |
+| <null> | 54             |
++--------+----------------+
 
-# 不使用WITH ROLLUP 统计每个颜色的销售数量,以及总量
+-- 不使用WITH ROLLUP 统计每个颜色的销售数量,以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY color, name
 
@@ -878,7 +964,7 @@ GROUP BY color, name
 | skirt | white | 5              |
 +-------+-------+----------------+
 
-# WITH ROLLUP 统计每个颜色的销售数量,以及总量
+-- WITH ROLLUP 统计每个颜色的销售数量,以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY color, name
 WITH ROLLUP
@@ -901,7 +987,7 @@ WITH ROLLUP
 | <null> | <null> | 54             |
 +--------+--------+----------------+
 
-# name 统计每个品类的销售数量, 以及总量
+-- name 统计每个品类的销售数量, 以及总量
 SELECT name, color, SUM(quantitty) FROM sales
 GROUP BY name, color
 WITH ROLLUP
@@ -923,6 +1009,41 @@ WITH ROLLUP
 | skirt  | <null> | 11             |
 | <null> | <null> | 54             |
 +--------+--------+----------------+
+
+-- LEFT() 选取name列, 但只显示前1字符。统计以开头为a、b、c为类别的工资，并以此计算总工资
+SELECT LEFT(name, 1) ,SUM(salary) FROM people
+GROUP BY LEFT(name, 1)
+WITH ROLLUP
++---------------+-------------+
+| LEFT(name, 1) | SUM(salary) |
++---------------+-------------+
+| a             |  6000.0     |
+| b             |  6000.0     |
+| c             |  6000.0     |
+| <null>        | 18000.0     |
++---------------+-------------+
+
+-- LEFT() 选取name列, 但只显示前1字符。统计以开头为a、b、c的工资，并以此计算总工资
+SELECT name ,SUM(salary) FROM people
+GROUP BY LEFT(name, 1),salary
+WITH ROLLUP
++------+-------------+
+| name | SUM(salary) |
++------+-------------+
+| a1   |  1000.0     |
+| a2   |  2000.0     |
+| a3   |  3000.0     |
+| a3   |  6000.0     |
+| b1   |  1000.0     |
+| b2   |  2000.0     |
+| b3   |  3000.0     |
+| b3   |  6000.0     |
+| c1   |  1000.0     |
+| c2   |  2000.0     |
+| c3   |  3000.0     |
+| c3   |  6000.0     |
+| c3   | 18000.0     |
++------+-------------+
 ```
 
 ##### [dbaplus社群：MySQL 中的 distinct 和 group by 哪个效率更高？太刁钻了！](https://mp.weixin.qq.com/s/bgDseZM45UagxrLnnZrvwg)
@@ -1131,20 +1252,20 @@ WITH ROLLUP
 - `NOT IN`: 判断不在集合中的字段
 
 ```sql
-# IN
+-- IN
 SELECT * FROM people
 WHERE salary IN (1000, 3000);
 
-# NOT IN
+-- NOT IN
 SELECT * FROM people
 WHERE salary NOT IN (1000, 3000);
 
-# 子查询1000工资的人
+-- 子查询1000工资的人
 SELECT name FROM people
 WHERE name IN
     (SELECT name FROM people
     WHERE salary = 1000);
-# 等同于以上
+-- 等同于以上
 SELECT name FROM people
 WHERE name IN ('a1', 'b1', 'c1');
 
@@ -1162,6 +1283,7 @@ WHERE name IN ('a1', 'b1', 'c1');
 > 可以出现在 `SELECT`, `HAVING`, `WHERE`
 
 ```sql
+-- 注意：不能超过1个字段，我这里为count(*)
 SELECT id, name,
     (SELECT count(*) FROM people1)
     AS count_people1
@@ -1181,7 +1303,14 @@ FROM people
 | 9  | c3   | 7             |
 +----+------+---------------+
 
-# 查询时，使用REPLACE() 将name字段中带有c的字符，改为d字符。
+-- 超过1个字段报错
+SELECT id, name,
+    (SELECT count(*) FROM people1)
+    AS count_people1
+FROM people
+(1241, 'Operand should contain 1 column(s)')
+
+-- 查询时，使用REPLACE() 将name字段中带有c的字符，改为d字符。
 SELECT id,
     REPLACE(name, 'c', 'd')
     AS name
@@ -1199,7 +1328,7 @@ FROM people
 | 8  | d2   |
 | 9  | d3   |
 +----+------+
-# 查询时，使用REPLACE() 并不会修改实际数据
+-- 查询时，使用REPLACE() 并不会修改实际数据
 SELECT id,name FROM people
 +----+------+
 | id | name |
@@ -1219,12 +1348,12 @@ SELECT id,name FROM people
 ##### 关量子查询
 
 ```sql
-# IN()函数子查询
+-- IN()函数子查询
 SELECT * FROM people WHERE id IN
 (SELECT id FROM people1
 WHERE id > 5);
 
-# 使用关联子查询代替以上IN函数子查询.结果一样, 效率更高
+-- 使用关联子查询代替以上IN函数子查询.结果一样, 效率更高
 SELECT * FROM people WHERE EXISTS
 (SELECT * FROM people1
 WHERE id > 5
@@ -1241,12 +1370,12 @@ AND people.id = people1.id);
 ##### with(临时表)
 
 ```sql
-# 创建临时表p
+-- 创建临时表p
 WITH p (name, salary) AS
     (SELECT name, salary FROM people)
-SELECT * FROM p
+SELECT * FROM p;
 
-# with 实现people, people1的内连接
+-- with 实现people, people1的内连接
 WITH p (id, name) AS
     (SELECT id, name FROM people),
     p1 (id, name) AS
@@ -1254,7 +1383,7 @@ WITH p (id, name) AS
 SELECT * FROM p, p1
     WHERE p.id = p1.id;
 
-# 等同于以上
+-- 等同于以上
 SELECT p.id, p.name, p1.id, p1.name
 FROM people as p
 INNER JOIN people1 as p1
@@ -1300,7 +1429,7 @@ SELECT name FROM people1
 | <null> |
 +--------+
 
-# UNION ALL保留重复行
+-- UNION ALL保留重复行
 SELECT name FROM people
 UNION ALL
 SELECT name FROM people1
@@ -1311,7 +1440,7 @@ SELECT name FROM people1
 > 从左边的集合去除右边的集合
 
 ```sql
-# people表去除people1表的重复行
+-- people表去除people1表的重复行
 
 SELECT name FROM people
 EXCEPT
@@ -1345,7 +1474,7 @@ SELECT name FROM people1
 +------+
 ```
 
-#### 聚集函数(aggregation)
+#### 聚和函数(aggregation)
 
 **语法**
 
@@ -1353,7 +1482,7 @@ SELECT name FROM people1
 > SELECT function(列名称) FROM 表名称
 > ```
 
-##### 基本聚集函数
+##### 基本聚和函数
 
 | 聚集函数             | 操作                  |
 |----------------------|-----------------------|
@@ -1365,41 +1494,106 @@ SELECT name FROM people1
 | COUNT(DISTINCT name) | 总行数,去除重复行       |
 
 ```sql
-# MAX(), MIN()
+-- MAX(), MIN()
 SELECT MAX(id),MIN(level) as max
 FROM cnarea_2019;
 
-# 选取 level 的平均值和 id 的总值
+-- 选取 level 的平均值和 id 的总值
 SELECT SUM(id),AVG(level)
 from cnarea_2019;
 
-# 查看总列数
+-- 查看总行数
 SELECT COUNT(1) as name from cnarea_2019;
 
-# 统计 level 的个数
+-- 统计 level 的个数
 SELECT COUNT(DISTINCT level) as totals from cnarea_2019;
 
-# 通过标量子查询，查询salary大于salary平均数
+-- 通过标量子查询，查询salary大于salary平均数
 SELECT * FROM people WHERE salary >
 (SELECT avg(salary) FROM people);
-# 又或者使用自定义变量
+-- 又或者使用自定义变量
 SET @avg_people := (SELECT AVG(salary) FROM people);
 SELECT * FROM people
 WHERE salary > @avg_people;
 ```
 
+- `count()`：统计不为 `NULL` 的记录有多少个
+
+    - [小林coding：哪种 count 性能最好？](https://xiaolincoding.com/mysql/index/count.html#%E5%93%AA%E7%A7%8D-count-%E6%80%A7%E8%83%BD%E6%9C%80%E5%A5%BD)
+
+    - 结论：性能排行`count(*) = count(1) > count(主键字段) > count(字段)`。
+        - 如果要执行 `count(1)`、 `count(*)`、 `count(主键字段)` 时，尽量在数据表上建立二级索引，这样优化器会自动采用 `key_len` 最小的二级索引进行扫描，相比于扫描主键索引效率会高一些。
+            - 再来，就是不要使用 `count(字段)` 来统计记录个数，因为它的效率是最差的，会采用全表扫描的方式来统计。如果你非要统计表中该字段不为 NULL 的记录个数，建议给这个字段建立一个二级索引。
+
+    - `count(*)` 执行过程：其实等于 `count(0)`：也就是说，当你使用 count(*) 时，MySQL 会将 * 参数转化为参数 0 来处理。
+        - `count(*)` 执行过程跟 `count(1)` 执行过程基本一样的，性能没有什么差异。
+
+    - `count(1)`执行过程：不是字段，所以不需要读取记录中的字段值。参数 1 很明显并不是 NULL，因此 server 层每从 InnoDB 读取到一条记录，就将 count 变量加 1。
+        - `count(1)` 相比 `count(主键字段)`（比如`count(id)`） 少一个步骤，就是不需要读取记录中的字段值，所以通常会说 `count(1)` 执行效率会比 `count(主键字段)` 高一点。
+
+    - `count()`的执行过程：
+
+        - 在通过 count 函数统计有多少个记录时，MySQL 的 server 层会维护一个名叫 count 的变量。 server 层会循环向 InnoDB 读取一条记录，如果 count 函数指定的参数不为 NULL，那么就会将变量 count 加 1，直到符合查询的全部记录被读完，就退出循环。最后将 count 变量的值发送给客户端。 
+
+            - InnoDB 是通过 B+ 树来保存记录的，根据索引的类型又分为聚簇索引和二级索引，它们区别在于，聚簇索引的叶子节点存放的是实际数据，而二级索引的叶子节点存放的是主键值，而不是实际数据。
+
+        - 1.如果表里`只有主键索引`，没有二级索引时：那么，InnoDB 循环遍历聚簇索引，将读取到的记录返回给 server 层，然后读取记录中的 id 值，就会 id 值判断是否为 NULL，如果不为 NULL，就将 count 变量加 1。
+
+        - 2.如果表里`有二级索引`时，InnoDB 循环遍历的对象就不是聚簇索引，而是二级索引。
+            - 这是因为相同数量的二级索引记录可以比聚簇索引记录占用更少的存储空间，所以二级索引树比聚簇索引树小，这样遍历二级索引的 I/O 成本比遍历聚簇索引的 I/O 成本小，因此「优化器」优先选择的是二级索引。 #
+
+            ```sql
+            -- key字段里的idx_c1是二级索引
+            show index from t
+            +-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+            | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Ignored |
+            +-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+            | t     | 0          | PRIMARY  | 1            | id          | A         | 64376       | <null>   | <null> |      | BTREE      |         |               | NO      |
+            | t     | 1          | idx_c1   | 1            | c1          | A         | 1           | <null>   | <null> |      | BTREE      |         |               | NO      |
+            +-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+
+            explain select count(id) from t;
+            +----+-------------+-------+-------+---------------+--------+---------+--------+-------+-------------+
+            | id | select_type | table | type  | possible_keys | key    | key_len | ref    | rows  | Extra       |
+            +----+-------------+-------+-------+---------------+--------+---------+--------+-------+-------------+
+            | 1  | SIMPLE      | t     | index | <null>        | idx_c1 | 256     | <null> | 64376 | Using index |
+            +----+-------------+-------+-------+---------------+--------+---------+--------+-------+-------------+
+            ```
+
+        - 3.如果表里没有索引，全表扫描。可以看到type字段是all
+
+            ```sql
+            explain select count(c2) from t;
+            +----+-------------+-------+------+---------------+--------+---------+--------+-------+-------+
+            | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows  | Extra |
+            +----+-------------+-------+------+---------------+--------+---------+--------+-------+-------+
+            | 1  | SIMPLE      | t     | ALL  | <null>        | <null> | <null>  | <null> | 64376 |       |
+            +----+-------------+-------+------+---------------+--------+---------+--------+-------+-------+
+            ```
+
 ##### 加密函数
 
 ```sql
 select md5('123');
++----------------------------------+
+| md5(123)                         |
++----------------------------------+
+| 202cb962ac59075b964b07152d234b70 |
++----------------------------------+
 
-# 保留两位小数
+-- 保留两位小数
 select format(111.111,2);
++-------------------+
+| format(111.111,2) |
++-------------------+
+| 111.11            |
++-------------------+
 
-# 加锁函数
+-- 加锁函数
 select get_lock('lockname',10);
 select is_free_lock('lockname');
 select release_lock('lockname');
+select is_free_lock('lockname');
 ```
 
 ##### rank(): 排名
@@ -1412,12 +1606,6 @@ select release_lock('lockname');
 SELECT name, salary,
 rank() OVER (ORDER BY salary DESC) AS salary_rank
 FROM people
-# or
-SELECT name, salary, (1 + (SELECT COUNT(*)
-                      FROM people1 AS B
-                      WHERE B.salary > A.salary)) AS salary_rank
-FROM people as A
-ORDER BY salary_rank
 
 +------+--------+-------------+
 | name | salary | salary_rank |
@@ -1433,7 +1621,27 @@ ORDER BY salary_rank
 | b1   | 1000   | 7           |
 +------+--------+-------------+
 
-# rank()对相等的值, 赋予相等的排名. 加上name字段让排名不相等
+
+SELECT name, salary, (1 + (SELECT COUNT(*)
+                      FROM people1 AS B
+                      WHERE B.salary > A.salary)) AS salary_rank
+FROM people as A
+ORDER BY salary_rank
++------+--------+-------------+
+| name | salary | salary_rank |
++------+--------+-------------+
+| a3   | 3000   | 1           |
+| b3   | 3000   | 1           |
+| c3   | 3000   | 1           |
+| a2   | 2000   | 4           |
+| b2   | 2000   | 4           |
+| c2   | 2000   | 4           |
+| a1   | 1000   | 5           |
+| b1   | 1000   | 5           |
+| c1   | 1000   | 5           |
++------+--------+-------------+
+
+-- rank()对相等的值, 赋予相等的排名. 加上name字段让排名不相等
 
 SELECT name, salary,
 rank() OVER (ORDER BY salary, name desc) AS salary_rank
@@ -1456,6 +1664,9 @@ FROM people
 
 ##### 分窗
 
+- `SUM(score) OVER (ORDER BY score)`
+- `AVG(score) OVER (ORDER BY score)`
+
 ```sql
 CREATE TABLE class(
     `id` int (8) AUTO_INCREMENT,
@@ -1464,7 +1675,7 @@ CREATE TABLE class(
     primary key (`id`)
 );
 
-# 插入数据
+-- 插入数据
 INSERT INTO class (score, year) VALUES
 (90, 2013),
 (80, 2012),
@@ -1476,11 +1687,14 @@ INSERT INTO class (score, year) VALUES
 (20, 2006),
 (10, 2005);
 
-# 累加. 9代表最大计算9行, 如果有第10行,则只会计算2到10行
+SELECT score, year,
+SUM(score) OVER (order by score) AS score_sum
+FROM class;
+-- 累加. 9代表最大计算9行, 如果有第10行,则只会计算2到10行
 SELECT score, year,
 SUM(score) OVER (order by score rows 9 preceding) AS score_sum
 FROM class;
-# or使用unbounded
+-- or使用unbounded
 SELECT score, year,
 SUM(score) OVER (order by score rows unbounded preceding) AS score_sum
 FROM class;
@@ -1499,7 +1713,7 @@ FROM class;
 | 90    | 2013 | 450       |
 +-------+------+-----------+
 
-# 平均数
+-- 平均数
 SELECT score, year,
 AVG(score) OVER (order by score rows 9 preceding) AS score_avg
 FROM class;
@@ -1518,7 +1732,7 @@ FROM class;
 | 90    | 2013 | 75.0000    |
 +-------+------+------------+
 
-# following 显示2行之后的值
+-- following 显示2行之后的值
 SELECT score, year,
 SUM(score) OVER (order by score rows between 9 preceding and 2 following) AS score_sum
 FROM class;
@@ -1537,7 +1751,7 @@ FROM class;
 | 90    | 2013 | 450       |
 +-------+------+-----------+
 
-# FIELD() 指定score列值, 不进行ORDER BY
+-- FIELD() 指定score列值, 不进行ORDER BY。这里是90,70不排序
 SELECT * FROM class
 ORDER BY FIELD (score, 90, 70)
 
@@ -1630,28 +1844,28 @@ ORDER BY FIELD (score, 90, 70)
 ---
 
 ```sql
-# 创建表j
+-- 创建表j
 CREATE TABLE j(
     id   int (8),
     name varchar(50) NOT NULL UNIQUE,
     date DATE
 );
 
-# 插入数据
+-- 插入数据
 insert into j (id,name,date) values
 (1,'tz1','2020-10-24'),
 (10,'tz2','2020-10-24'),
 (100,'tz3','2020-10-24');
 
-# 查看结果
+-- 查看结果
 select * from j;
-+------+------+------------+
-| id   | name | date       |
-+------+------+------------+
-| 1   | tz1 | 2020-10-24 |
-| 10  | tz2 | 2020-10-24 |
-| 100 | tz3 | 2020-10-24 |
-+------+------+------------+
++-----+------+------------+
+| id  | name | date       |
++-----+------+------------+
+| 1   | tz1  | 2020-10-24 |
+| 10  | tz2  | 2020-10-24 |
+| 100 | tz3  | 2020-10-24 |
++-----+------+------------+
 ```
 
 #### INNER JOIN(内连接)
@@ -1659,13 +1873,13 @@ select * from j;
 - people表
 
 ```sql
-# INNER JOIN
+-- INNER JOIN
 SELECT * FROM people INNER JOIN people1
 ON people.id = people1.id;
-# JOIN
+-- JOIN
 SELECT * FROM people JOIN people1
 ON people.id = people1.id;
-# or
+-- or
 SELECT * FROM people, people1
 WHERE people.id = people1.id;
 
@@ -1685,12 +1899,12 @@ WHERE people.id = people1.id;
 - cnarea_2019表
 
 ```sql
-# 选取 j 表的 id,name,date 字段以及 cnarea_2019 表的 name 字段
+-- 选取 j 表的 id,name,date 字段以及 cnarea_2019 表的 name 字段
 select j.id,j.date,cnarea_2019.name
 from j,cnarea_2019
 where cnarea_2019.id=j.id;
 
-# 或者
+-- 或者
 select j.id,j.name,j.date,cnarea_2019.name
 from j inner join  cnarea_2019
 on cnarea_2019.id=j.id;
@@ -1711,8 +1925,8 @@ on cnarea_2019.id=j.id;
 - 因为 `Nest Loop Join` 的算法,用更小的数据表驱动更大数据表,**更快**.
 
 ```sql
-# 先读取 j 再读取 cnarea_2019 或者说 驱动表是j 被驱动表是cnarea_2019.
-# 因为 j 表的数据更小所以更快
+-- 先读取 j 再读取 cnarea_2019 或者说 驱动表是j 被驱动表是cnarea_2019.
+-- 因为 j 表的数据更小所以更快
 select j.id,j.name,j.date,cnarea_2019.name
 from j straight_join cnarea_2019
 on j.id=cnarea_2019.id;
@@ -1721,7 +1935,7 @@ on j.id=cnarea_2019.id;
 #### LEFT JOIN(左连接)
 
 ```sql
-# 左连接,以左表(j)id 字段个数进行选取.所以结果与inner join一样
+-- 左连接,以左表(j)id 字段个数进行选取.所以结果与inner join一样
 select j.id,j.name,j.date,cnarea_2019.name
 from j left join  cnarea_2019
 on cnarea_2019.id=j.id;
@@ -1734,11 +1948,11 @@ on cnarea_2019.id=j.id;
 |  100 | tz3  | 2020-10-24 | 安德路社区居委会         |
 +------+------+------------+--------------------------+
 
-# 插入一条高于 cnarea_2019表id最大值 的数据
+-- 插入一条高于 cnarea_2019表id最大值 的数据
 insert into j (id,name,date) value
 (10000000,'tz一百万','2020-10-24');
 
-# 再次左连接,因为 cnarea_2019 没有id 10000000(一百万)的数据,所以这里显示为 null
+-- 再次左连接,因为 cnarea_2019 没有id 10000000(一百万)的数据,所以这里显示为 null
 
 select j.id,j.name,j.date,cnarea_2019.name
 from j left join cnarea_2019
@@ -1757,7 +1971,7 @@ on j.id = cnarea_2019.id;
 #### RIGHT JOIN(左连接)
 
 ```sql
-# 右连接,以右表(cnarea_2019)id字段个数进行选取.左表id没有的数据为null.因为cnarea_2019表数据量太多这里limit 10
+-- 右连接,以右表(cnarea_2019)id字段个数进行选取.左表id没有的数据为null.因为cnarea_2019表数据量太多这里limit 10
 
 select j.id,j.date,cnarea_2019.name,cnarea_2019.pinyin
 from j right join cnarea_2019
@@ -1924,9 +2138,9 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
         - 从执行计划中可以看到这些信息：
 
-            - 驱动表是 t2，被驱动表是 t1。原因是：explain 分析 join 语句时，在第一行的就是驱动表；选择 t2 做驱动表的原因：如果没固定连接方式（比如没加 straight_join）,优化器会优先选择小表做驱动表。所以使用 inner join 时，前面的表并不一定就是驱动表。
+            - 驱动表是 t2，被驱动表是 t1。原因是：explain 分析 join 语句时，在第一行的就是驱动表；选择 t2 做驱动表的原因：如果没固定连接方式（比如没加 straight_join）,`优化器会优先选择小表做驱动表。所以使用 inner join 时，前面的表并不一定就是驱动表`。
 
-            - 使用了Index Nested-Loop Join算法。一般 join 语句中，如果执行计划 Extra 中未出现 Using join buffer （***）；则表示使用的 join 算法是 Index Nested-Loop Join算法。
+            - 使用了Index Nested-Loop Join算法。一般 join 语句中，如果执行计划 Extra 中未出现 `Using join buffer （***）`；则表示使用的 join 算法是 Index Nested-Loop Join算法。
 
 - 3.Block Nested-Loop Join算法：如果被驱动表的关联字段没索引，在MySQL 8.0.20版本之前，就会使用 Block Nested-Loop Join(简称：BNL)
 
@@ -1946,10 +2160,10 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
     ```
 
     - 在 MySQL 5.7 版本下的执行计划如下：
-        - 在 Extra 发现 Using join buffer (Block Nested Loop)，这个就说明该关联查询使用的是 BNL 算法。
+        - 在 Extra 发现 `Using join buffer (Block Nested Loop)`，这个就说明该关联查询使用的是 BNL 算法。
 
     - 在 MySQL 8.0.25 版本下的执行计划如下：
-        - 在 Extra 发现 Using join buffer (hash join)，因为前面提到，从 MySQL 8.0.20 开始，哈希连接替换了块嵌套循环。
+        - 在 Extra 发现 `Using join buffer (hash join)`，因为前面提到，从 MySQL 8.0.20 开始，Hash Join替换了BNL。
 
 - 4.Hash Join算法：从 MySQL 8.0.20 开始，MySQL 不再使用 Block Nested-Loop Join 算法，并且在以前使用 Block Nested-Loop Join 算法的所有情况下都使用 Hash Join 优化。
 
@@ -2397,11 +2611,23 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         ('xiaomi');
 
     SELECT emum_col FROM emum_test;
+    +----------+
+    | emum_col |
+    +----------+
+    | huawei   |
+    | meizu    |
+    | xiaomi   |
+    +----------+
+
     SELECT emum_col + 0 FROM emum_test;
+    +--------------+
+    | emum_col + 0 |
+    +--------------+
+    | 2            |
+    | 3            |
+    | 1            |
+    +--------------+
     ```
-
-    ![image](./Pictures/mysql/emum_test.avif)
-
 
 - 集合类型SET:
 
@@ -2420,14 +2646,20 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
             acl SET('READ', 'WRITE', 'DELETE')
         );
 
-        # 注意:中间不能有空格'READ, WRITE'
+        -- 注意:中间不能有空格'READ, WRITE'
         INSERT INTO set_test VALUES
         ('READ,WRITE'),
         ('WRITE,DELETE');
 
-        # FIND_IN_SET() 查找带有'WRITE'行
+        -- FIND_IN_SET() 查找带有'WRITE'行
         SELECT * FROM set_test
         WHERE FIND_IN_SET('WRITE',acl)
+        +--------------+
+        | acl          |
+        +--------------+
+        | READ,WRITE   |
+        | WRITE,DELETE |
+        +--------------+
         ```
 
     - 使用整数存储
@@ -2445,19 +2677,31 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
         (@READ + @WRITE),
         (@WRITE + @DELETE);
 
+        SELECT * FROM set_int_test;
+        +-----+
+        | acl |
+        +-----+
+        | 3   |
+        | 6   |
+        +-----+
+
         SELECT * FROM set_int_test WHERE acl & @READ;
+        +-----+
+        | acl |
+        +-----+
+        | 3   |
+        +-----+
         ```
-        ![image](./Pictures/mysql/set_int_test.avif)
 
 - 字符串:
 
-    - VARCHAR:
+    - `VARCHAR`:
 
       - 可变长度,需要额外记录长度
 
-        - 当长度 <= 255 时,需要 1 个字节
+        - 当长度 <= 255 时,需要 1 个字节来记录长度
 
-        - 当长度 > 255 时,需要 2 个字节
+        - 当长度 > 255 时,需要 2 个字节来记录长度
 
         - `varchar(1)`,需要 2 个字节
 
@@ -2465,7 +2709,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 
         - 如果update字符串, 页不能容纳update后的大小, innodb就会分裂页
 
-    - CHAR:
+    - `CHAR`:
 
         - 定长字符串,不容易产生碎片
 
@@ -2513,9 +2757,9 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
             ![image](./Pictures/mysql/char_test.avif)
 
 
-    - BINARY, VARBINARY 对应了 CHAR 和 VARCHAR 的二进制存储，相关的特性都一样。不同的有以下几点
-        - binary(10)/varbinary(10) 代表的不是字符个数，而是字节数。
-        - 行结束符不一样。char 的行结束符是 \0，binary 的行结束符是 0x00。
+    - `BINARY`, `VARBINARY` 对应了 `CHAR` 和 `VARCHAR` 的二进制存储，相关的特性都一样。不同的有以下几点
+        - `BINARY(10)`、`VARBINARY(10)` 代表的不是字符个数，而是字节数。
+        - 行结束符不一样。`CHAR` 的行结束符是 \0，`BINARY` 的行结束符是 0x00。
         - 由于是二进制存储，所以字符编码以及排序规则这类就直接无效了。
 
             ```sql
@@ -2531,7 +2775,7 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
             +----------------------+----------------------+
             ```
 
-        - 使用BINARY(16)保存uuid
+        - 使用`BINARY(16)`保存uuid
 
             - 通过`UNHEX()`, `HEX()` 函数进行转换
 
@@ -2544,9 +2788,14 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
             (UNHEX('FDFE0000000000005A55CAFFFEFA9089'));
 
             SELECT HEX(uuid) FROM uuid_test;
+            +----------------------------------+
+            | HEX(uuid)                        |
+            +----------------------------------+
+            | FDFE0000000000005A55CAFFFEFA9089 |
+            +----------------------------------+
             ```
 
-    - TEXT(字符串), BLOB(二进制字符串):
+    - `TEXT(字符串),` `BLOB(二进制字符串)`:
 
         - TEXT 存储以明文存储，有对应的字符集和校验规则；BLOB 则以二进制存储，没有字符集和排序规则，用于图片, 视频存储
 
@@ -2731,6 +2980,41 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
     - 4.全表扫描无排序情况下,两者性能无差异,在全表有排序的情况下, 两种性能差异巨大；
 
         - 至此，我们不难发现，当我们最该字段进行排序操作的时候，Mysql会根据该字段的设计的长度进行内存预估，如果设计过大的可变长度，会导致内存预估的值超出sort_buffer_size的大小，导致mysql采用磁盘临时文件排序,最终影响查询性能。
+
+##### [爱可生开源社区：技术分享 | MySQL VARCHAR 最佳长度评估实践](https://mp.weixin.qq.com/s/gTc1nMez3_pYTl0dZbLl6A)
+
+- 问题：对一个 VARCHAR 类型的字段进行长度扩容。为什么从 VARCHAR(20) 调整为 VARCHAR(50) 就比较快，但是从  VARCHAR(50) 调整为 VARCHAR(100) 就需要执行很久呢？
+
+- 实验对比。省略...
+
+- 由于 `UTF8MB4` 为四字节编码字符集：即一个字节长度可存储 63.75（255/4）个字符
+    - 所以当我们将 VARCHAR(63) 修改为 VARCHAR(64) 时，需要增加一个字节去进行数据的存储，就要通过建立临时表的方式去完成本次长度扩容，故需要花费大量时间。
+
+- 由于 `UTF8` 为三字节编码字符集：即一个字节可存储 85（255/3=85）个字符。
+
+| 字符长度修改 | UTF8(MB3)                                  | UTF8MB4                                      |
+|--------------|--------------------------------------------|----------------------------------------------|
+| 20->50       | online ddl (inplace)                       | online ddl (inplace)                         |
+| 50->100      | online ddl (copy)                          | online ddl (copy)                            |
+| X->Y         | 当Y*3<256 时，inplace；当X*3>=256，inplace | 当 Y*4<256 时，inplace；当 X*4>=256，inplace |
+| 备注         | 一个字符最大占用 3 个字节                  | 一个字符最大占用 4 个字节                    |
+
+- 使用 UTF8MB4 举例：
+
+    - 对于字段的最大字节长度在 256 字符内变化 (即 x*4<256 且 Y*4<256)，online ddl 走 inplace 模式，效率高。
+    - 对于字段的最大字节长度在 256 字符外变化 (即 x*4>=256 且 Y*4>=256) ，online ddl 走 inplace 模式，效率高。
+    - 否则，online ddl 走 copy 模式，效率低.
+    - UTF8(MB3) 同理。
+
+
+- 为避免由于后期字段长度扩容，online ddl 走效率低的 copy 模式，建议：
+
+    - 对于 UTF8(MB3) 字符类型：
+        - 字符个数小于 50 个，建议设置为 VARCHAR(50) 或更小的字符长度。
+        - 字符个数接近 84（256/3=83.33）个，建议设置为 VARCHAR(84)  或更大的字符长度。
+    - 对于 UTF8MB4 字符类型：
+        - 字符个数小于 50 个，建议设置为 VARCHAR(50)，或更小的字符长度。
+        - 字符个数接近 64（256/4=64）个，建议设置为 VARCHAR(64) 或更大的字符长度。
 
 ##### [爱可生开源社区：技术分享 | MySQL 隐式转换必知必会](https://mp.weixin.qq.com/s/VzbRxNlcfOsBdoMtRHu6lw)
 
@@ -3035,15 +3319,15 @@ SELECT * FROM new RIGHT JOIN cnarea_2019 ON new.id =cnarea_2019.id;
 #### 基本使用
 
 ```sql
-# 创建 new 数据库设置 id 为主键,不能为空,自动增量
+-- 创建 new 数据库设置 id 为主键,不能为空,自动增量
 CREATE TABLE new(
-    `id` int (8) AUTO_INCREMENT COMMENT '自增主键ID', # AUTO_INCREMENT 自动增量(每条新记录递增 1) # int(8)不影响int本身支持的大小，依然可以插入最大值4294967295(2^32-1) # COMMENT注释
-    `name` varchar(50) NOT NULL UNIQUE,     # NOT NULL 设置不能为空 # UNIQUE 设置唯一性索引 # varchar(50)最多50个字符，超过就报错
-    `date` DATE DEFAULT '2020-10-24',       # DEFAULT 设置默认值
-    INDEX date(date),                       # INDEX 创建索引
-    PRIMARY KEY (`id`),                     # 设置主健为 id 字段(列)
-    CHECK (name in ('tz', 'tz1', 'tz2'))    # CHECK 设置name必须满足in内的集合
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '测试表'; # 字符集编码为 utf8mb4，排序规则为utf8mb4_bin。不推荐显示设置，因为默认会继承数据库的字符集编码和排序规则。COMMENT为注释
+    `id` int (8) AUTO_INCREMENT COMMENT '自增主键ID', -- AUTO_INCREMENT 自动增量(每条新记录递增 1) # int(8)不影响int本身支持的大小，依然可以插入最大值4294967295(2^32-1) # COMMENT注释
+    `name` varchar(50) NOT NULL UNIQUE,     -- NOT NULL 设置不能为空 # UNIQUE 设置唯一性索引 # varchar(50)最多50个字符，超过就报错
+    `date` DATE DEFAULT '2020-10-24',       -- DEFAULT 设置默认值
+    INDEX date(date),                       -- INDEX 创建索引
+    PRIMARY KEY (`id`),                     -- 设置主健为 id 字段(列)
+    CHECK (name in ('tz', 'tz1', 'tz2'))    -- CHECK 设置name必须满足in内的集合
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT '测试表'; -- 字符集编码为 utf8mb4，排序规则为utf8mb4_bin。不推荐显示设置，因为默认会继承数据库的字符集编码和排序规则。COMMENT为注释
 ```
 
 - `NULL` / `NOT NULL`
@@ -3086,7 +3370,6 @@ CREATE TABLE new(
     - 对包含 NULL 列建立索引，比不包含的 NULL 的字段，要多占用一个 BIT 位来存储。
 
 - `UNIQUE` 唯一性索引
-
   > - 列(字段) 内的数据不能出现重复
 
     - PRIMARY KEY ( `列名称` ) 设置主键
@@ -3126,7 +3409,7 @@ CREATE TABLE new(
 - 查看表的相关命令
 
     ```sql
-    # desc 查看 new 表里的字段
+    -- desc 查看 new 表里的字段
     desc new;
     +-------+-------------+------+-----+------------+----------------+
     | Field | Type        | Null | Key | Default    | Extra          |
@@ -3136,7 +3419,7 @@ CREATE TABLE new(
     | date | date        | YES | MUL | 2020-10-24 |                |
     +-------+-------------+------+-----+------------+----------------+
 
-    # 查看 new 表详细信息
+    -- 查看 new 表详细信息
     show create table new\G;
     ***************************[ 1. row ]***************************
     Table        | new
@@ -3150,10 +3433,10 @@ CREATE TABLE new(
       CONSTRAINT `CONSTRAINT_1` CHECK (`name` in ('tz','tz1','tz2'))
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 
-    # 修改 new表id字段 的初始值为100
+    -- 修改 new表id字段 的初始值为100
     ALTER TABLE new AUTO_INCREMENT=100;
 
-    # 查看表索引。只有date不是唯一性索引
+    -- 查看表索引。只有date不是唯一性索引
     show index from new
     +-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
     | Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Ignored |
@@ -3176,10 +3459,10 @@ CREATE TABLE new(
         -- 创建测试表
         CREATE TABLE test_like (
             id int
-        )
+        );
 
         -- like命令可以创建表结构一样的表。数据不会复制
-        CREATE TABLE test_like1 LIKE test_like
+        CREATE TABLE test_like1 LIKE test_like;
         ```
 
 #### 压缩表
@@ -3197,8 +3480,8 @@ CREATE TABLE new(
 
     - 情景二：默认 MySQL 页大小 16K，而 OS 文件系统一般块大小为 4K，所以在 MySQL 在刷脏页的过程中，有一定的概率出现页没写全而导致数据坏掉的情形。
         - 比如 16K 的页写了 12K，剩下 4K 没写成功，导致 MySQL 页数据损坏。这个时候就算通过 Redo Log 也恢复不了，因为几乎有所有的关系数据库采用的 Redo Log 都记录了数据页的偏移量，此时就算通过 Redo Log 恢复后，数据也是错误的。
-        - 所以 MySQL 在刷脏数据之前，会把这部分数据先写入共享表空间里的 DOUBLE WRITE BUFFER 区域来避免这种异常。
-        - 此时如果 MySQL 采用压缩表，并且每张表页大小和磁盘块大小一致，比如也是 4K，那 DOUBLE WRITE BUFFER 就可以不需要，这部分开销就可以规避掉了。
+        - 所以 MySQL 在刷脏数据之前，会把这部分数据先写入共享表空间里的 `DOUBLE WRITE BUFFER` 区域来避免这种异常。
+        - 此时如果 MySQL 采用压缩表，并且每张表页大小和磁盘块大小一致，比如也是 4K，那 `DOUBLE WRITE BUFFER` 就可以不需要，这部分开销就可以规避掉了。
 
 - 压缩表
     - 优点：节省磁盘 IO，减少网络 IO
@@ -3559,44 +3842,6 @@ CREATE TABLE new(
             1 row in set (0.00 sec)
             ```
 
-#### 分区表
-
-- 问题：
-    - 1.单张表数据量太大，每天会产生 10W 条记录，一年就是 3650W 条记录，
-    - 2.对这张表的查询 95% 都是在某一天或者几天内，过滤区间最大不超过一个月。比如在2019年3月1日、2019年4 月20 日或者是2019年5月1日和2019年5月5日这个时间段内。偶尔会涉及到跨月、跨年查询，但是频率很低。
-    - 3.记录保留10年。也就是单表3.6亿条记录，单表太大，不便于管理，后期如果单表损坏，修复也难。
-    - 4.单表查询性能很差，对历史数据删除性能也很差。
-
-- 解决方法：分区表
-    - 1.查询过滤的数据范围相对比较集中，不是那么分散；要同时考虑过期数据清理性能问题。
-    - 2.考虑把表拆分为10张新表，一张是当前表，剩余9张是历史归档表；当前表存放最近两年的数据，每到年底迁移老旧数据到历史表进行归档，并且对过期历史数据进行清理。
-    - 3.考虑对部分过滤场景使用 MySQL 分区表，非常适合 95% 的查询；可以使用分区置换功能把数据移到历史表。
-    - 4.分区表带来几个好处：一是查询性能提升；二是管理方便，过期数据直接快速清理；三是对应用透明，暂时不需要应用改代码。
-
-```sql
-CREATE TABLE sales (
-    sale_id INT,
-    sale_date DATE,
-    amount DECIMAL(10, 2)
-) PARTITION BY RANGE (YEAR(sale_date)) (
-    PARTITION p2022 VALUES LESS THAN (2023),
-    PARTITION p2023 VALUES LESS THAN (2024),
-    PARTITION p2024 VALUES LESS THAN MAXVALUE
-);
-
-INSERT INTO sales (sale_id, sale_date, amount) VALUES
-(1, '2022-01-01', 100.50),
-(2, '2022-02-15', 200.75),
-(3, '2022-03-20', 150.00),
-(4, '2023-04-10', 300.20),
-(5, '2023-05-05', 250.80),
-(6, '2023-06-12', 180.30),
-(7, '2023-07-08', 220.40),
-(8, '2024-08-23', 270.60),
-(9, '2024-09-17', 320.90),
-(10, '2024-10-05', 280.75);
-```
-
 #### TEMPORARY临时表
 
 - 临时表特点：
@@ -3613,14 +3858,14 @@ INSERT INTO sales (sale_id, sale_date, amount) VALUES
     - 因为数据完全在内存中，所以，一旦断电，数据就消失了，无法找回。不过临时表只保存中间结果，所以还是可以用的。
 
 ```sql
-# CREATE TEMPORARY 创建临时表。存储引擎是 InnoDB，并且把表存放在磁盘上。
+-- CREATE TEMPORARY 创建临时表。存储引擎是 InnoDB，并且把表存放在磁盘上。
 CREATE TEMPORARY TABLE demo.mytransdisk(
     itemnumber int,
     groupnumber int,
     branchnumber int
 );
 
-# ENGINE = MEMORY 创建内存临时表
+-- ENGINE = MEMORY 创建内存临时表
 CREATE TEMPORARY TABLE demo.mytrans(
     itemnumber int,
     groupnumber int,
@@ -3671,7 +3916,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
 - 外键的sql语句
 
     ```sql
-    # delete 和 update都设置为CASCADE级联
+    -- delete 和 update都设置为CASCADE级联
     CREATE TABLE foreign_test(
         `date` date,
         FOREIGN KEY (date) REFERENCES new(date)
@@ -3679,7 +3924,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
              ON UPDATE CASCADE
     );
 
-    # delete设置为CASCADE级联，update设置为NO ACTION
+    -- delete设置为CASCADE级联，update设置为NO ACTION
     CREATE TABLE foreign_test(
         `date` date,
         FOREIGN KEY (date) REFERENCES new(date)
@@ -3696,13 +3941,13 @@ CREATE TEMPORARY TABLE demo.mytrans(
 - 创建 a,b 两表：a表为父表（基础表）、b表为子表（外键表）
 
     ```sql
-    # 创建a表
+    -- 创建a表
     CREATE TABLE a(
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL
     ) ENGINE=INNODB;
 
-    # 创建b表，设置外键a_id。这里先不设置CASCADE级联权限
+    -- 创建b表，设置外键a_id。这里先不设置CASCADE级联权限
     CREATE TABLE b(
         id INT AUTO_INCREMENT PRIMARY KEY,
         a_id INT NOT NULL,
@@ -3711,7 +3956,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
         REFERENCES a(id)
     ) ENGINE=INNODB;
 
-    # 在创建b表时，如果没有指定 CONSTRAINT，系统会自动生成(我这里为 b_ibfk_1):
+    -- 在创建b表时，如果没有指定 CONSTRAINT，系统会自动生成(我这里为 b_ibfk_1):
     CREATE TABLE b(
         id INT AUTO_INCREMENT PRIMARY KEY,
         a_id INT NOT NULL,
@@ -3719,7 +3964,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
         REFERENCES a(id)
     ) ENGINE=INNODB;
 
-    # 查看CONSTRAINT
+    -- 查看CONSTRAINT
     show create table b\G;
     *************************** 1. row ***************************
            Table: b
@@ -3733,26 +3978,26 @@ CREATE TEMPORARY TABLE demo.mytrans(
     ```
 
     ```sql
-    # 插入a 表 id 为1
+    -- 插入a 表 id 为1
     INSERT INTO a (id,name) VALUE
     (1,'in a');
 
-    # 插入b 表 外键a_id 必须和刚才插入 a 表的 id 值一样
+    -- 插入b 表 外键a_id 必须和刚才插入 a 表的 id 值一样
     INSERT INTO b (id,a_id) VALUE
     (10,1);
     ```
 
 - b 表:无法对 外键`a_id` 进行增删改
 
-    - INSERT b表的值，如果在a表没有的相对应的值会报错。
+    - `INSERT` b表的值，如果在a表没有的相对应的值会报错。
         ```sql
-        # 因为a表没有id为2的数据，所以报错
+        -- 因为a表没有id为2的数据，所以报错
         INSERT INTO b (id,a_id) VALUE
         (20,2);
         ERROR 1452 (23000): Cannot add or update a child row: a foreign key constraint fails (`china`.`b`, CONSTRAINT `b_ibfk_1` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`))
         ```
 
-    - UPDATE b 表的 外键a_id 值
+    - `UPDATE` b 表的 外键a_id 值
         ```sql
         UPDATE b
         SET a_id = 2
@@ -3762,7 +4007,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
 
 - a 表:
 
-    - UPDATE a 表的值，会因为没有权限失败
+    - `UPDATE` a 表的值，会因为没有权限失败
 
         ```sql
         UPDATE a SET id = 2
@@ -3770,14 +4015,14 @@ CREATE TEMPORARY TABLE demo.mytrans(
         ERROR 1451 (23000): Cannot delete or update a parent row: a foreign key constraint fails (`china`.`b`, CONSTRAINT `fk_a` FOREIGN KEY (`a_id`) REFERENCES `a` (`id`))
         ```
 
-    - 解决方法1：DELETE b表对应的值后，可以对a表修改成功
+    - 解决方法1：`DELETE` b表对应的值后，可以对a表修改成功
 
         ```sql
-        # DELETE b表的值
+        -- DELETE b表的值
         DELETE FROM b
         WHERE id =10;
 
-        # 再次更新a表的值，成功。
+        -- 再次更新a表的值，成功。
         UPDATE a SET id = 2
         WHERE id = 1;
         ```
@@ -3785,10 +4030,10 @@ CREATE TEMPORARY TABLE demo.mytrans(
     - 解决方法2：设置`CASCADE`权限
 
         ```sql
-        # 删除外键
+        -- 删除外键
         ALTER TABLE b DROP FOREIGN KEY fk_a;
 
-        # 重新添加外键，设置CASCADE权限
+        -- 重新添加外键，设置CASCADE权限
         ALTER TABLE b
             ADD CONSTRAINT a_id
             FOREIGN KEY (a_id)
@@ -3796,12 +4041,12 @@ CREATE TEMPORARY TABLE demo.mytrans(
             ON UPDATE CASCADE
             ON DELETE CASCADE;
 
-        # 重新UPDATE a 表的值。成功修改
+        -- 重新UPDATE a 表的值。成功修改
         UPDATE a
         SET id = 2
         WHERE id = 1;
 
-        # 查看结果。不管是a表、b表都是一样的值
+        -- 查看结果。不管是a表、b表都是一样的值
         SELECT * FROM a;
         SELECT * FROM b;
         ```
@@ -3814,7 +4059,7 @@ CREATE TEMPORARY TABLE demo.mytrans(
         DELETE FROM a
         WHERE id = 2;
 
-        # 查看结果。a表的数据删除后，b表对应的数据也会删除:
+        -- 查看结果。a表的数据删除后，b表对应的数据也会删除:
         select * from b;
         +----+------+
         | id | a_id |
@@ -3833,21 +4078,21 @@ CREATE TEMPORARY TABLE demo.mytrans(
 > ```
 
 ```sql
-# 插入一条数据
+-- 插入一条数据
 insert into new (name,date) values
 ('tz','2020-10-24');
 
-# 插入多条数据
+-- 插入多条数据
 insert into new (name,date) values
 ('tz1','2020-10-24'),
 ('tz2','2020-10-24'),
 ('tz3','2020-10-24');
 
-# 查看
+-- 查看
 select * from new;
 
-# 可以看到 id 字段自动增量
-MariaDB [china]> select * from new;
+-- 可以看到 id 字段自动增量
+select * from new;
 +-----+------+------------+
 | id  | name | date       |
 +-----+------+------------+
@@ -3869,24 +4114,23 @@ MariaDB [china]> select * from new;
   > ```
 
 ```sql
-
-# 创建名为 newcn 数据库
+-- 创建名为 newcn 数据库
 create table newcn (
     id int(4) unique auto_increment,
     name varchar(50)
 );
 
-# 导入 1 条数据
+-- 导入 1 条数据
 insert into newcn (id,name)
 select id,name from cnarea_2019
 where id=1;
 
-# 可多次导入
+-- 可多次导入
 insert into newcn (id,name)
 select id,name from cnarea_2019
 where id >= 2 and id <=10 ;
 
-# 查看结果
+-- 查看结果
 select * from newcn;
 +------+--------------------------+
 | id   | name                     |
@@ -3903,7 +4147,7 @@ select * from newcn;
 | 10 | 黄图岗社区居委会 |
 +------+--------------------------+
 
-# 插入包含 广州 的数据
+-- 插入包含 广州 的数据
 insert into newcn (id,name)
 select id,name from cnarea_2019
 where name regexp '广州.*';
@@ -3991,27 +4235,27 @@ VALUES (1, 'New', '2014-08-20 18:47:42');
 > ```
 
 ```sql
-# 修改 id=1 的 city_code 字段为111
+-- 修改 id=1 的 city_code 字段为111
 update cnarea_2019
 set city_code=111
 where id=1;
 
-# 对每个 id-3 填回刚才删除的 id1,2,3
+-- 对每个 id-3 填回刚才删除的 id1,2,3
 update cnarea_2019
 set id=(id-3)
 where id>2;
 
-# 对小于level平均值进行加1
+-- 对小于level平均值进行加1
 update cnarea_2019
 set level=(level+1)
 where level<=(select avg(level) from cnarea_2019);
 
-# 把 广州 修改为 北京,replace() 修改列的某一部分值
+-- 把 广州 修改为 北京,replace() 修改列的某一部分值
 update cnarea_2019
 set name=replace(name,'广州','北京')
 where name regexp '广州.*';
 
-# 把以 北京 和 深圳 开头的数据,修改为 广州
+-- 把以 北京 和 深圳 开头的数据,修改为 广州
 update cnarea_2019
 set name=replace(name,'深圳','广州'),
 name=replace(name,'北京','广州')
@@ -4021,23 +4265,23 @@ where name regexp '^深圳' or name regexp '^北京';
 #### case语句，在UPDATE多条语句时，可以按顺序执行，避免出错
 
 ```sql
-# 工资只有1000的人, 升2倍
+-- 工资只有1000的人, 升2倍
 UPDATE people
 set salary = salary * 2
 WHERE salary = 1000
 
-# 工资只有2000的人, 升1.5倍
+-- 工资只有2000的人, 升1.5倍
 UPDATE people
 set salary = salary * 1.5
 WHERE salary = 2000
 
-# 工资大于2000的人, 升1.2倍
+-- 工资大于2000的人, 升1.2倍
 UPDATE people
 set salary = salary * 1.2
 WHERE salary > 2000
 
-# 注意:以上顺序不能倒转
-# 使用case语句避免顺序倒转
+-- 注意:以上顺序不能倒转
+-- 使用case语句避免顺序倒转
 UPDATE people
 SET salary = case
     when salary = 1000 then salary * 2
@@ -4072,24 +4316,24 @@ SET salary = case
 > ```
 
 ```sql
-# 删除 id1
+-- 删除 id1
 delete from cnarea_2019
 where id=1;
-# 删除 id2和4
+-- 删除 id2和4
 delete from cnarea_2019
 where id in (2,4);
 
-# 查看结果
+-- 查看结果
 select level, count(*) as totals from cnarea_2019
 group by level;
 
-# 删除表的所有数据，但不会删除表本身
+-- 删除表的所有数据，但不会删除表本身
 delete from cnarea_2019;
 
-# 删除表的所有数据，但不会删除表本身(无法回退)
+-- 删除表的所有数据，但不会删除表本身(无法回退)
 truncate table cnarea_2019;
 
-# 这两者的区别简单理解就是 drop 语句删除表之后,可以通过日志进行回复,而 truncate 删除表之后永远恢复不了,所以,一般不使用 truncate 进行表的删除.
+-- 这两者的区别简单理解就是 drop 语句删除表之后,可以通过日志进行回复,而 truncate 删除表之后永远恢复不了,所以,一般不使用 truncate 进行表的删除.
 ```
 
 **语法:**
@@ -4109,19 +4353,19 @@ truncate table cnarea_2019;
 | PROCEDURE |
 
 ```sql
-# 删除 cnarea_2019 表
+-- 删除 cnarea_2019 表
 drop table cnarea_2019;
 
-# 先判断 cnarea_2019 表是否存在,如存在则删除
+-- 先判断 cnarea_2019 表是否存在,如存在则删除
 drop table if exists cnarea_2019;
 
-# 删除 china 数据库
+-- 删除 china 数据库
 drop database china;
 
-# 先判断 chinaa 数据库是否存在,如存在则删除
+-- 先判断 chinaa 数据库是否存在,如存在则删除
 drop table if exists china;
 
-# 删除后,可以这样恢复数据库
+-- 删除后,可以这样恢复数据库
 create database china;
 mysql -uroot -pYouPassward china < china_area_mysql.sql
 ```
@@ -4129,14 +4373,14 @@ mysql -uroot -pYouPassward china < china_area_mysql.sql
 #### 删除重复的数据
 
 ```sql
-# 创建表
+-- 创建表
 create table clone (
     `id` int (8),
     `name` varchar(50),
     `date` DATE
 );
 
-# 插入数据
+-- 插入数据
 insert into clone (id,name,date) values
 (1,'tz','2020-10-24'),
 (2,'tz','2020-10-24'),
@@ -4144,10 +4388,10 @@ insert into clone (id,name,date) values
 (2,'tz1','2020-10-24'),
 (2,'tz1','2020-10-24');
 
-# 通过 ALTER IGNORE 加入 主健(PRIMARY KEY) 删除重复的数据
+-- 通过 ALTER IGNORE 加入 主健(PRIMARY KEY) 删除重复的数据
 ALTER IGNORE TABLE clone
 ADD PRIMARY KEY (id, name);
-# 或者 ALTER IGNORE 加入 唯一性索引(UNIQUE)
+-- 或者 ALTER IGNORE 加入 唯一性索引(UNIQUE)
 ALTER IGNORE TABLE clone
 ADD UNIQUE KEY (id, name);
 
@@ -4160,13 +4404,88 @@ select * from clone;
 |  2 | tz1  | 2020-10-24 |
 +----+------+------------+
 
-# 成功后可以删除 (这是主健)
+-- 成功后可以删除 (这是主健)
 alter table ca drop primary key;
 
-# 成功后可以删除 (这是unique)
+-- 成功后可以删除 (这是unique)
 alter table clone drop index id;
 alter table clone drop index name;
 ```
+
+### 表设计
+
+#### 范式设计
+
+- [爱可生开源社区：第33期：MySQL 表标准化设计](https://mp.weixin.qq.com/s/vPMUEBcCflK7St-HXbmAAA)
+
+#### 反范式设计
+
+- [爱可生开源社区：第34期：MySQL 表冗余设计](https://mp.weixin.qq.com/s/NBYAYu5Tg7_OtqGqueya7A)
+
+#### 大表处理
+
+- 水平拆分和垂直拆分有些不一样
+    - 垂直拆分最小单元是字段：与业务有很强的关联性，具体业务对应具体的拆分数据
+    - 水平拆分最小单元是数据行：与具体业务关系不大，业务关联可以是拆分后的单张表数据，也可以是拆分前的全局数据。
+        - 简单来说，水平拆分对应用透明，应用逻辑在数据拆分后不需要大动。
+
+##### 垂直拆分
+
+- [爱可生开源社区：第35期：MySQL 数据垂直拆分](https://mp.weixin.qq.com/s/s4KhCwK_7GL7CUL603LvjQ)
+
+##### 水平拆分
+
+- [爱可生开源社区：第36期：MySQL 原生水平拆表](https://mp.weixin.qq.com/s/UFIylhiLvRbniTUpD4qT7Q)
+
+##### 分区表
+
+- 问题：
+    - 1.单张表数据量太大，每天会产生 10W 条记录，一年就是 3650W 条记录，
+    - 2.对这张表的查询 95% 都是在某一天或者几天内，过滤区间最大不超过一个月。比如在2019年3月1日、2019年4 月20 日或者是2019年5月1日和2019年5月5日这个时间段内。偶尔会涉及到跨月、跨年查询，但是频率很低。
+    - 3.记录保留10年。也就是单表3.6亿条记录，单表太大，不便于管理，后期如果单表损坏，修复也难。
+    - 4.单表查询性能很差，对历史数据删除性能也很差。
+
+- 解决方法：分区表
+    - 1.查询过滤的数据范围相对比较集中，不是那么分散；要同时考虑过期数据清理性能问题。
+    - 2.考虑把表拆分为10张新表，一张是当前表，剩余9张是历史归档表；当前表存放最近两年的数据，每到年底迁移老旧数据到历史表进行归档，并且对过期历史数据进行清理。
+    - 3.考虑对部分过滤场景使用 MySQL 分区表，非常适合 95% 的查询；可以使用分区置换功能把数据移到历史表。
+    - 4.分区表带来几个好处：一是查询性能提升；二是管理方便，过期数据直接快速清理；三是对应用透明，暂时不需要应用改代码。
+
+```sql
+CREATE TABLE sales (
+    sale_id INT,
+    sale_date DATE,
+    amount DECIMAL(10, 2)
+) PARTITION BY RANGE (YEAR(sale_date)) (
+    PARTITION p2022 VALUES LESS THAN (2023),
+    PARTITION p2023 VALUES LESS THAN (2024),
+    PARTITION p2024 VALUES LESS THAN MAXVALUE
+);
+
+INSERT INTO sales (sale_id, sale_date, amount) VALUES
+(1, '2022-01-01', 100.50),
+(2, '2022-02-15', 200.75),
+(3, '2022-03-20', 150.00),
+(4, '2023-04-10', 300.20),
+(5, '2023-05-05', 250.80),
+(6, '2023-06-12', 180.30),
+(7, '2023-07-08', 220.40),
+(8, '2024-08-23', 270.60),
+(9, '2024-09-17', 320.90),
+(10, '2024-10-05', 280.75);
+```
+
+###### [爱可生开源社区：第37期：适当的使用 MySQL 原生表分区](https://mp.weixin.qq.com/s/W0qTSI9CwejFKHnCByap0g)
+
+###### [爱可生开源社区：第38期：MySQL 时间类分区具体实现](https://mp.weixin.qq.com/s/AD1F_W50dkEbkmonyt0OWw)
+
+###### [爱可生开源社区：第39期：MySQL 时间类分区写 SQL 注意事项](https://mp.weixin.qq.com/s/2uCHl_Hs95-IlNApMZ-2XA)
+
+###### [爱可生开源社区：第40期：MySQL 分区表案例分享](https://mp.weixin.qq.com/s/_Wn_SvPurNdEE8xNuANEtA)
+
+###### [爱可生开源社区：第41期：MySQL 哈希分区表](https://mp.weixin.qq.com/s/hLSlXZjx1e02cSvx0z2tDA)
+
+###### [爱可生开源社区：第42期：MySQL 是否有必要多列分区](https://mp.weixin.qq.com/s/tYVHXgLAhQqofI8D-LxOHQ)
 
 ## DDL (Data Definition Language) 数据定义语言
 
@@ -4913,42 +5232,42 @@ show table status like '名称'\G;
 | ENGINE | 修改存储引擎     |
 
 ```sql
-# 重命名表
+-- 重命名表
 ALTER TABLE cnarea_2019 RENAME ca;
 
-# 将列 name 改名为 mingzi ,类型改为 char(50)
+-- 将列 name 改名为 mingzi ,类型改为 char(50)
 ALTER TABLE ca change name mingzi char(50);
 
-# 删除 id 列
+-- 删除 id 列
 ALTER TABLE ca DROP id;
 
-# 添加 id 列
+-- 添加 id 列
 ALTER TABLE ca ADD id INT FIRST;
 
-# 重命名 id 列为 number(bigint类型)
+-- 重命名 id 列为 number(bigint类型)
 ALTER TABLE ca CHANGE id number BIGINT;
 
-# 修改 city_code 列,为 char(50) 类型
+-- 修改 city_code 列,为 char(50) 类型
 ALTER TABLE ca MODIFY city_code char(50);
-# 或者
+-- 或者
 ALTER TABLE ca CHANGE city_code city_code char(50);
 
-# 修改 ca 表 id 列默认值1000
+-- 修改 ca 表 id 列默认值1000
 ALTER TABLE ca MODIFY id BIGINT NOT NULL DEFAULT 1000;
-# 或者
+-- 或者
 ALTER TABLE ca ALTER id SET DEFAULT 1000;
 
-# 添加主键,确保该主键默认不为空(NOT NULL)
+-- 添加主键,确保该主键默认不为空(NOT NULL)
 ALTER TABLE ca MODIFY id INT NOT NULL;
 ALTER TABLE ca ADD PRIMARY KEY (id);
 
-# 删除主键
+-- 删除主键
 ALTER TABLE ca DROP PRIMARY KEY;
 
-# 删除唯一性索引(unique)的 id 字段
+-- 删除唯一性索引(unique)的 id 字段
 ALTER TABLE ca DROP index id;
 
-# 修改 ca 表的存储引擎
+-- 修改 ca 表的存储引擎
 ALTER TABLE ca ENGINE = MYISAM;
 ```
 
@@ -5018,17 +5337,1065 @@ ALTER TABLE ca ENGINE = MYISAM;
 
 ## INDEX(索引)
 
-- MySQL 的索引按照存储方式分为两类：
+- 当你想查阅书中某个知识的内容，你会选择一页一页的找呢？还是在书的目录去找呢？
+    - 那换到数据库中，索引的定义就是帮助存储引擎快速获取数据的一种数据结构，形象的说就是`索引`是数据的目录。
 
-    - [爱可生开源社区：第16期：索引设计（MySQL 的索引结构）](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247490190&idx=1&sn=3e2a4e161017edb33ba36cdf10537d5d&chksm=fc96f811cbe17107deba66301b2788c2c32026249135dead9ce66b06355a4d863128ed068c59&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+- 索引和数据位于存储引擎
 
-    - 聚集索引（Clustered Index）：是指关系表记录的物理顺序与索引的逻辑顺序相同。由于一张表只能按照一种物理顺序存放，一张表最多也只能存在一个聚集索引。与非聚集索引相比，聚集索引有着更快的检索速度。
+- 索引
 
-        - MySQL 里只有 INNODB 表支持聚集索引，INNODB 表数据本身就是聚集索引，也就是常说 IOT，索引组织表。B+树的非叶子节点按照主键顺序存放，叶子节点存放主键以及对应的行记录。所以对 INNODB 表进行全表顺序扫描会非常快。
+    - 优点:提升查询速度。可以减少随机 IO,索引能过滤出越少的数据,则从磁盘中读入的数据也就越少
 
-    - 非聚集索引（Secondary Index）：指的是非叶子节点按照索引的键值顺序存放，叶子节点存放索引键值以及对应的主键键值。
-        - MySQL 里除了 INNODB 表主键外，其他的都是二级索引。
-            - MYISAM，memory 等引擎的表索引都是非聚集索引。简单点说，就是索引与行数据分开存储。一张表可以有多个二级索引。
+    - 缺点：
+        - 需要占用物理空间，数量越大，占用空间越大；
+        - 创建索引和维护索引要耗费时间，这种时间随着数据量的增加而增大；
+        - 会降低表的增删改的效率，因为每次增删改索引，B+ 树为了维护索引有序性，都需要进行动态维护。
+
+        - 所以，索引不是万能钥匙，它也是根据场景来使用的。
+            - 限制每张表上的索引数量,建议单张表索引不超过 5 个
+
+            - 禁止给表中的每一列都建立单独的索引
+
+            - 对于非常小的表全表扫描, 比索引更有效
+
+- 什么时候适用索引？
+    - 字段有唯一性限制的，比如商品编码；
+    - 经常用于 `WHERE` 查询条件的字段，这样能够提高整个表的查询速度，如果查询条件不是一个字段，可以建立联合索引。
+    - 经常用于 `GROUP BY` 和 `ORDER BY` 的字段，这样在查询的时候就不需要再去做一次排序了，因为我们都已经知道了建立索引之后在 B+Tree 中的记录都是排序好的。
+
+- 什么时候不需要创建索引？
+    - `WHERE` 条件，`GROUP BY`，`ORDER BY` 里用不到的字段，索引的价值是快速定位，如果起不到定位的字段通常是不需要创建索引的，因为索引是会占用物理空间的。
+
+    - 字段中存在大量重复数据，不需要创建索引，比如性别字段，只有男女，如果数据库表中，男女的记录分布均匀，那么无论搜索哪个值都可能得到一半的数据。在这些情况下，还不如不要索引，因为 MySQL 还有一个查询优化器，查询优化器发现某个值出现在表的数据行中的百分比很高的时候，它一般会忽略索引，进行全表扫描。
+
+    - 表数据太少的时候，不需要创建索引；
+
+    - 经常更新的字段不用创建索引，比如不要对电商项目的用户余额建立索引，因为索引字段频繁修改，由于要维护 B+Tree的有序性，那么就需要频繁的重建索引，这个过程是会影响数据库性能的。
+
+### SQL语法
+
+> ```sql
+> CREATE INDEX 索引名
+> ON 表名 (列1, 列2,...)
+> -- 降序
+> CREATE INDEX 索引名
+> ON 表名 (列1, 列2,... DESC)
+>
+> ALTER table 表名
+> ADD INDEX 索引名(列1, 列2);
+> ```
+
+- 创建主键
+    ```sql
+    -- 表中不包含主键，创建一个主键：
+    ALTER TABLE tablename ADD PRIMARY KEY (col1, col2);
+
+    -- 替换一个已存在的主键：
+    ALTER TABLE tabelname DROP PRIMARY KEY, ADD PRIMARY KEY (col1, col2);
+    ```
+
+- 增加一个唯一键：
+    ```sql
+    ALTER TABLE tablename ADD UNIQUE (col3);
+    CREATE UNIQUE INDEX index2 ON tablename(col4);
+    ```
+
+- 增加一个顺序索引：
+    ```sql
+    ALTER TABLE tablename ADD INDEX (col5);
+
+    -- 顺序
+    CREATE INDEX index3 ON tablename (col6);
+    -- 降序
+    CREATE INDEX index3 ON ca (col6 desc);
+    ```
+
+- 增加一个函数索引：
+    ```sql
+    ALTER TABLE tablename ADD INDEX ((func(col7)));
+    CREATE INDEX index4 ON tablename ((func(col8)));
+    ```
+
+- 删除索引
+    ```sql
+    ALTER TABLE table DROP PRIMARY KEY;
+    ALTER TABLE tabel DROP INDEX indexname;
+    DORP INDEX indexname ON table;
+    ```
+
+```sql
+-- 显示索引
+SHOW INDEX FROM table;
+
+-- 查看索引的元数据
+SHOW CREATE TABLE table\G
+
+-- 优化表数据和索引数据
+OPTIMIZE TABLE table
+```
+
+### 索引长度限制
+
+- [小许code：遇到个MySQL索引长度限制的问题](https://mp.weixin.qq.com/s/wA_6F3nqsB-3I8iDglwxrQ)
+
+```sql
+Specified key was too long; max key length is 767 bytes
+-- 需要添加索引的字段的长度太长,超过了767字节
+```
+
+![image](./Pictures/mysql/index-索引长度限制.avif)
+
+- MyISAM
+    - 单列索引：最大长度不能超过 1000 bytes，否则会报警，但是创建成功，最终创建的是前缀索引（取前333个字符）。
+    - 联合索引：索引长度和不能超过 1000 bytes，否则会报错，创建失败
+
+- InnoDB
+    - 单列索引：超过 767 bytes的，给出warning，最终索引创建成功，取前缀索引（取前 255 字符）
+    - 联合索引：各列长度不超过 767 字节 ，如果有超过 767 bytes 的，则给出报警，索引最后创建成功，但是对于超过 767 字节的列取前缀索引，与索引列顺序无关，总和不得超过 3072 ，否则失败，无法创建
+
+- 不同mysql版本
+
+    - MySQL5.5 版本：引入了 `innodb_large_prefix`，用来禁用大型前缀索引，以便与不支持大索引键前缀的早期版本的 InnoDB 兼容
+
+        - 开启 `innodb_large_prefix` 可以使单索引的长度限制达到 3072 字节（但是联合索引总长度限制还是 3072 字节），禁用时单索引的长度限制为 767 字节
+
+    - MySQL5.7： MySQL5.5版本与MySQL5.6 版本，`innodb_large_prefix` 是默认关闭的，在 MySQL5.7 及以上版本则默认开启
+
+    - MySQL8.0 版本：`innodb_large_prefix` 已被移除，从版本 8.0 开始，索引长度限制由行格式决定
+
+        - 若行格式为 `DYNAMIC` 或 `COMPRESSED` 时，限制值为 3072，而行格式 `REDUNDANT` 或 `COMPACT` 时，限制值为 767。
+
+            - MySQL在5.7及以上版本在InnoDB引擎中默认行格式是 `DYNAMIC`，所以限制长度为3072字节。
+
+- 字符集对索引长度影响
+
+    ![image](./Pictures/mysql/index-字符集对索引长度影响.avif)
+
+    - `UTF8MB4` 为四字节编码字符集；`UTF8` 为三字节编码字符集：
+        - 在`UTF8`编码下varchar(255)是255 * 3 = 765字节：765 * 4 = 3060，因此最多`4`个varchar(255)字段就快超过综合3072了
+        - 在`UTF8MB4`编码下varchar(255)是255 * 3 = 765字节：765 * 3 = 3060，因此最多`3`个varchar(255)字段就快超过综合3072了
+
+- 解决方案
+
+    - 1.将varchar(255)字段改成更小的字符长度类型
+    - 2.如果是MySQL5.5版本与MySQL5.6 版本，可以启用innodb_large_prefix参数,来使得单个索引字段的长度突破767
+    - 3.这种大字段类型可以考虑前缀索引
+
+### EXPLAIN
+
+- [MySQL数据库联盟：一文搞懂MySQL执行计划](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485161&idx=1&sn=8952815f9fae79edfcb6da57ecf60c38&chksm=e84063a0df37eab6b035f2c59284fe48b79272327f6bf02efeecd2f9ff63e9353123fff11bda&cur_album_id=3234198021790154762&scene=190#rd)
+
+- [爱可生开源社区：技术分享 | EXPLAIN 执行计划详解（1）](https://mp.weixin.qq.com/s/DHCXwMdGTGrftHELBgGonA)
+
+- ChatGPT并不能完全正确的优化，或者ChatGPT优化的SQL，需要我们再去校验，这个时候就需要用到执行计划的基本功了。
+
+- 我们重点关注的点如下：
+- 1.使用全表扫描，性能最差，即`type=ALL`
+- 2.扫描行数过多，即rows>阈值
+- 3.查询时使用了排序操作，也比较耗时，即Extra包含`Using filesort`
+- 4.索引类型为index，代表全盘扫描了索引的数据，Extra信息为Using where，代表要搜索的列没有被索引覆盖，需要回表，性能较差。
+- 以上几点都可能造成SQL性能的劣化，是我们需要额外关注的高风险sql。
+
+```sql
+EXPLAIN SELECT * FROM t1 WHERE b=100;
+-- 等同于上
+desc SELECT * FROM t1 WHERE b=100;
++----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+| id | select_type | table | type | possible_keys | key   | key_len | ref   | rows | Extra |
++----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+| 1  | SIMPLE      | t1    | ref  | idx_b         | idx_b | 5       | const | 1    |       |
++----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+```
+
+- 加粗的列为需要重点关注的项。
+
+| 列名            | 解释                                                                                                      |
+|-----------------|-----------------------------------------------------------------------------------------------------------|
+| id              | 查询编号                                                                                                  |
+| **select_type** | 查询类型：显示本行是简单还是复杂查询                                                                      |
+| table           | 涉及到的表                                                                                                |
+| partitions      | 匹配的分区：查询将匹配记录所在的分区。仅当使用 partition 关键字时才显示该列。对于非分区表，该值为 NULL。 |
+| **type**        | 本次查询的表连接类型                                                                                      |
+| possible_keys   | 值并不是越多越好，可能使用的索引越多，查询优化器计算查询成本时就得花费更长时间，所以如果可以的话，尽量删除那些用不到的索引。                                                                                            |
+| **key**         | 实际选择的索引                                                                                            |
+| **key_len**     | 被选择的索引长度：如果键是 NULL，则长度为 NULL。使用的索引的长度。在不损失精确性的情况下，长度越短越好 。|
+| ref             | 与索引比较的列                                                                                            |
+| **rows**        | 执行计划的 rows 列就代表预计需要扫描的行数；如果使用索引来执行查询时，执行计划的 rows 列就代表预计扫描的索引记录行数。对InnoDB来说，这个值是估值，并不一定准确                                              |
+| filtered        | 按条件筛选的行的百分比                                                                                    |
+| **Extra**       | 附加信息                                                                                                  |
+
+- `id`：查询语句中每出现一个 SELECT 关键字，MySQL 就会为它分配一个唯一的 id 值。
+    - 2个`id`值一样的情况：优化器对子查询做了 semi-join 优化时，和关联查询一样两个查询的 id 是一样的：
+        ```sql
+        explain select * from t1 where a in (select b from t2 where t2.b=100);
+        +----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+--------------------------------------------------------------------+
+        | id | select_type | table | partitions | type | possible_keys | key  | key_len | ref   | rows | filtered | Extra                                                              |
+        +----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+--------------------------------------------------------------------+
+        |  1 | SIMPLE      | t1    | NULL       | ref  | a             | a    | 5       | const |    1 |   100.00 | NULL                                                               |
+        |  1 | SIMPLE      | t2    | NULL       | ALL  | NULL          | NULL | NULL    | NULL  |    1 |   100.00 | Using where; FirstMatch(t1); Using join buffer (Block Nested Loop) |
+        +----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+--------------------------------------------------------------------+
+        ```
+
+    - `id`值为 `NULL`：这是因为 union 结果是要去重的，内部创建了一个 <union1,2> 名字的临时表，把查询 1 和查询 2 的结果集都合并到这个临时表中，利用唯一键进行去重，这种情况下查询 id 就为 NULL。
+        ```sql
+        explain select * from t1 union select * from t2;
+        +----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+        | id | select_type  | table      | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra           |
+        +----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+        |  1 | PRIMARY      | t1         | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 1000 |   100.00 | NULL            |
+        |  2 | UNION        | t2         | NULL       | ALL  | NULL          | NULL | NULL    | NULL |    1 |   100.00 | NULL            |
+        | NULL | UNION RESULT | <union1,2> | NULL       | ALL  | NULL          | NULL | NULL    | NULL | NULL |     NULL | Using temporary |
+        +----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+        ```
+
+
+
+- `filtered`
+
+    - 对于单表查询来说：
+        - 如果是全表扫描，filtered 值代表满足 where 条件的行数占表总行数的百分比；
+        - 如果是使用索引来执行查询，filtered 值代表从索引上取得数据后，满足其他过滤条件的数据行数的占比。
+
+    - 从 a 索引上取得 99 行数据，优化器估算认为这 99 行数据中有 33.33% 满足 b > 100 这个条件。对于单表查询来说，这个意义不大。
+
+        ```sql
+        explain select * from t1 where a<100 and b > 100;
+        +----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+------------------------------------+
+        | id | select_type | table | partitions | type  | possible_keys | key  | key_len | ref  | rows | filtered | Extra                              |
+        +----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+------------------------------------+
+        |  1 | SIMPLE      | t1    | NULL       | range | a             | a    | 5       | NULL |   99 |    33.33 | Using index condition; Using where |
+        +----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+------------------------------------+
+        ```
+
+    - 对于关联查询来说，驱动表的 rows*(filtered/100) 代表优化器认为的扇出，对于关联查询的成本估算有很大的影响。
+
+        - 从执行计划中可以看出来，查询优化器打算把 s1 当作驱动表，s2 当作被驱动表。我们可以看到驱动表 s1 表的执行计划的 rows 列为 9688， filtered 列为 10.00，这意味着驱动表 s1 的扇出值就是 9688 × 10.00% = 968.8，这说明还要对被驱动表执行大约 968 次查询。
+        ```sql
+        EXPLAIN SELECT * FROM s1 INNER JOIN s2 ON s1.key1 = s2.key1 WHERE s1.common_field = 'a';
+        +----+-------------+-------+------------+------+---------------+----------+---------+-------------------+------+----------+-------------+
+        | id | select_type | table | partitions | type | possible_keys | key      | key_len | ref               | rows | filtered | Extra       |
+        +----+-------------+-------+------------+------+---------------+----------+---------+-------------------+------+----------+-------------+
+        |  1 | SIMPLE      | s1    | NULL       | ALL  | idx_key1      | NULL     | NULL    | NULL              | 9688 |    10.00 | Using where |
+        |  1 | SIMPLE      | s2    | NULL       | ref  | idx_key1      | idx_key1 | 303     | xiaohaizi.s1.key1 |    1 |   100.00 | NULL        |
+        +----+-------------+-------+------------+------+---------------+----------+---------+-------------------+------+----------+-------------+
+        ```
+
+#### select_type各种值的解释
+
+| select_type 的值     | 解释                                                        |
+|----------------------|-------------------------------------------------------------|
+| SIMPLE               | 简单查询(不使用关联查询或子查询)                            |
+| PRIMARY              | 如果包含关联查询或者子查询，则最外层的查询部分标记为primary |
+| UNION                | 联合查询中第二个及后面的查询                                |
+| DEPENDENT UNION      | 满足依赖外部的关联查询中第二个及以后的查询                  |
+| UNION RESULT         | 联合查询的结果                                              |
+| SUBQUERY             | 子查询中的第一个查询                                        |
+| DEPENDENT SUBQUERY   | 子查询中的第一个查询，并且依赖外部查询                      |
+| DERIVED              | 用到派生表的查询                                            |
+| MATERIALIZED         | 被物化的子查询                                              |
+| UNCACHEABLE SUBQUERY | 一个子查询的结果不能被缓存，必须重新评估外层查询的每一行    |
+| UNCACHEABLE UNION    | 关联查询第二个或后面的语句属于不可缓存的子查询              |
+
+
+- 1.SIMPLE
+
+- 查询语句中**不包含 UNION 或者子查询**的查询都算作是 SIMPLE 类型，比方说下边这个单表查询的 select_type 的值就是 SIMPLE：
+
+    ```sql
+    explain select * from t1 where b=1 order by a;
+    +----+-------------+-------+------------+------+---------------+-------+---------+-------+------+----------+---------------------------------------+
+    | id | select_type | table | partitions | type | possible_keys | key   | key_len | ref   | rows | filtered | Extra                                 |
+    +----+-------------+-------+------------+------+---------------+-------+---------+-------+------+----------+---------------------------------------+
+    |  1 | SIMPLE      | t1    | NULL       | ref  | idx_b         | idx_b | 5       | const |    1 |   100.00 | Using index condition; Using filesort |
+    +----+-------------+-------+------------+------+---------------+-------+---------+-------+------+----------+---------------------------------------+
+    ```
+
+- 关联查询也是 SIMPLE 类型：
+
+    ```sql
+    explain select * from t1 join t2 on t1.a=t2.a;
+    +----+-------------+-------+------------+------+---------------+------+---------+-----------+------+----------+-------------+
+    | id | select_type | table | partitions | type | possible_keys | key  | key_len | ref       | rows | filtered | Extra       |
+    +----+-------------+-------+------------+------+---------------+------+---------+-----------+------+----------+-------------+
+    |  1 | SIMPLE      | t2    | NULL       | ALL  | a             | NULL | NULL    | NULL      |    1 |   100.00 | Using where |
+    |  1 | SIMPLE      | t1    | NULL       | ref  | a             | a    | 5       | hucq.t2.a |    1 |   100.00 | NULL        |
+    +----+-------------+-------+------------+------+---------------+------+---------+-----------+------+----------+-------------+
+    ```
+
+- 2.PRIMARY
+
+- 对于**包含 union 或者子查询**的大查询来说，它是由几个小查询组成的，其中最左边的那个查询的 select_type 值就是 PRIMARY，比如：
+
+```sql
+explain select * from t1 union select * from t2;
++----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+| id | select_type  | table      | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra           |
++----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+|  1 | PRIMARY      | t1         | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 1000 |   100.00 | NULL            |
+|  2 | UNION        | t2         | NULL       | ALL  | NULL          | NULL | NULL    | NULL |    1 |   100.00 | NULL            |
+| NULL | UNION RESULT | <union1,2> | NULL       | ALL  | NULL          | NULL | NULL    | NULL | NULL |     NULL | Using temporary |
++----+--------------+------------+------------+------+---------------+------+---------+------+------+----------+-----------------+
+```
+
+- 3.UNION：位于 union 或者 union all 查询中第二个及其以后的查询被标记为 UNION，第一个被标记为 primary ，可以对比上一个例子的效果。
+
+- 4.UNION RESULT：MySQL 选择使用临时表来完成 UNION 查询的去重工作，针对该临时表的查询的 select_type 就是 UNION RESULT，跟上一个例子一样。
+
+- 5.SUBQUERY
+
+- 当子查询不能被优化成 semi-join，但可以用 materialization 来优化，显示为 SUBQUERY，表示这是一个不相关子查询，子查询只需要执行一遍（因为结果被物化成临时表了），举例：
+
+```sql
+explain SELECT * FROM t1 WHERE t1.a IN (SELECT t2.b FROM t2 WHERE id < 10);
++----+-------------+-------+-------+---------+------+------+-------------+
+| id | select_type | table | type  | key     | ref  | rows | Extra       |
++----+-------------+-------+-------+---------+------+------+-------------+
+|  1 | PRIMARY     | t1    | ALL   | NULL    | NULL |  100 | Using where |
+|  2 | SUBQUERY    | t2    | range | PRIMARY | NULL |    9 | Using where |
++----+-------------+-------+-------+---------+------+------+-------------+
+```
+
+- 6.DEPENDENT SUBQUERY
+
+- 当子查询不能被优化成 semi-join，并且是一个相关子查询（或者非相关子查询关闭 materialization 优化策略时），会被优化器转化成 exists 相关子查询来进行查询，显示为 DEPENDENT SUBQUERY，表示这是一个相关子查询，会根据外查询结果执行多次。举例：
+
+```sql
+SELECT * FROM t1 WHERE t1.a IN (SELECT t2.b FROM t2 WHERE id < 10);
++----+--------------------+-------+-------+---------+------+----------+-------------+
+| id | select_type        | table | type  | key     | rows | filtered | Extra       |
++----+--------------------+-------+-------+---------+------+----------+-------------+
+|  1 | PRIMARY            | t1    | ALL   | NULL    |  100 |   100.00 | Using where |
+|  2 | DEPENDENT SUBQUERY | t2    | range | PRIMARY |    9 |    10.00 | Using where |
++----+--------------------+-------+-------+---------+------+----------+-------------+
+```
+
+- 7.MATERIALIZED
+
+- 当子查询被优化成 semi-join 执行，并且 semi-join 用的是 Materialize 策略，这个子查询对应显示就是 MATERIALIZED，然后用子查询结果物化后的临时表与另一张表进行关联查询。举例：
+
+```sql
+SELECT * FROM t1 WHERE t1.a IN (SELECT t2.b FROM t2 WHERE id < 10);
++----+--------------+-------------+-------+---------+---------------+------+-------------+
+| id | select_type  | table       | type  | key     | ref           | rows | Extra       |
++----+--------------+-------------+-------+---------+---------------+------+-------------+
+|  1 | SIMPLE       | <subquery2> | ALL   | NULL    | NULL          | NULL | Using where |
+|  1 | SIMPLE       | t1          | ref   | a       | <subquery2>.b |    1 | NULL        |
+|  2 | MATERIALIZED | t2          | range | PRIMARY | NULL          |    9 | Using where |
++----+--------------+-------------+-------+---------+---------------+------+-------------+
+```
+
+- 8.DERIVED
+
+- 对于无法使用 derived_merge 优化的派生子查询，优化器会采用物化的方式执行的包含派生表的子查询，该派生表对应的子查询的 select_type 就是 DERIVED，举例：
+
+```sql
+explain select * from t1 join (select distinct a from t2) as derived_t2 on t1.a=derived_t2.a;
++----+-------------+------------+------------+-------+---------------+-------------+---------+----------------+------+----------+-------------+
+| id | select_type | table      | partitions | type  | possible_keys | key         | key_len | ref            | rows | filtered | Extra       |
++----+-------------+------------+------------+-------+---------------+-------------+---------+----------------+------+----------+-------------+
+|  1 | PRIMARY     | t1         | NULL       | ALL   | a             | NULL        | NULL    | NULL           |  100 |   100.00 | Using where |
+|  1 | PRIMARY     | <derived2> | NULL       | ref   | <auto_key0>   | <auto_key0> | 5       | join_test.t1.a |   10 |   100.00 | Using index |
+|  2 | DERIVED     | t2         | NULL       | index | a             | a           | 5       | NULL           | 1000 |   100.00 | Using index |
++----+-------------+------------+------------+-------+---------------+-------------+---------+----------------+------+----------+-------------+
+```
+
+#### type各种值的解释
+
+- 查询性能从上到下依次是最好到最差。
+
+| type的值        | 解释                                                                       |
+|-----------------|----------------------------------------------------------------------------|
+| system          | 查询对象表只有一行数据且只能用于 MyISAM 和 Memory 引擎的表，这是最好的情况 |
+| const           | 基于主键或唯一索引查询，最多返回一条结果                                   |
+| eq_ref          | 表连接时基于主键或非 NULL 的唯一索引完成扫描                               |
+| ref             | 基于普通索引的等值查询，或者表间等值连接                                   |
+| fulltext        | 全文检索                                                                   |
+| ref_or_null     | 表连接类型是 ref，但进行扫描的索引列中可能包含 NULL 值                     |
+| index_merge     | 利用多个索引                                                               |
+| unique_subquery | 子查询中使用唯一索引                                                       |
+| index_subquery  | 子查询中使用普通索引                                                       |
+| range           | 利用索引进行范围查询                                                       |
+| index           | 覆盖索引扫描，可以简单描述为没有过滤条件的索引扫描；更进一步，如果从索引角度来讲，就是全表扫了。|
+| ALL             | 全表扫描                                                                   |
+
+
+- 1.system：
+
+- 当表中只有一条记录并且该表使用的存储引擎的统计数据是精确的，比如 MyISAM、Memory，那么对该表的访问方法就是 system：
+
+    ```sql
+    explain select * from t_myisam;
+    +----+-------------+----------+------------+--------+---------------+------+---------+------+------+----------+-------+
+    | id | select_type | table    | partitions | type   | possible_keys | key  | key_len | ref  | rows | filtered | Extra |
+    +----+-------------+----------+------------+--------+---------------+------+---------+------+------+----------+-------+
+    |  1 | SIMPLE      | t_myisam | NULL       | system | NULL          | NULL | NULL    | NULL |    1 |   100.00 | NULL  |
+    +----+-------------+----------+------------+--------+---------------+------+---------+------+------+----------+-------+
+    ```
+
+- InnoDB 表即使只有一行，也不是 system，而是 ALL：
+
+    ```sql
+    explain select * from t5;                                                                                                                               +----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+
+    | id | select_type | table | partitions | type | possible_keys | key  | key_len | ref  | rows | filtered | Extra |
+    +----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+
+    |  1 | SIMPLE      | t5    | NULL       | ALL  | NULL          | NULL | NULL    | NULL |    1 |   100.00 | NULL  |
+    +----+-------------+-------+------------+------+---------------+------+---------+------+------+----------+-------+
+    ```
+
+- 2.const：根据主键或者唯一二级索引列与单个常数进行等值匹配时（不能有多个条件用 or 连接，这属于范围查询），对单表的访问方法就是 const，举例：
+
+```sql
+explain select * from t1 where id=100;
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+| id | select_type | table | partitions | type  | possible_keys | key     | key_len | ref   | rows | filtered | Extra |
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+|  1 | SIMPLE      | t1    | NULL       | const | PRIMARY       | PRIMARY | 4       | const |    1 |   100.00 | NULL  |
++----+-------------+-------+------------+-------+---------------+---------+---------+-------+------+----------+-------+
+```
+
+- 3.eq_ref
+
+- 在连接查询时，如果被驱动表是通过主键或者唯一二级索引列等值匹配的方式进行访问的（如果该主键或者唯一二级索引是联合索引的话，所有的索引列都必须进行等值比较），则对该被驱动表的访问方法就是 eq_ref，举例：
+
+```sql
+explain select * from t1 join t2 on t1.id=t2.id where t1.a<50;
++----+-------------+-------+------------+--------+---------------+---------+---------+------------+------+----------+-------------+
+| id | select_type | table | partitions | type   | possible_keys | key     | key_len | ref        | rows | filtered | Extra       |
++----+-------------+-------+------------+--------+---------------+---------+---------+------------+------+----------+-------------+
+|  1 | SIMPLE      | t2    | NULL       | ALL    | PRIMARY       | NULL    | NULL    | NULL       |    1 |   100.00 | NULL        |
+|  1 | SIMPLE      | t1    | NULL       | eq_ref | PRIMARY,a     | PRIMARY | 4       | hucq.t2.id |    1 |     5.00 | Using where |
++----+-------------+-------+------------+--------+---------------+---------+---------+------------+------+----------+-------------+
+```
+
+- 4.ref
+
+- 当通过普通的二级索引列与常量进行等值匹配时，那么对该表的访问方法就是 ref，即使匹配到的值可能是多行，举例：
+
+```sql
+explain select * from t11 where a=100;
++----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+-------+
+| id | select_type | table | partitions | type | possible_keys | key  | key_len | ref   | rows | filtered | Extra |
++----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+-------+
+|  1 | SIMPLE      | t11   | NULL       | ref  | a             | a    | 5       | const |  500 |   100.00 | NULL  |
++----+-------------+-------+------------+------+---------------+------+---------+-------+------+----------+-------+
+```
+
+- 5.ref_or_null
+
+- 当对普通二级索引进行等值匹配查询，该索引列的值也可以是 NULL 值时，那么对该表的访问方法就可能是 ref_or_null，举例：
+
+```sql
+explain select * from t11 where a=100 or a is null;
++----+-------------+-------+------------+-------------+---------------+------+---------+-------+------+----------+-----------------------+
+| id | select_type | table | partitions | type        | possible_keys | key  | key_len | ref   | rows | filtered | Extra                 |
++----+-------------+-------+------------+-------------+---------------+------+---------+-------+------+----------+-----------------------+
+|  1 | SIMPLE      | t11   | NULL       | ref_or_null | a             | a    | 5       | const |  501 |   100.00 | Using index condition |
++----+-------------+-------+------------+-------------+---------------+------+---------+-------+------+----------+-----------------------+
+```
+
+- 6.index_merge
+
+- 一般情况下对于某个表的查询只能使用到一个索引，在某些场景下可以使用 Intersection、Union、Sort-Union 这三种索引合并的方式来执行查询，此时就显示为 index_merge，举例：
+
+```sql
+explain select * from t1 where a<50 or b=50;
++----+-------------+-------+------------+-------------+---------------+---------+---------+------+------+----------+----------------------------------------+
+| id | select_type | table | partitions | type        | possible_keys | key     | key_len | ref  | rows | filtered | Extra                                  |
++----+-------------+-------+------------+-------------+---------------+---------+---------+------+------+----------+----------------------------------------+
+|  1 | SIMPLE      | t1    | NULL       | index_merge | a,idx_b       | a,idx_b | 5,5     | NULL |   50 |   100.00 | Using sort_union(a,idx_b); Using where |
++----+-------------+-------+------------+-------------+---------------+---------+---------+------+------+----------+----------------------------------------+
+```
+
+- 7.unique_subquery
+
+- 对一些包含 in 子查询的查询语句中，如果优化器无法使用 semi-join 或物化进行优化，最终将子查询转换为 EXISTS 子查询，而且子查询可以使用到主键或者唯一键进行等值匹配的话，那么该子查询执行计划的type列的值就是 unique_subquery。举例：
+
+```sql
+explain select * from t1 where a in(select id from t2 where t1.a=t2.a) or b=100;
++----+--------------------+-------+------------+-----------------+---------------+---------+---------+------+------+----------+-------------+
+| id | select_type        | table | partitions | type            | possible_keys | key     | key_len | ref  | rows | filtered | Extra       |
++----+--------------------+-------+------------+-----------------+---------------+---------+---------+------+------+----------+-------------+
+|  1 | PRIMARY            | t1    | NULL       | ALL             | idx_b         | NULL    | NULL    | NULL | 1000 |   100.00 | Using where |
+|  2 | DEPENDENT SUBQUERY | t2    | NULL       | unique_subquery | PRIMARY,a     | PRIMARY | 4       | func |    1 |   100.00 | Using where |
++----+--------------------+-------+------------+-----------------+---------------+---------+---------+------+------+----------+-------------+
+```
+
+- 8.range
+
+- 如果使用索引获取某些范围区间的记录，那么就可能使用到 range 访问方法。举例：
+
+```sql
+explain select * from t1 where a<50 and a>20;
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+| id | select_type | table | partitions | type  | possible_keys | key  | key_len | ref  | rows | filtered | Extra                 |
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+|  1 | SIMPLE      | t1    | NULL       | range | a             | a    | 5       | NULL |   29 |   100.00 | Using index condition |
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+
+explain select * from t1 where a in(1,2,3);
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+| id | select_type | table | partitions | type  | possible_keys | key  | key_len | ref  | rows | filtered | Extra                 |
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+|  1 | SIMPLE      | t1    | NULL       | range | a             | a    | 5       | NULL |    3 |   100.00 | Using index condition |
++----+-------------+-------+------------+-------+---------------+------+---------+------+------+----------+-----------------------+
+```
+
+- 9.index
+
+- 需要扫描全部的索引记录时，该表的访问方法就是 index，成本很高。举例：
+
+```sql
+EXPLAIN SELECT key_part1 FROM s1 WHERE key_part3 = 'a';
++----+-------------+-------+------------+-------+---------------+--------------+---------+------+------+----------+--------------------------+
+| id | select_type | table | partitions | type  | possible_keys | key          | key_len | ref  | rows | filtered | Extra                    |
++----+-------------+-------+------------+-------+---------------+--------------+---------+------+------+----------+--------------------------+
+|  1 | SIMPLE      | s1    | NULL       | index | NULL          | idx_key_part | 909     | NULL | 9688 |    10.00 | Using where; Using index |
++----+-------------+-------+------------+-------+---------------+--------------+---------+------+------+----------+--------------------------+
+```
+
+possible_keys 和 key
+在 EXPLAIN 语句输出的执行计划中，possible_keys 列表示在某个查询语句中，对某个表执行单表查询时可能用到的索引有哪些，key 列表示实际用到的索引有哪些。
+
+有些时候使用到的索引未必在 passible_keys 中，上面 type 为 index 的示例中，passible_keys 显示为 NULL，但实际 key 显示是使用到索引的。possible_keys 列中的值并不是越多越好，可能使用的索引越多，查询优化器计算查询成本时就得花费更长时间，所以如果可以的话，尽量删除那些用不到的索引。
+
+
+- key_len各种字段类型对应的长度
+
+- explain 中的 key_len 列用于表示这次查询中，所选择的索引长度有多少字节，常用于判断联合索引有多少列被选择了。下表总结了常用字段类型的 key_len：
+
+| 列类型                    | KEY_LEN                                                                   | 备注                                             |
+|---------------------------|---------------------------------------------------------------------------|--------------------------------------------------|
+| int                       | key_len = 4+1                                                             | int 为 4 bytes，允许为 NULL，加 1 byte           |
+| int                       | not null key_len = 4                                                      | 不允许为 NULL                                    |
+| bigint                    | key_len=8+1                                                               | bigint 为 8 bytes，允许为 NULL 加 1 byte         |
+| bigint not null           | key_len=8                                                                 | bigint 为 8 bytes                                |
+| char(30) utf8             | key_len=30*3+1                                                            | char(n)为：n * 3 ，允许为 NULL 加 1 byte         |
+| char(30) not null utf8    | key_len=30*3                                                              | 不允许为 NULL                                    |
+| varchar(30) not null utf8 | key_len=30*3+2                                                            | utf8 每个字符为 3 bytes，变长数据类型,加 2 bytes |
+| varchar(30)               | utf8                                                                      | key_len=30*3+2+1                                 | utf8 每个字符为 3 bytes，允许为 NULL,加 1 byte,变长数据类型，加 2 bytes |
+| datetime                  | key_len=8+1 (MySQL 5.6.4之前的版本)；key_len=5+1(MySQL 5.6.4及之后的版本) | 允许为 NULL，加 1 byte                           |
+
+#### Extra各种值的解释
+
+- [爱可生开源社区：技术分享 | EXPLAIN 执行计划详解（2）--Extra](https://mp.weixin.qq.com/s/Ihl6GG5MQzU1NkqCOScm9A)
+
+- [爱可生开源社区：第 49 期：根据 EXPLAIN EXTRA 栏提示进行优化（一）](https://mp.weixin.qq.com/s/lc-9QNmI00nJ1Z9OAw_lJw)
+
+| Extra                         | 常见的值                                                                 | 解释                                                                          | 例子 |
+|-------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------------------------------|------|
+| Using filesort                | 将用外部排序而不是索引排序，数据较小时从内存排序，否则需要在磁盘完成排序 | explain select * from t1 order by create_time;                                |
+| Using temporary               | 需要创建一个临时表来存储结构，通常发生对没有索引的列进行 GROUP BY 时     | explain select * from t1 group by create_time;                                |
+| Using where                   | 使用 where 语句来处理结果                                                | explain select * from t1 where create_time='2019-06-18 14:38:24';             |
+| Using index                   |查询的字段都包含在使用的索引中；where 子句使用的字段也都包含在使用的索引中。                                                             | explain select a from t1 where a=111;                                         |
+| Impossible WHERE              | 对 where 子句判断的结果总是 false 而不能选择任何数据                     | explain select * from t1 where 1<0;                                           |
+| Using join buffer (hash join) | 关联查询中，被驱动表的关联字段没索引                                     | explain select * from t1 straight_join t2 on (t1.create_time=t2.create_time); |
+| Using index condition         | 先条件过滤索引，再查数据                                                 | explain select * from t1 where a >900 and a like '%9';                        |
+| Select tables optimized away  | 使用某些聚合函数（比如 max、min）来访问存在索引的某个字段是              | explain select max(a) from t1;                                                |
+| ......                        |                                                                          |                                                                               |
+
+- `Using index`
+
+    - 这条提示信息是最为常见的，表示这条 SQL 可以不用回表，只需要扫描现存索引结构即可拿到所需记录；需要对索引中的记录按照索引顺序进行扫描。执行计划的 extra 会显示为 `Using index`：
+
+    - 查询的字段都包含在使用的索引中；
+        - 所以单从数据库角度来讲，很多公司里定制的开发规范都强调在写 SQL 时，只需拿必要字段而不推荐写 `SELECT *` 也是很有道理的。
+    - `where` 子句使用的字段也都包含在使用的索引中。
+
+    - 例子：有组合索引：`idx_a (first_name,last_name,birth_date)`
+
+        ```sql
+        explain select first_name,last_name,birth_date from employees where \
+        first_name='Mayuri' and last_name like 'Alpay' and birth_date > '1968-01-01'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: range
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 127
+                  ref: NULL
+                 rows: 1
+             filtered: 100.00
+                Extra: Using where; Using index
+        ```
+
+- `Backward index scan`：这条提示信息代表此条 SQL 可以走索引，不过没有按照索引顺序扫描，而是反向扫描；一般来讲，这个提示信息发生在需要倒序扫描索引记录的业务。
+    ```sql
+    desc select  r1 from t1 where 1 order by r1 desc\G
+    *************************** 1. row ***************************
+               id: 1
+      select_type: SIMPLE
+            table: t1
+       partitions: NULL
+             type: index
+    possible_keys: NULL
+              key: idx_r1
+          key_len: 5
+              ref: NULL
+             rows: 101745
+         filtered: 100.00
+            Extra: Backward index scan; Using index
+    1 row in set, 1 warning (0.00 sec)
+    ```
+
+    - 解决方法：针对这条 SQL 来讲，如果可以的话，需要单独创建一个倒序索引：
+        ```sql
+        alter table t1 add key idx_r1_desc(r1 desc);
+        ```
+
+- `Using index condition`：查询数据时如果使用 index condition down 索引条件下推就会出现
+
+    - 使用二级索引查找数据时，where 条件中属于索引一部分但无法使用索引的条件（比如 `like '%abc'` 左侧字符不确定），MySQL 也会把这部分判断条件下推到存储引擎层，筛选之后再进行回表，这样回表时需要查找的数据就更少。
+
+    - 索引条件下推的特点：
+
+        - 下推的条件涉及的字段一定要是使用到的二级索引的一部分，因为二级索引索引存储了这些字段的值，才能进行筛选，所以叫做“索引条件下推”；
+        - 大幅减小回表时的随机 I/O 开销。因为索引条件下推可以在查找完二级索引后利用条件筛选，减小结果集，减小接下来回表的次数，而回表做的是随机 I/O（开销大），所以能够节省大量的 I/O 开销；
+        - 大幅减小了存储引擎层到 MySQL 服务层的传输开销。条件下推给了存储引擎层，提前进行筛选，这样返回给 MySQL 服务层的数据就变少了；
+        - 剩下的不能用到索引的 where 条件还是在 MySQL 服务层生效。
+
+    - 总的来说，只要是用到 `index filter`，就会发生索引条件下推。但不一定出现 `Using index condition` 就一定发生了索引条件下推。
+
+    - 例子：有一个组合索引：`idx_a (first_name,last_name,birth_date)`
+
+        - 查询的 where 子句中 `first_name='Mayuri'` 条件可以使用到二级索引 idx_a，而 `last_name like '%Alpay'` 条件最左的字符不固定所以不能使用二级索引。索引下推的执行过程是：
+        - 通过二级索引 idx_a 查找满足 `first_name='Mayuri'` 条件的记录；
+        - MySQL 把条件 `last_name like '%Alpay'` 下推到 InnoDB 层，对上一步的结果进行筛选（因为 last_name 是索引 idx_a 的一部分，所以可以直接筛选，否则不行）；
+        - 取出上一步结果中的主键值，进行回表。
+
+        ```sql
+        explain select * from employees where first_name='Mayuri' and last_name like '%Alpay'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: ref
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 58
+                  ref: const
+                 rows: 230
+             filtered: 11.11
+                Extra: Using index condition
+        ```
+
+    - 例子：有一个组合索引：`idx_a (first_name,last_name,birth_date)`
+
+        - 在索引树上 `first_name > 'Mayuri'` 的数据行，对于 last_name 的值来说是无序的。所以搜索索引树时，只能用 `first_name > 'Mayuri'` 来找出数据，然后再把 `last_name = 'Alpay'` 这个条件下推到 innodb 层筛选数据。
+
+        - `select * from employees where first_name > 'Mayuri' and last_name = 'Alpay';`
+
+    - 例子：有一个组合索引：`idx_a (first_name,last_name,birth_date)`
+
+        - 虽然这里显示了 `Using index condition`，但实际上是不需要做索引条件下推的，因为索引的第一个字段固定，对于 last_name 字段值来说也是有序的。这属于一个 “bug”，特地考古找到了丁奇老师回复的一条评论：
+
+        ```sql
+        explain select * from employees where  first_name='Mayuri' and last_name > 'Alpay'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: range
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 124
+                  ref: NULL
+                 rows: 226
+             filtered: 100.00
+                Extra: Using index condition
+        ```
+
+- `Using where`
+
+    - 就是前面说的 MySQL 服务层可以把属于索引的一部分但又无法使用索引的条件下推到存储引擎层，而其他条件还是得在 MySQL 服务层应用来过滤存储引擎层返回的数据。当出现这的情况，执行计划的 extra 字段就会出现 "Using where"，它可以和 "Using index" 一起出现，也可以和 "Using index condition" 一起出现。
+
+    - 全表扫描的时候，MySQL 服务层应用 where 条件过滤数据
+
+        ```sql
+         explain select emp_no,first_name,last_name from employees where hire_date = '1959-12-06'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: ALL
+        possible_keys: NULL
+                  key: NULL
+              key_len: NULL
+                  ref: NULL
+                 rows: 299454
+             filtered: 10.00
+                Extra: Using where
+        ```
+
+    - 使用索引访问数据，但是 where 子句中有除了该索引包含的字段之外的条件时。
+        ```sql
+        explain select emp_no,first_name,last_name from employees where first_name='Mayuri' and hire_date = '1959-12-06'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: ref
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 58
+                  ref: const
+                 rows: 230
+             filtered: 10.00
+                Extra: Using where
+        ```
+
+    - 使用索引访问数据，并达到索引覆盖，但是 where 子句中有属于索引一部分但无法使用索引的条件（比如 like '%abc' 左侧字符不确定）条件时：
+        ```sql
+        explain select first_name,last_name,birth_date from employees where  first_name='Mayuri' and last_name like '%Alpay'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: ref
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 58
+                  ref: const
+                 rows: 230
+             filtered: 11.11
+                Extra: Using where; Using index
+        ```
+
+    - 使用索引访问数据，并且使用索引条件下推，并且 where 子句中有除了该索引包含的字段之外的条件时
+        ```sql
+        explain select * from employees where  first_name='Mayuri' and last_name like '%Alpay' and hire_date>'1969-01-01'\G
+        *************************** 1. row ***************************
+                   id: 1
+          select_type: SIMPLE
+                table: employees
+           partitions: NULL
+                 type: ref
+        possible_keys: idx_a
+                  key: idx_a
+              key_len: 58
+                  ref: const
+                 rows: 230
+             filtered: 3.70
+                Extra: Using index condition; Using where
+        ```
+
+- `Select tables optimized away`：以最优的方式来得到结果，不需要访问实体表。
+
+    - SQL 不需要实际执行即可拿到结果，也就是说 SQL 在被优化器交给执行器之前就可以拿到结果，不需要实际执行
+
+    - 1.返回结果最多只能有一行。
+    - 2.这一行必须从一个确定的结果集中获取。
+    ```sql
+    desc select min(r2),max(r3) from t1 \G
+    *************************** 1. row ***************************
+               id: 1
+      select_type: SIMPLE
+            table: t1
+       partitions: NULL
+             type: ALL
+    possible_keys: NULL
+              key: NULL
+          key_len: NULL
+              ref: NULL
+             rows: 101745
+         filtered: 100.00
+            Extra: NULL
+    ```
+
+    ```sql
+    -- 对于以上这条 SQL ，检索表 t1 字段 r2 的最小值以及字段 r3 的最大值，需要全表扫，加个索引后，执行计划就变为如下：
+    alter table t1 add key idx_r2(r2), add key idx_r3(r3);
+
+    desc select min(r2),max(r3) from t1 \G
+    *************************** 1. row ***************************
+               id: 1
+      select_type: SIMPLE
+            table: NULL
+       partitions: NULL
+             type: NULL
+    possible_keys: NULL
+              key: NULL
+          key_len: NULL
+              ref: NULL
+             rows: NULL
+         filtered: NULL
+            Extra: Select tables optimized away
+    ```
+
+    ```sql
+    desc select min(r2) from t1 where r2 = 1\G
+    *************************** 1. row ***************************
+               id: 1
+      select_type: SIMPLE
+            table: NULL
+       partitions: NULL
+             type: NULL
+    possible_keys: NULL
+              key: NULL
+          key_len: NULL
+              ref: NULL
+             rows: NULL
+         filtered: NULL
+            Extra: Select tables optimized away
+    ```
+
+- `Zero limit`：这个表示 SQL 语句使用了 `LIMIT 0` 子句。检查语句合法性的需求，可以给语句后面加 `LIMIT 0`
+
+    ```sql
+    SELECT * FROM t1 WHERE b=100 limit 0
+    +----+---+---+-------------+-------------+
+    | id | a | b | create_time | update_time |
+    +----+---+---+-------------+-------------+
+    +----+---+---+-------------+-------------+
+
+    EXPLAIN SELECT * FROM t1 WHERE b=100 limit 0
+    +----+-------------+--------+--------+---------------+--------+---------+--------+--------+------------+
+    | id | select_type | table  | type   | possible_keys | key    | key_len | ref    | rows   | Extra      |
+    +----+-------------+--------+--------+---------------+--------+---------+--------+--------+------------+
+    | 1  | SIMPLE      | <null> | <null> | <null>        | <null> | <null>  | <null> | <null> | Zero limit |
+    +----+-------------+--------+--------+---------------+--------+---------+--------+--------+------------+
+    ```
+#### [爱可生开源社区：技术分享 | explain format=json 详解](https://mp.weixin.qq.com/s/enVUxwZrkw40XAtV_EeU2A)
+
+#### 对比有无索引的执行计划
+
+- 准备工作
+
+```sql
+-- 创建测试表
+CREATE TABLE `t1` (
+ `id` int NOT NULL auto_increment,
+  `a` int DEFAULT NULL,
+  `b` int DEFAULT NULL,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_a` (`a`),
+  KEY `idx_b` (`b`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 创建存储过程。插入1000行数据
+delimiter $$
+create procedure insert_t1()
+begin
+  declare i int;
+  set i=1;
+  while(i<=1000)do
+    insert into t1(a,b) values(i, i);
+    set i=i+1;
+  end while;
+end$$
+delimiter ;
+
+-- 调用存储过程
+call insert_t1();
+
+-- 查看t1表
+select count(*) from t1;
++----------+
+| count(*) |
++----------+
+| 1000     |
++----------+
+
+-- 查看索引
+show index from t1;
++-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+| Table | Non_unique | Key_name | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Ignored |
++-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+| t1    | 0          | PRIMARY  | 1            | id          | A         | 1000        | <null>   | <null> |      | BTREE      |         |               | NO      |
+| t1    | 1          | idx_a    | 1            | a           | A         | 1000        | <null>   | <null> | YES  | BTREE      |         |               | NO      |
+| t1    | 1          | idx_b    | 1            | b           | A         | 1000        | <null>   | <null> | YES  | BTREE      |         |               | NO      |
++-------+------------+----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+```
+
+- 对比有无索引的执行计划
+
+- 条件字段是主键的执行计划
+
+    ```sql
+    explain select * from t1 where id=100;
+    +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
+    | id | select_type | table | type  | possible_keys | key     | key_len | ref   | rows | Extra |
+    +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
+    | 1  | SIMPLE      | t1    | const | PRIMARY       | PRIMARY | 4       | const | 1    |       |
+    +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
+    ```
+
+    - `type`是`const`：表示基于主键或唯一索引的查询
+    - `key` 是`PRIMARY`：表示走了主键索引
+    - `row` 表示扫描的行数：只扫描了一行。
+
+- 条件字段有索引的执行计划
+
+    ```sql
+    explain select * from t1 where b=100;
+    +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+    | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra |
+    +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+    | 1  | SIMPLE      | t1    | ref  | idx_b         | idx_b | 5       | const | 1    |       |
+    +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
+    ```
+
+    - `type`是`ref`：表示基于普通索引的等值查询，或者表间等值连接
+    - `key`：走了索引的。
+    - `rows`：发现只扫描了1行
+
+- 条件字段没索引的执行计划
+
+    ```sql
+    -- 删除b字段上的索引
+    alter table t1 drop index idx_b;
+    -- 再来看刚才这条语句的执行计划
+    explain select * from t1 where b=100;
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
+    | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra       |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
+    | 1  | SIMPLE      | t1    | ALL  | <null>        | <null> | <null>  | <null> | 1000 | Using where |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
+    ```
+
+    - `type`是`ALL`：全表扫描。
+    - `key`是`NULL`：没走索引。
+    - `rows`这里其实是扫描了很多行：这里是估值，所以不一定准确。
+
+- 获取正在执行语句的执行计划
+
+- 这个通常用来分析正在执行的问题SQL。
+
+```sql
+-- 执行一条慢查询
+select *,sleep(100) from t1 limit 1;
+
+-- 在另外一次窗口查看当前连接
+show processlist;
++----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
+| Id | User | Host | db | Command | Time | State | Info | Progress |
++----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
+| 4  | root | localhost | martin | Query   | 16   | User sleep | select *,sleep(100) from t1 limit 1 | 0.0      |
+| 9  | root | localhost | martin | Query   | 0    | starting   | show processlist                    | 0.0      |
++----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
+
+-- 再来查询给定连接的执行计划
+EXPLAIN FOR CONNECTION 4;
++----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
+| id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra |
++----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
+| 1 | SIMPLE | t1 | ALL | <null> | <null> | <null> | <null> | 1000 |  |
++----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
+```
+
+- 从MySQL 8.0.16开始，可以输出树状执行计划，并且能返回预估成本和预估的返回行数
+
+```sql
+explain format=tree select * from t1 where a=100;
+```
+
+- `cost`表示预估成本信息；
+- `rows`表示预估扫描行数。
+
+
+- 从MySQL 8.0.18开始，引入了EXPLAIN ANALYZE
+
+- 使用这个，会执行SQL，并返回有关执行成本，返回行数，执行时间，循环次数等信息
+
+```sql
+explain analyze select * from t1 where a=100;
+```
+
+- `cost` 表示预估的成本信息
+- `rows` 前面的表示预估值，后面的表示实际返回的行数
+- `actual time` 第一个值是获取第一行的实际时间，第二个值获取所有行的时间，如果循环了多次就是平均时间，单位毫秒
+- `loops` 循环次数
+
+### 索引的分类
+
+- [小林coding：什么是索引？](https://xiaolincoding.com/mysql/index/index_interview.html#%E4%BB%80%E4%B9%88%E6%98%AF%E7%B4%A2%E5%BC%95)
+
+- 4个角度来分类索引。 
+    - 数据结构：B+tree索引、Hash索引、Full-text索引。 
+    - 物理存储：聚簇索引（主键索引）、二级索引（辅助索引）。 
+    - 字段特性：主键索引、唯一索引、普通索引、前缀索引。
+    - 字段个数：单列索引、联合索引。
+
+- MySQL 中的索引可以分为以下几种类型：
+
+    - 平衡树 (B-Tree) 索引 — 最常用的索引类型。此索引类型可以与使用 =、>、>=、<、<= 和 BETWEEN 关键字的搜索查询一起使用，也可以与 LIKE 查询一起使用。
+
+    - 空间（R-Tree）索引——可以与 MySQL 几何数据类型一起使用来索引地理对象。
+
+    - 哈希索引——通常仅用于使用 = 或 <=> 搜索运算符的查询。非常快，但只能在使用 MEMORY 存储引擎时使用。
+
+    - 覆盖索引——覆盖完成查询所需的所有列的索引。
+
+    - 聚集索引——此类索引存储行数据。通常PRIMARY KEY是 s 或，如果它们不存在，则为UNIQUE索引。
+
+    - 多列（复合）索引——在多列上创建的索引。
+
+    - 前缀索引——这样的索引只允许你索引列的前缀。由于此类索引不会索引列的完整值，因此它们经常用于节省空间。
+
+#### 按数据结构分类
+
+- [爱可生开源社区：第16期：索引设计（MySQL 的索引结构）](https://mp.weixin.qq.com/s?__biz=MzU2NzgwMTg0MA==&mid=2247490190&idx=1&sn=3e2a4e161017edb33ba36cdf10537d5d&chksm=fc96f811cbe17107deba66301b2788c2c32026249135dead9ce66b06355a4d863128ed068c59&cur_album_id=1338281900976472064&scene=189#wechat_redirect)
+
+![image](./Pictures/mysql/index_存储引擎支持的数据结构索引.avif)
+
+- 聚集索引（Clustered Index）：是指关系表记录的物理顺序与索引的逻辑顺序相同。由于一张表只能按照一种物理顺序存放，一张表最多也只能存在一个聚集索引。与非聚集索引相比，聚集索引有着更快的检索速度。
+
+- 非聚集索引（Secondary Index）：指的是非叶子节点按照索引的键值顺序存放，叶子节点存放索引键值以及对应的主键键值。
+    - MySQL 里除了 INNODB 表主键外，其他的都是二级索引。
+        - MYISAM，memory 等引擎的表索引都是非聚集索引。简单点说，就是索引与行数据分开存储。一张表可以有多个二级索引。
+
+- 创建的主键索引和二级索引**默认使用的是 B+Tree 索引**。
+
+- 在创建表时，InnoDB 存储引擎会根据不同的场景选择不同的列作为索引：
+
+    - 1.如果有主键：默认会使用主键作为`聚簇索引`（Clusered Index）的索引键（key）；
+    - 2.如果没有主键：就选择第一个不包含 NULL 值的唯一列作为`聚簇索引`的索引键（key）；
+
+    - 在上面两个都没有的情况下：InnoDB 会生成一个名为GEN_CLUST_INDEX 包含id值的隐藏列(`隐藏聚簇索引`)
+
+
+    - 如果`聚簇索引`的值是非顺序的. 如`UUID`, 则会导致索引的插入完全随机:
+
+        - 顺序的主键:每一条记录都存储在上一条记录的后面
+
+            - 顺序写入会造成锁的竞争, 可通过variable [`innodb autoinc_lock_mode`](https://dev.mysql.com/doc/refman/8.0/en/innodb-auto-increment-handling.html)设置锁的并发度
+
+                - 只能在auto-increment的索引上使用
+
+                - 如果没有relication复制, 设置2
+
+                    - 最大并发度, 但副本的auto-increment值未必不一致
+
+                    - mysql 8.0:默认为2
+
+                - 如果有relication复制, 设置0, 1
+
+                    - mariadb 10.5.11-1:默认为1
+
+        - 非顺序的主键:
+
+            - 乱序写入, 有可能会在中间的页写入:
+
+                - 写入的页可能已被移除缓存, 这需要从磁盘加载到内存, 会导致大量的随机io
+
+                - 页分裂(page split):如果写入的页已满, 就会分裂成两个页
+
+            - 可以使用以下命令优化表数据和索引数据, 避免随机io
+                ```sql
+                OPTIMIZE TABLE table_name
+                ```
+
+
+    - 其它索引都属于`辅助索引`（Secondary Index），也被称为二级索引或非聚簇索引。
 
 - MYISAM 存储引擎表：
 
@@ -5139,374 +6506,61 @@ ALTER TABLE ca ENGINE = MYISAM;
                     SELECT * FROM t1 WHERE id = 10005;
                     ```
 
-- MySQL 中的索引可以分为以下几种类型：
-
-    - 平衡树 (B-Tree) 索引 — 最常用的索引类型。此索引类型可以与使用 =、>、>=、<、<= 和 BETWEEN 关键字的搜索查询一起使用，也可以与 LIKE 查询一起使用。
-
-    - 空间（R-Tree）索引——可以与 MySQL 几何数据类型一起使用来索引地理对象。
-
-    - 哈希索引——通常仅用于使用 = 或 <=> 搜索运算符的查询。非常快，但只能在使用 MEMORY 存储引擎时使用。
-
-    - 覆盖索引——覆盖完成查询所需的所有列的索引。
-
-    - 聚集索引——此类索引存储行数据。通常PRIMARY KEY是 s 或，如果它们不存在，则为UNIQUE索引。
-
-    - 多列（复合）索引——在多列上创建的索引。
-
-    - 前缀索引——这样的索引只允许你索引列的前缀。由于此类索引不会索引列的完整值，因此它们经常用于节省空间。
-
-- 对于非常小的表全表扫描, 比索引更有效
-
-- 限制每张表上的索引数量,建议单张表索引不超过 5 个
-
-    - 禁止给表中的每一列都建立单独的索引
-
-- 建立索引的意义:索引查询,可以减少随机 IO,索引能过滤出越少的数据,则从磁盘中读入的数据也就越少
-
-### SQL语法
-
-> ```sql
-> CREATE INDEX 索引名
-> ON 表名 (列1, 列2,...)
-> # 降序
-> CREATE INDEX 索引名
-> ON 表名 (列1, 列2,... DESC)
->
-> ALTER table 表名
-> ADD INDEX 索引名(列1, 列2);
-> ```
-
-- 创建主键
-    ```sql
-    -- 表中不包含主键，创建一个主键：
-    ALTER TABLE tablename ADD PRIMARY KEY (col1, col2);
-
-    -- 替换一个已存在的主键：
-    ALTER TABLE tabelname DROP PRIMARY KEY, ADD PRIMARY KEY (col1, col2);
-    ```
-
-- 增加一个唯一键：
-    ```sql
-    ALTER TABLE tablename ADD UNIQUE (col3);
-    CREATE UNIQUE INDEX index2 ON tablename(col4);
-    ```
-
-- 增加一个顺序索引：
-    ```sql
-    ALTER TABLE tablename ADD INDEX (col5);
-
-    # 顺序
-    CREATE INDEX index3 ON tablename (col6);
-    # 降序
-    CREATE INDEX index3 ON ca (col6 desc);
-    ```
-
-- 增加一个函数索引：
-    ```sql
-    ALTER TABLE tablename ADD INDEX ((func(col7)));
-    CREATE INDEX index4 ON tablename ((func(col8)));
-    ```
-
-- 删除索引
-    ```sql
-    ALTER TABLE table DROP PRIMARY KEY;
-    ALTER TABLE tabel DROP INDEX indexname;
-    DORP INDEX indexname ON table;
-    ```
+##### 例子：先创建一张商品表，id 为主键
 
 ```sql
-# 显示索引
-SHOW INDEX FROM table;
-
-# 查看索引的元数据
-SHOW CREATE TABLE table\G
-
-# 优化表数据和索引数据
-OPTIMIZE TABLE table
+CREATE TABLE `product`  (
+`id` int(11) NOT NULL,
+`product_no` varchar(20)  DEFAULT NULL,
+`name` varchar(255) DEFAULT NULL,
+`price` decimal(10, 2) DEFAULT NULL,
+PRIMARY KEY (`id`) USING BTREE
+) CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 ```
 
-### 聚集索引
+- 商品表里，有这些行数据：
+    ![image](./Pictures/mysql/index_存储引擎支持的数据结构索引-例子.avif)
 
-- [Clusered Index](https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html)(聚簇索引):按顺序保存所有数据文件
+- 二级索引的 B+Tree长的样子
+    - 实际上是双向链表
+    - 其中非叶子的 key 值是 product_no（图中橙色部分），叶子节点存储的数据是主键值（图中绿色部分）。
+    ![image](./Pictures/mysql/index_B+树.avif)
 
-    - 如果表定义了主键InnoDB将其作为**Clusered Index**
+    - B+Tree 是一种多叉树：
+        - 叶子节点才存放数据，非叶子节点只存放索引
+        - 每个节点里的数据是按主键顺序存放的。
+        - 每一层父节点的索引值都会出现在下层子节点的索引值中，因此在叶子节点中，包括了所有的索引值信息，并且每一个叶子节点都有两个指针，分别指向下一个叶子节点和上一个叶子节点，形成一个双向链表。
 
-    - B+树是左小右大的顺序存储结构：
-        - 节点：主键值
-        - 叶节点上包含 事务ID, MVCC的回滚指针, 剩余列(col2...)
-
-    - InnoDB每个表都有一个聚簇索引:
-
-        - 如果表没有主键:
-
-            - InnoDB会使用第一个UNIQUE not NULL作为Clusered Index
-
-        - 如果表没有 Primary key 和 Unique not NULL:
-
-            - InnoDB 会生成一个名为GEN_CLUST_INDEX 包含id值的隐藏列(隐藏聚簇索引)
-
-        - 如果聚簇索引的值是非顺序的. 如`UUID`, 则会导致索引的插入完全随机:
-
-            - 顺序的主键:每一条记录都存储在上一条记录的后面
-
-                - 顺序写入会造成锁的竞争, 可通过variable [`innodb autoinc_lock_mode`](https://dev.mysql.com/doc/refman/8.0/en/innodb-auto-increment-handling.html)设置锁的并发度
-
-                    - 只能在auto-increment的索引上使用
-
-                    - 如果没有relication复制, 设置2
-
-                        - 最大并发度, 但副本的auto-increment值未必不一致
-
-                        - mysql 8.0:默认为2
-
-                    - 如果有relication复制, 设置0, 1
-
-                        - mariadb 10.5.11-1:默认为1
-
-            - 非顺序的主键:
-
-                - 乱序写入, 有可能会在中间的页写入:
-
-                    - 写入的页可能已被移除缓存, 这需要从磁盘加载到内存, 会导致大量的随机io
-
-                    - 页分裂(page split):如果写入的页已满, 就会分裂成两个页
-
-                - 可以使用以下命令优化表数据和索引数据, 避免随机io
-                    ```sql
-                    OPTIMIZE TABLE table_name
-                    ```
-
-### B+树匹配原则
-
-```sql
-CREATE table index_test (
-    last_name varchar(50),
-    first_name varchar(50),
-    date DATE
-);
-
-INSERT INTO index_test VALUES
-('Jobs', 'Steve', '1955-2-24'),
-('王', '小二', '2021-7-10');
-
--- 创建二级索引
-ALTER TABLE index_test
-ADD KEY(last_name, first_name, date);
-```
-
-- 重复索引:如果有索引(A, B), 就没有必要再创建(A)索引, 如发现重复索引可以立即删除
-
-- 最左匹配:
-
-    - 1.只匹配第一列`(last_name)`
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name='Jobs'
-        ```
-
-    - 2.只匹配last_name前缀以'J'开头的
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name LIKE 'J%'
-        ```
-
-    - 3.按顺序从左到右匹配如:`(last_name, first_name)`, `(last_name, first_name, date)`
+    - 例子
 
         ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE last_name='Jobs'
-        AND first_name = 'Steve'
-        AND date = '1955-2-24'
+        select * from product where product_no = '0002';
         ```
 
-        - **不能**跨过中间的列进行匹配如:`(last_name, date)`
-        ```sql
-        EXPLAIN SELECT * FROM index_test
-        WHERE date = '1955-2-24'
-        AND last_name='Jobs'
-        ```
+        - 会先检二级索引中的 B+Tree 的索引值（商品编码，product_no），找到对应的叶子节点，然后获取主键值，然后再通过主键索引中的 B+Tree 树查询到对应的叶子节点，然后获取整行数据。这个过程叫「回表」，也就是说要查两个 B+Tree 才能查到数据。
 
-- 范围匹配:
+        ![image](./Pictures/mysql/index_B+树-回表.avif)
 
-    - 某列使用范围匹配, 那么后面的列则无法使用索引
+##### 为什么 MySQL InnoDB  选择 B+tree 作为索引的数据结构？
 
-        - 尽可能使用`IN()` 代替范围查询, `IN()` 是多个等值查询依然可以使用索引
+- 1.B+Tree vs B Tree
+    - B+Tree 只在叶子节点存储数据，而 B 树 的非叶子节点也要存储数据，所以 B+Tree 的单个节点的数据量更小，在相同的磁盘 I/O 次数下，就能查询更多的节点。 
+        - 另外，B+Tree 叶子节点采用的是双链表连接，适合 MySQL 中常见的基于范围的顺序查找，而 B 树无法做到这一点。
 
-        ??可以
+- 2.B+Tree vs 二叉树
+    - 对于有 N 个叶子节点的 B+Tree，其搜索复杂度为O(logdN)，其中 d 表示节点允许的最大子节点个数为 d 个。
+    - 在实际的应用当中， d 值是大于100的，这样就保证了，即使数据达到千万级别时，B+Tree 的高度依然维持在 3-4 层左右，也就是说一次数据查询操作只需要做 3-4 次的磁盘 I/O 操作就能查询到目标数据。 
+        - 而二叉树的每个父节点的儿子节点个数只能是 2 个，意味着其搜索复杂度为 O(logN)，这已经比 B+Tree 高出不少，因此二叉树检索到目标数据所经历的磁盘 I/O 次数要更多。
 
-        - 以下只能匹配last_name, first_name
-            ```sql
-            EXPLAIN SELECT * FROM index_test
-            WHERE last_name='Jobs'
-            AND first_name LIKE 'S%'
-            AND date = '1955-2-24'
-            ```
-- 排序匹配:
+- 3.B+Tree vs Hash
+    - Hash 在做等值查询的时候效率贼快，搜索复杂度为 O(1)。
+        - 但是 Hash 表不适合做范围查询，它更适合做等值的查询，这也是 B+Tree 索引要比 Hash 表索引有着更广泛的适用场景的原因。
 
-    - 1.和上面例子一样适用于最左匹配和范围匹配原则:
-
-        ```sql
-        EXPLAIN SELECT last_name FROM index_test
-        ORDER BY last_name, first_name, date\G;
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index_test
-        type          | index
-        possible_keys | <null>
-        key           | last_name
-        key_len       | 410
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ```
-
-        - 列的顺序可以从where子句开始:
-            ```sql
-            EXPLAIN SELECT last_name FROM index_test
-            WHERE last_name = 'Jobs'
-            ORDER BY first_name, date\G;
-
-            ***************************[ 1. row ]***************************
-            id            | 1
-            select_type   | SIMPLE
-            table         | index_test
-            type          | ref
-            possible_keys | last_name
-            key           | last_name
-            key_len       | 203
-            ref           | const
-            rows          | 1
-            Extra         | Using where; Using index
-            ```
-
-    - 2.降序`desc`, 依然能使用索引:
-        ```sql
-        EXPLAIN SELECT last_name from index_test
-        ORDER BY last_name DESC, first_name DESC, date DESC\G;
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index_test
-        type          | index
-        possible_keys | <null>
-        key           | last_name
-        key_len       | 410
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ```
-
-        - 但如果有两种不同排序方向, 则不能使用索引:
-
-            - Extra字段为`Using filesort`:表示不能使用索引, 需要自己排序, 数据量小则会在内存, 大则会在磁盘
-                - 排序是成本很高的操作, 尽量避免对大量数据排序
-
-            ```sql
-            EXPLAIN SELECT last_name FROM index_test
-            ORDER BY last_name ASC, first_name ASC, date DESC\G;
-            -- 两条语句一样
-            EXPLAIN SELECT last_name FROM index_test
-            ORDER BY last_name, first_name, date DESC\G;
-
-            ***************************[ 1. row ]***************************
-            id            | 1
-            select_type   | SIMPLE
-            table         | index_test
-            type          | index
-            possible_keys | <null>
-            key           | last_name
-            key_len       | 410
-            ref           | <null>
-            rows          | 2
-            Extra         | Using index; Using filesort
-            ```
-
-### 前缀索引
-
-- 有时，你可能会遇到需要索引长列的情况，从而使索引变得非常大。在这些情况下，你还可以索引列的前几个字符，而不是索引整个值——这样的索引称为前缀索引。
-
-- 对于过长的值, 可以建立前缀索引
-
-    - 一个数据表的 x_name 值都是类似 23213223.434323.4543.4543.34324.可以只取前7位`alter table table1 add key (x_name(7))`
-
-- 无法使用`ORDER BY`, `GROUP BY`, 以及覆盖查询
-
-- 后缀索引(suffix index):像电子邮件这类值比较有效. 但mysql不支持后缀, 可以把字符串反转后, 再建立前缀索引
-
-- 索引选择性:不重复的索引值,和表总数的比例. 唯一性索引的选择性是1, 性能最好
-
-- 假设要建立cnarea_2019表的name列索引:
-
-    - 查看选择性:
-    ```sql
-    SELECT COUNT(DISTINCT name) / COUNT(*) FROM cnarea_2019;
-
-    +---------------------------------+
-    | COUNT(DISTINCT name) / COUNT(*) |
-    +---------------------------------+
-    | 0.6138 |
-    +---------------------------------+
-    ```
-
-    - 查看不同前缀长度的选择性
-    ```sql
-    SELECT
-    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel3,
-    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel4,
-    COUNT(DISTINCT LEFT(name, 5)) / COUNT(*) AS sel5,
-    COUNT(DISTINCT LEFT(name, 6)) / COUNT(*) AS sel6,
-    COUNT(DISTINCT LEFT(name, 7)) / COUNT(*) AS sel7,
-    COUNT(DISTINCT LEFT(name, 8)) / COUNT(*) AS sel8,
-    COUNT(DISTINCT LEFT(name, 9)) / COUNT(*) AS sel9,
-    COUNT(DISTINCT LEFT(name, 10)) / COUNT(*) AS sel10,
-    COUNT(DISTINCT LEFT(name, 11)) / COUNT(*) AS sel11,
-    COUNT(DISTINCT LEFT(name, 12)) / COUNT(*) AS sel12
-    FROM cnarea_2019;
-
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    | sel3 | sel4 | sel5 | sel6 | sel7 | sel8 | sel9 | sel10 | sel11 | sel12 |
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    | 0.5271 | 0.5271 | 0.5662 | 0.5866 | 0.5981 | 0.6057 | 0.6095 | 0.6119 | 0.6128 | 0.6133 |
-    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
-    ```
-
-    - 查看当前缀为8时, 最频繁出现的次数
-    ```sql
-    SELECT COUNT(*) AS cnt, LEFT(name, 8) FROM cnarea_2019
-    GROUP BY name
-    ORDER BY cnt DESC
-    LIMIT 10;
-
-    +-----+---------------+
-    | cnt | LEFT(name, 8) |
-    +-----+---------------+
-    | 358 | 和平村委会 |
-    | 333 | 张庄村委会 |
-    | 328 | 团结村委会 |
-    | 321 | 王庄村委会 |
-    | 305 | 太平村委会 |
-    | 281 | 市辖区     |
-    | 274 | 胜利村委会 |
-    | 265 | 新民村委会 |
-    | 264 | 新庄村委会 |
-    | 261 | 红星村委会 |
-    +-----+---------------+
-    ```
-
-    - 到达8后选择性的提升已经很小了, 因此建立长度为8的索引
-
-        ```sql
-        ALTER TABLE cnarea_2019 ADD KEY (name(8));
-        ```
-
-### HASH INDEX（哈希索引）
+##### HASH INDEX（哈希索引）
 
 - 只有所有列全匹配才有效:
 
-  - 假设索引为`key(last_name, first_name, date)`, 那么查询时如果只有last_name, 则无法使用索引
+  - 假设索引为`key(last_name, first_name, date)`, 那么查询时如果只有`last_name`, 则无法使用索引
 
 - 仅适用于 MEMORY 存储引擎。
 
@@ -5520,7 +6574,7 @@ ADD KEY(last_name, first_name, date);
 
 - 创建索引
     ```sql
-    // USING HASH查询末尾的选项
+    -- USING HASH查询末尾的选项
     CREATE INDEX idx_name ON demo_table (demo_column) USING HASH;
     ```
 
@@ -5548,7 +6602,7 @@ ADD KEY(last_name, first_name, date);
 
         - 3.判断第1行指针是否为Jobs, 防止hash冲突
 
-#### 自适应哈希(adaptive hash index)
+###### 自适应哈希(adaptive hash index)
 
 - innodb的一个特殊功能, 但某些索引值操作比较频繁时, 会在内存中基于B+树之上创建hash索引
 
@@ -5604,149 +6658,15 @@ ADD KEY(last_name, first_name, date);
         ```sql
         SELECT CONV(RIGHT(MD5('http://www.mysql.com/'), 16), 16, 10) AS HASH64
         ```
-### 覆盖索引
 
-- 覆盖索引:索引包含查询所需的字段值
-
-    - 能提升性能, 无需回表
-
-        - 如果索引不能覆盖查询所有列, 需要每扫描一条索引记录后, 回表查询对应的行, 基本是随机io
-
-    - 因此必须存储字段值, 想hash, 空间, 全文索引都不能存储字段值
-
-- 通过`EXPLAIN`命令Extra字段为`Using index` 就是覆盖索引:
-
-    - 注意:type字段的`index` , 说明使用了索引扫描排序.[跳转至type字段说明](#explain-type)
-
-    ```sql
-    CREATE table index1_test (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(10)
-    );
-
-    INSERT INTO index1_test(name) VALUES ('one'), ('two');
-
-    EXPLAIN SELECT id FROM index1_test\G;
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | index1_test
-    type          | index
-    possible_keys | <null>
-    key           | PRIMARY
-    key_len       | 4
-    ref           | <null>
-    rows          | 2
-    Extra         | Using index
-    ```
-
-- 通过`EXPLAIN`命令Extra字段为`Using where`表示没有使用索引:
-
-    ```sql
-    EXPLAIN SELECT name FROM index1_test
-    WHERE name = 'one'\G;
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | index1_test
-    type          | ALL
-    possible_keys | <null>
-    key           | <null>
-    key_len       | <null>
-    ref           | <null>
-    rows          | 2
-    Extra         | Using where
-    ```
-
-    - 通过子查询查找id, 即第一阶段使用覆盖索引.这叫作延迟关联(deferred join)
-        ```sql
-        SELECT * FROM index1_test
-        JOIN (SELECT id FROM index1_test) as id
-        ON (index1_test.id = id.id);
-
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | index
-        possible_keys | PRIMARY
-        key           | PRIMARY
-        key_len       | 4
-        ref           | <null>
-        rows          | 2
-        Extra         | Using index
-        ***************************[ 2. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | ALL
-        possible_keys | PRIMARY
-        key           | <null>
-        key_len       | <null>
-        ref           | <null>
-        rows          | 2
-        Extra         | Using where; Using join buffer (flat, BNL join)
-        ```
-
-    - 创建二级索引后在查询:
-        ```sql
-        ALTER TABLE index1_test ADD INDEX name(name);
-
-        EXPLAIN SELECT name FROM index1_test
-        WHERE name = 'one'\G;
-        ***************************[ 1. row ]***************************
-        id            | 1
-        select_type   | SIMPLE
-        table         | index1_test
-        type          | ref
-        possible_keys | name
-        key           | name
-        key_len       | 43
-        ref           | const
-        rows          | 1
-        Extra         | Using where; Using index
-        ```
-
-        ```sql
-        MariaDB root@(none):china> explain select id from index1_test order by name,id
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-        | id | select_type | table       | type  | possible_keys | key  | key_len | ref    | rows | Extra       |
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-        | 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index |
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
-
-        1 row in set
-        Time: 0.005s
-        MariaDB root@(none):china> explain select id from index1_test order by id,name
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-        | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra
-                      |
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-        | 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index; Using filesort |
-        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
-
-        ```
-
-### Multiple-Column Indexes (多列索引)
-
-- 最多可以**16**个列
-
-- 请记住 MySQL 从左到右使用索引，反之则不然。
-
-```sql
-CREATE INDEX composite_idx ON demo_table(c1,c2,c3);
-
-SELECT * FROM demo_table WHERE c1 = 5 AND c2 = 10;
-```
-
-### 空间索引（R-Tree 索引）
+##### 空间索引（R-Tree 索引）
 
 - 用于访问空间（地理）对象——要使用这些索引，你必须使用 MySQL 提供的 GIS 函数：其中一些函数包括`MBRContains`、`MBRCovers`或`MBREquals`
 
 - 创建索引
 
     ```sql
-    // 需要SPATIAL关键字
+    -- 需要SPATIAL关键字
     CREATE SPATIAL INDEX spatial_idx ON demo_table (demo_column);
     ALTER TABLE demo_table ADD SPATIAL INDEX(spatial_idx);
     ```
@@ -5754,15 +6674,372 @@ SELECT * FROM demo_table WHERE c1 = 5 AND c2 = 10;
 - 使用此类索引的查询示例：
 
     ```sql
-    // 在使用类似variable_1或variable_2任何容量的变量之前，你应该首先定义它们（该WKT value参数表示代表几何对象的众所周知的文本格式值）：
+    -- 在使用类似variable_1或variable_2任何容量的变量之前，你应该首先定义它们（该WKT value参数表示代表几何对象的众所周知的文本格式值）：
     SET @variable_1 = ST_GeomFromText('WKT value');
 
-    // 查询示例
+    -- 查询示例
     SELECT MBRContains(@variable_1, @variable_2);
     SELECT MBRWithin(@variable_2, @variable_1);
     ```
 
-### 主键设计原则
+
+#### 按字段特性分类
+
+- 1.主键索引：就是建立在主键字段上的索引，通常在创建表的时候一起创建，一张表最多只有一个主键索引，索引列的值不允许有空值。
+
+    - 在创建表时，创建主键索引的方式如下：
+
+        ```sql
+        CREATE TABLE table_name  (
+        ....
+        PRIMARY KEY (index_column_1) USING BTREE
+        );
+        ```
+
+- 2.唯一索引：建立在 UNIQUE 字段上的索引，一张表可以有多个唯一索引，索引列的值必须唯一，但是允许有空值。
+
+    - 在创建表时，创建主键索引的方式如下：
+        ```sql
+        CREATE TABLE table_name  (
+        ....
+        UNIQUE KEY(index_column_1,index_column_2,...) 
+        );
+        ```
+
+    - 建表后，如果要创建唯一索引，可以使用这面这条命令：
+
+        ```sql
+        CREATE UNIQUE INDEX index_name
+        ON table_name(index_column_1,index_column_2,...); 
+        ```
+
+- 3.普通索引：普通索引就是建立在普通字段上的索引，既不要求字段为主键，也不要求字段为 UNIQUE。
+
+    - 在创建表时，创建普通索引的方式如下：
+
+        ```sql
+        CREATE TABLE table_name  (
+        ....
+        INDEX(index_column_1,index_column_2,...) 
+        );
+        ```
+
+    - 建表后，如果要创建普通索引，可以使用这面这条命令：
+
+        ```sql
+        CREATE INDEX index_name
+        ON table_name(index_column_1,index_column_2,...); 
+        ```
+
+- 4.前缀索引
+    - 前缀索引是指对字符类型字段的前几个字符建立的索引，而不是在整个字段上建立的索引，前缀索引可以建立在字段类型为 char、 varchar、binary、varbinary 的列上。
+    - 使用前缀索引的目的是为了减少索引占用的存储空间，提升查询效率。
+
+    - 在创建表时，创建前缀索引的方式如下：
+
+        ```sql
+        CREATE TABLE table_name(
+        column_list,
+        INDEX(column_name(length))
+        ); 
+        ```
+
+    - 建表后，如果要创建前缀索引，可以使用这面这条命令：
+
+        ```sql
+        CREATE INDEX index_name
+        ON table_name(column_name(length)); 
+        ```
+
+#### 按字段个数分类
+
+建立在单列上的索引称为单列索引，比如主键索引；
+建立在多列上的索引称为联合索引（二级索引）；
+
+- 联合索引
+
+    - 商品表中的 product_no 和 name 字段组合成联合索引(product_no, name)，创建联合索引的方式如下：
+
+        ```sql
+        CREATE INDEX index_product_no_name ON product(product_no, name);
+        ```
+
+    - 联合索引`(product_no, name)` 的 B+Tree 示意图如下（图中叶子节点之间实际上是双向链表）。
+
+        ![image](./Pictures/mysql/index_联合索引.avif)
+
+        - 联合索引的非叶子节点用两个字段的值作为  B+Tree 的 key 值。当在联合索引查询数据时先按 product_no 字段比较，在 product_no 相同的情况下再按 name 字段比较。
+
+        - 也就是说，联合索引查询的 B+Tree 是先按 product_no 进行排序，然后再 product_no 相同的情况再按 name 字段排序。
+
+        - 因此，使用联合索引时，存在**最左匹配原则**，也就是按照最左优先的方式进行索引的匹配。在使用联合索引进行查询的时候，如果不遵循「最左匹配原则」，联合索引会失效，这样就无法利用到索引快速查询的特性了。
+
+- 索引区分度：建立联合索引时的字段顺序，对索引效率也有很大影响。越靠前的字段被用于索引过滤的概率越高，实际开发工作中建立联合索引时，要把区分度大的字段排在前面，这样区分度大的字段越有可能被更多的 SQL 使用到。
+
+    - 区分度就是某个字段 column 不同值的个数「除以」表的总行数，计算公式如下：`区分度 = dinstinct(coolumn) / count(*)`
+
+    - 例子：
+       - 性别的区分度就很小，不适合建立索引或不适合排在联合索引列的靠前的位置
+       - UUID 这类字段就比较适合做索引或排在联合索引列的靠前的位置。
+
+    - 因为如果索引的区分度很小，假设字段的值分布均匀，那么无论搜索哪个值都可能得到一半的数据。在这些情况下，还不如不要索引，因为 MySQL 还有一个查询优化器，查询优化器发现某个值出现在表的数据行中的百分比（惯用的百分比界线是"30%"）很高的时候，它一般会忽略索引，进行全表扫描。
+
+##### 联合索引（二级索引）匹配
+
+- 创建了一个 (a, b, c) 联合索引
+
+    - 如果查询条件符合最左匹配原则，就可以匹配上联合索引：
+
+        - `where a=1`
+        - `where a=1 and b=2 and c=3`
+        - `where a=1 and b=2`
+        - 需要注意的是，因为有查询优化器，所以 a 字段在 where 子句的顺序并不重要。
+
+    - 如果查询条件不符合最左匹配原则，联合索引失效：
+        - `where b=2`
+        - `where c=3`
+        - `where b=2 and c=3` 
+
+        - 这些查询条件之所以会失效，是因为(a, b, c) 联合索引，是先按 a 排序，在 a 相同的情况再按 b 排序，在 b 相同的情况再按 c 排序。所以，b 和 c 是全局无序，局部相对有序的，这样在没有遵循最左匹配原则的情况下，是无法利用到索引的。
+
+    - 重复索引:如果有索引(a, b, c), 就没有必要再创建(a)索引, 如发现重复索引可以立即删除
+
+- 创建测试表
+
+    ```sql
+    CREATE table index_test (
+        last_name varchar(50),
+        first_name varchar(50),
+        date DATE
+    );
+
+    INSERT INTO index_test VALUES
+    ('Jobs', 'Steve', '1955-2-24'),
+    ('王', '小二', '2021-7-10');
+
+    -- 创建联合索引
+    ALTER TABLE index_test
+    ADD KEY(last_name, first_name, date);
+
+    -- 查看表的所有索引
+    show index from index_test
+    +------------+------------+-----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+    | Table      | Non_unique | Key_name  | Seq_in_index | Column_name | Collation | Cardinality | Sub_part | Packed | Null | Index_type | Comment | Index_comment | Ignored |
+    +------------+------------+-----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+    | index_test | 1          | last_name | 1            | last_name   | A         | 2           | <null>   | <null> | YES  | BTREE      |         |               | NO      |
+    | index_test | 1          | last_name | 2            | first_name  | A         | 2           | <null>   | <null> | YES  | BTREE      |         |               | NO      |
+    | index_test | 1          | last_name | 3            | date        | A         | 2           | <null>   | <null> | YES  | BTREE      |         |               | NO      |
+    +------------+------------+-----------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+---------------+---------+
+    ```
+
+- 最左匹配:
+
+    - 1.只匹配第一列`last_name`
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name='Jobs'
+        +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+        | id | select_type | table      | type | possible_keys | key       | key_len | ref   | rows | Extra                    |
+        +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+        | 1  | SIMPLE      | index_test | ref  | last_name     | last_name | 203     | const | 1    | Using where; Using index |
+        +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+        ```
+
+    - 2.只匹配`last_name`前缀以`J`开头的
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name LIKE 'J%'
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+--------------------------+
+        | id | select_type | table      | type  | possible_keys | key       | key_len | ref    | rows | Extra                    |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+--------------------------+
+        | 1  | SIMPLE      | index_test | range | last_name     | last_name | 203     | <null> | 1    | Using where; Using index |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+--------------------------+
+        ```
+
+    - 3.按顺序从左到右匹配如:`(last_name, first_name)`, `(last_name, first_name, date)`
+
+        ```sql
+        EXPLAIN SELECT * FROM index_test
+        WHERE last_name='Jobs'
+        AND first_name = 'Steve'
+        AND date = '1955-2-24'
+        +----+-------------+------------+------+---------------+-----------+---------+-------------------+------+--------------------------+
+        | id | select_type | table      | type | possible_keys | key       | key_len | ref               | rows | Extra                    |
+        +----+-------------+------------+------+---------------+-----------+---------+-------------------+------+--------------------------+
+        | 1  | SIMPLE      | index_test | ref  | last_name     | last_name | 410     | const,const,const | 1    | Using where; Using index |
+        +----+-------------+------------+------+---------------+-----------+---------+-------------------+------+--------------------------+
+        ```
+
+        - **不能**跨过中间的列进行匹配如:`(last_name, date)`
+
+            ```sql
+            -- ??可以
+            EXPLAIN SELECT * FROM index_test
+            WHERE date = '1955-2-24'
+            AND last_name='Jobs'
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            | id | select_type | table      | type | possible_keys | key       | key_len | ref   | rows | Extra                    |
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            | 1  | SIMPLE      | index_test | ref  | last_name     | last_name | 203     | const | 1    | Using where; Using index |
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            ```
+
+- 范围匹配:
+
+    - 范围查询的字段可以用到联合索引，但是在范围查询字段的后面的字段无法用到联合索引
+
+        - 尽可能使用`IN()` 代替范围查询, `IN()` 是多个等值查询依然可以使用索引
+
+    - 联合索引`(a, b)`哪一个字段用到了联合索引的 B+Tree？
+
+        ```sql
+        explain select * from t_table where a > 1 and b = 2
+        ```
+
+        - 答案：只有 a 字段用到了联合索引进行索引查询，而 b 字段并没有使用到联合索引
+            - 执行计划中 key_len 知道这一点，在使用联合索引进行查询的时候，通过 key_len 我们可以知道优化器具体使用了多少个字段的搜索条件来形成扫描区间的边界条件。
+                - 举例个例子 a 和 b 都是 int 类型且不为 NULL 的字段，那么 Q1 这条查询语句执行计划如下，可以看到 key_len 为 4 字节（如果字段允许为 NULL，就在字段类型占用的字节数上加 1，也就是 5 字节），说明只有 a 字段用到了联合索引进行索引查询，而且可以看到，即使 b 字段没用到联合索引，key 为 idx_a_b，说明  Q1 查询语句使用了 idx_a_b 联合索引。
+
+    - 联合索引`(a, b)`哪一个字段用到了联合索引的 B+Tree？
+        ```sql
+        explain select * from t_table where a >= 1 and b = 2，
+        ```
+        - 答案：这条查询语句 a 和 b 字段都用到了联合索引进行索引查询
+            - 对于符合 a = 1 的二级索引记录的范围里，b 字段的值是「有序」的
+            - 我们也可以在执行计划中的 key_len 知道这一点。执行计划如下，可以看到 key_len 为 8 字节，说明优化器使用了 2 个字段的查询条件来形成扫描区间的边界条件，也就是  a 和 b 字段都用到了联合索引进行索引查询。
+
+    - 联合索引`(a, b)`哪一个字段用到了联合索引的 B+Tree？
+        ```sql
+        SELECT * FROM t_table WHERE a BETWEEN 2 AND 8 AND b = 2
+        ```
+        - 答案：这条查询语句 a 和 b 字段都用到了联合索引进行索引查询
+            - `a BETWEEN 2 AND 8` 的意思是查询 a 字段的值在 2 和 8 之间的记录。不同的数据库对 BETWEEN ... AND 处理方式是有差异的。在 MySQL 中，BETWEEN 包含了 value1 和 value2 边界值，类似于 >= and =<。而有的数据库则不包含 value1 和 value2 边界值（类似于 > and <）。
+            - 虽然 a 字段使用了 BETWEEN 进行范围查询，但是联合索引的最左匹配原则并没有在遇到 a 字段的范围查询（ BETWEEN）后就停止匹配了，b 字段还是可以用到了联合索引的。
+            - 我们也可以在执行计划中的 key_len 知道这一点。执行计划如下，可以看到 key_len 为 8 字节，说明优化器使用了 2 个字段的查询条件来形成扫描区间的边界条件，也就是  a 和 b 字段都用到了联合索引进行索引查询。
+
+    - 联合索引`(name, age)`哪一个字段用到了联合索引的 B+Tree？
+
+        ```sql
+        SELECT * FROM t_user WHERE name like 'j%' and age = 22
+        ```
+    - 答案：这条查询语句 name 和 age 字段都用到了联合索引进行索引查询
+        - 由于联合索引（二级索引）是先按照 name 字段的值排序的，所以前缀为 ‘j’ 的 name 字段的二级索引记录都是相邻的， 于是在进行索引扫描的时候，可以定位到符合前缀为 ‘j’ 的 name 字段的第一条记录，然后沿着记录所在的链表向后扫描，直到某条记录的 name 前缀不为 ‘j’  为止。
+
+            ![image](./Pictures/mysql/index_联合索引-范围查询.avif)
+
+        - 虽然在符合前缀为 ‘j’ 的 name 字段的二级索引记录的范围里，age 字段的值是「无序」的，但是对于符合 name = j 的二级索引记录的范围里，age字段的值是「有序」的（因为对于联合索引，是先按照 name 字段的值排序，然后在 name 字段的值相同的情况下，再按照 age 字段的值进行排序）。
+            - 于是，在确定需要扫描的二级索引的范围时，当二级索引记录的 name 字段值为 ‘j’ 时，可以通过 age = 22 条件减少需要扫描的二级索引记录范围（age 字段可以利用联合索引进行索引查询的意思）。也就是说，从符合 name = 'j' and age = 22 条件的第一条记录时开始扫描，而不需要从第一个 name 为 j 的记录开始扫描 。如下图的右边：
+            ![image](./Pictures/mysql/index_联合索引-范围查询1.avif)
+
+        - 我们也可以在执行计划中的 key_len 知道这一点。本次例子中：
+            - name 字段的类型是 varchar(30) 且不为 NULL，数据库表使用了 utf8mb4 字符集，一个字符集为 utf8mb4 的字符是 4 个字节，因此 name 字段的实际数据最多占用的存储空间长度是 120 字节（30 x 4），然后因为 name 是变长类型的字段，需要再加 2 字节（用于存储该字段实际数据的长度值），也就是 name 的 key_len 为 122。
+            - age 字段的类型是 int 且不为 NULL，key_len 为 4。
+
+- 排序匹配:
+
+    - 1.和上面例子一样适用于最左匹配和范围匹配原则:
+
+        ```sql
+        EXPLAIN SELECT last_name FROM index_test
+        ORDER BY last_name, first_name, date;
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        | id | select_type | table      | type  | possible_keys | key       | key_len | ref    | rows | Extra       |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        | 1  | SIMPLE      | index_test | index | <null>        | last_name | 410     | <null> | 2    | Using index |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        ```
+
+        - 列的顺序可以从where子句开始:
+            ```sql
+            EXPLAIN SELECT last_name FROM index_test
+            WHERE last_name = 'Jobs'
+            ORDER BY first_name, date;
+
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            | id | select_type | table      | type | possible_keys | key       | key_len | ref   | rows | Extra                    |
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            | 1  | SIMPLE      | index_test | ref  | last_name     | last_name | 203     | const | 1    | Using where; Using index |
+            +----+-------------+------------+------+---------------+-----------+---------+-------+------+--------------------------+
+            ```
+
+    - 2.降序`desc`, 依然能使用索引:
+        ```sql
+        EXPLAIN SELECT last_name from index_test
+        ORDER BY last_name DESC, first_name DESC, date DESC;
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        | id | select_type | table      | type  | possible_keys | key       | key_len | ref    | rows | Extra       |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        | 1  | SIMPLE      | index_test | index | <null>        | last_name | 410     | <null> | 2    | Using index |
+        +----+-------------+------------+-------+---------------+-----------+---------+--------+------+-------------+
+        ```
+
+        - 但如果有两种不同排序方向, 则不能使用索引:
+
+            - Extra字段为`Using filesort`:表示不能使用索引, 需要自己排序, 数据量小则会在内存, 大则会在磁盘
+                - 排序是成本很高的操作, 尽量避免对大量数据排序
+
+            ```sql
+            EXPLAIN SELECT last_name FROM index_test
+            ORDER BY last_name ASC, first_name ASC, date DESC\G;
+            -- 两条语句一样
+            EXPLAIN SELECT last_name FROM index_test
+            ORDER BY last_name, first_name, date DESC\G;
+
+            ***************************[ 1. row ]***************************
+            id            | 1
+            select_type   | SIMPLE
+            table         | index_test
+            type          | index
+            possible_keys | <null>
+            key           | last_name
+            key_len       | 410
+            ref           | <null>
+            rows          | 2
+            Extra         | Using index; Using filesort
+            ```
+
+
+##### 索引下推（Using index condition）
+
+- 现在我们知道，对于联合索引`(a, b)`，在执行 `select * from table where a > 1 and b = 2` 语句的时候，只有 a 字段能用到索引，那在联合索引的 B+Tree 找到第一个满足条件的主键值（ID 为 2）后，还需要判断其他条件是否满足（看 b 是否等于 2），那是在联合索引里判断？还是回主键索引去判断呢？
+
+    - 在 MySQL 5.6 之前，只能从 ID2 （主键值）开始一个个回表，到「主键索引」上找出数据行，再对比 b 字段值。
+
+    - 而 MySQL 5.6 引入的索引下推优化（index condition pushdown)， 可以在联合索引遍历过程中，对联合索引中包含的字段先做判断，直接过滤掉不满足条件的记录，减少回表次数。
+
+- 当你的查询语句的`explain`执行计划里，出现了  `Extra` 为 `Using index condition`，那么说明使用了索引下推的优化。
+
+### 索引优化
+
+- 几种常见优化索引的方法：
+    - 主键索引最好是自增的
+    - 前缀索引优化
+    - 覆盖索引优化
+    - 索引最好设置为 `NOT NULL`
+    - 防止索引失效
+
+- 前缀索引优化：
+
+    - 优点：使用前缀索引是为了减小索引字段大小，可以增加一个索引页中存储的索引值，有效提高索引的查询速度。在一些大字符串的字段作为索引时，使用前缀索引可以帮助我们减小索引项的大小。
+
+    - 缺点：
+        - order by 就无法使用前缀索引；
+        - 无法把前缀索引用作覆盖索引；
+
+- 覆盖索引优化
+
+    - 覆盖索引是指 SQL 中 query 的所有字段，在索引 B+Tree  的叶子节点上都能找得到的那些索引，从二级索引中查询得到记录，而**不需要通过聚簇索引查询获得**，可以避免回表的操作。
+
+    - 假设我们只需要查询商品的名称、价格，有什么方式可以避免回表呢？
+        - 我们可以建立一个联合索引，即「商品ID、名称、价格」作为一个联合索引。如果索引中存在这些数据，查询将不会再次检索主键索引，从而避免回表。
+
+    - 所以，使用覆盖索引的好处就是，不需要查询出包含整行记录的所有信息，也就减少了大量的 I/O 操作。
+
+- 索引最好设置为 `NOT NULL`
+    - 1.索引列存在 NULL 就会导致优化器在做索引选择的时候更加复杂，更加难以优化，因为可为 NULL 的列会使索引、索引统计和值比较都更复杂，比如进行索引统计时，count 会省略值为NULL 的行。
+    - 2.NULL 值是一个没意义的值，但是它会占用物理空间，所以会带来的存储空间的问题，因为 InnoDB 存储记录的时候，如果表中存在允许为 NULL 的字段，那么行格式  (opens new window)中至少会用 1 字节空间存储 NULL 值列表，如下图的紫色部分：
+
+#### 主键设计原则
 
 - 表的主键指的针对一张表中的一列或者多列，其结果必须能标识表中每行记录的唯一性。InnoDB 表是索引组织表，主键既是数据也是索引。
 
@@ -5945,6 +7222,291 @@ SELECT * FROM demo_table WHERE c1 = 5 AND c2 = 10;
             +--------------------+----+
             ```
 
+#### 前缀索引
+
+- 有时，你可能会遇到需要索引长列的情况，从而使索引变得非常大。在这些情况下，你还可以索引列的前几个字符，而不是索引整个值——这样的索引称为前缀索引。
+
+- 对于过长的值, 可以建立前缀索引
+
+    - 一个数据表的 x_name 值都是类似 23213223.434323.4543.4543.34324.可以只取前7位`alter table table1 add key (x_name(7))`
+
+- 无法使用`ORDER BY`, `GROUP BY`, 以及覆盖查询
+
+- 后缀索引(suffix index):像电子邮件这类值比较有效. 但mysql不支持后缀, 可以把字符串反转后, 再建立前缀索引
+
+- 索引选择性:不重复的索引值,和表总数的比例. 唯一性索引的选择性是1, 性能最好
+
+- 假设要建立cnarea_2019表的name列索引:
+
+    - 查看选择性:
+    ```sql
+    SELECT COUNT(DISTINCT name) / COUNT(*) FROM cnarea_2019;
+
+    +---------------------------------+
+    | COUNT(DISTINCT name) / COUNT(*) |
+    +---------------------------------+
+    | 0.6138 |
+    +---------------------------------+
+    ```
+
+    - 查看不同前缀长度的选择性
+    ```sql
+    SELECT
+    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel3,
+    COUNT(DISTINCT LEFT(name, 4)) / COUNT(*) AS sel4,
+    COUNT(DISTINCT LEFT(name, 5)) / COUNT(*) AS sel5,
+    COUNT(DISTINCT LEFT(name, 6)) / COUNT(*) AS sel6,
+    COUNT(DISTINCT LEFT(name, 7)) / COUNT(*) AS sel7,
+    COUNT(DISTINCT LEFT(name, 8)) / COUNT(*) AS sel8,
+    COUNT(DISTINCT LEFT(name, 9)) / COUNT(*) AS sel9,
+    COUNT(DISTINCT LEFT(name, 10)) / COUNT(*) AS sel10,
+    COUNT(DISTINCT LEFT(name, 11)) / COUNT(*) AS sel11,
+    COUNT(DISTINCT LEFT(name, 12)) / COUNT(*) AS sel12
+    FROM cnarea_2019;
+
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    | sel3 | sel4 | sel5 | sel6 | sel7 | sel8 | sel9 | sel10 | sel11 | sel12 |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    | 0.5271 | 0.5271 | 0.5662 | 0.5866 | 0.5981 | 0.6057 | 0.6095 | 0.6119 | 0.6128 | 0.6133 |
+    +--------+--------+--------+--------+--------+--------+--------+--------+--------+--------+
+    ```
+
+    - 查看当前缀为8时, 最频繁出现的次数
+    ```sql
+    SELECT COUNT(*) AS cnt, LEFT(name, 8) FROM cnarea_2019
+    GROUP BY name
+    ORDER BY cnt DESC
+    LIMIT 10;
+
+    +-----+---------------+
+    | cnt | LEFT(name, 8) |
+    +-----+---------------+
+    | 358 | 和平村委会 |
+    | 333 | 张庄村委会 |
+    | 328 | 团结村委会 |
+    | 321 | 王庄村委会 |
+    | 305 | 太平村委会 |
+    | 281 | 市辖区     |
+    | 274 | 胜利村委会 |
+    | 265 | 新民村委会 |
+    | 264 | 新庄村委会 |
+    | 261 | 红星村委会 |
+    +-----+---------------+
+    ```
+
+    - 到达8后选择性的提升已经很小了, 因此建立长度为8的索引
+
+        ```sql
+        ALTER TABLE cnarea_2019 ADD KEY (name(8));
+        ```
+
+
+
+#### 覆盖索引
+
+- 覆盖索引:索引包含查询所需的字段值
+
+    - 能提升性能, 无需回表
+
+        - 如果索引不能覆盖查询所有列, 需要每扫描一条索引记录后, 回表查询对应的行, 基本是随机io
+
+    - 因此必须存储字段值, 想hash, 空间, 全文索引都不能存储字段值
+
+- 通过`EXPLAIN`命令Extra字段为`Using index` 就是覆盖索引:
+
+    - 注意:type字段的`index` , 说明使用了索引扫描排序.[跳转至type字段说明](#explain-type)
+
+    ```sql
+    CREATE table index1_test (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(10)
+    );
+
+    INSERT INTO index1_test(name) VALUES ('one'), ('two');
+
+    EXPLAIN SELECT id FROM index1_test\G;
+    ***************************[ 1. row ]***************************
+    id            | 1
+    select_type   | SIMPLE
+    table         | index1_test
+    type          | index
+    possible_keys | <null>
+    key           | PRIMARY
+    key_len       | 4
+    ref           | <null>
+    rows          | 2
+    Extra         | Using index
+    ```
+
+- 通过`EXPLAIN`命令Extra字段为`Using where`表示没有使用索引:
+
+    ```sql
+    EXPLAIN SELECT name FROM index1_test
+    WHERE name = 'one'\G;
+    ***************************[ 1. row ]***************************
+    id            | 1
+    select_type   | SIMPLE
+    table         | index1_test
+    type          | ALL
+    possible_keys | <null>
+    key           | <null>
+    key_len       | <null>
+    ref           | <null>
+    rows          | 2
+    Extra         | Using where
+    ```
+
+    - 通过子查询查找id, 即第一阶段使用覆盖索引.这叫作延迟关联(deferred join)
+        ```sql
+        SELECT * FROM index1_test
+        JOIN (SELECT id FROM index1_test) as id
+        ON (index1_test.id = id.id);
+
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | index
+        possible_keys | PRIMARY
+        key           | PRIMARY
+        key_len       | 4
+        ref           | <null>
+        rows          | 2
+        Extra         | Using index
+        ***************************[ 2. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | ALL
+        possible_keys | PRIMARY
+        key           | <null>
+        key_len       | <null>
+        ref           | <null>
+        rows          | 2
+        Extra         | Using where; Using join buffer (flat, BNL join)
+        ```
+
+    - 创建二级索引后在查询:
+        ```sql
+        ALTER TABLE index1_test ADD INDEX name(name);
+
+        EXPLAIN SELECT name FROM index1_test
+        WHERE name = 'one'\G;
+        ***************************[ 1. row ]***************************
+        id            | 1
+        select_type   | SIMPLE
+        table         | index1_test
+        type          | ref
+        possible_keys | name
+        key           | name
+        key_len       | 43
+        ref           | const
+        rows          | 1
+        Extra         | Using where; Using index
+        ```
+
+        ```sql
+        MariaDB root@(none):china> explain select id from index1_test order by name,id
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+        | id | select_type | table       | type  | possible_keys | key  | key_len | ref    | rows | Extra       |
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+        | 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index |
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-------------+
+
+        1 row in set
+        Time: 0.005s
+        MariaDB root@(none):china> explain select id from index1_test order by id,name
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+        | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra
+                      |
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+        | 1  | SIMPLE      | index1_test | index | <null>        | name | 43      | <null> | 2    | Using index; Using filesort |
+        +----+-------------+-------------+-------+---------------+------+---------+--------+------+-----------------------------+
+
+        ```
+
+#### 防止索引失效
+
+- 这里简单说一下，发生索引失效的情况：
+
+    - 1.当我们使用左或者左右模糊匹配的时候，也就是 `like %xx` 或者 `like %xx%`这两种方式都会造成索引失效；
+
+        ```sql
+        -- name 字段为二级索引
+        select * from t_user where name like '%林';
+        ```
+
+        - 因为索引 B+ 树是按照「索引值」有序排列存储的，只能根据前缀进行比较。
+
+    - 2.当我们在查询条件中对索引列做了`计算`、`函数`、`类型转换`，这些情况下都会造成索引失效；
+
+        - `函数`：对索引字段使用函数，就会导致索引失效。
+
+            ```sql
+            -- name 为二级索引
+            select * from t_user where length(name)=6;
+            ```
+
+            - 因为索引保存的是索引字段的原始值，而不是经过函数计算后的值，自然就没办法走索引了。
+
+            - 不过，从 MySQL 8.0 开始，索引特性增加了函数索引，即可以针对函数计算后的值建立一个索引，也就是说该索引的值是函数计算后的值，所以就可以通过扫描索引来查询数据。
+            - 例子：我通过下面这条语句，对 `length(name)` 的计算结果建立一个名为 `idx_name_length` 的索引。
+
+                ```sql
+                alter table t_user add key idx_name_length ((length(name)));
+                ```
+
+        - `计算`：在查询条件中对索引进行`表达式计算`，也是无法走索引的。
+
+            ```sql
+            explain select * from t_user where id + 1 = 10;
+            ```
+
+            - 因为索引保存的是索引字段的原始值，而不是 id + 1 表达式计算后的值，所以无法走索引，只能通过把索引字段的取值都取出来，然后依次进行表达式的计算来进行条件判断，因此采用的就是全表扫描的方式。
+
+        - `隐式转换`：如果索引字段是字符串类型，但是在条件查询中，输入的参数是整型的话。
+            - 1.MySQL 的数据类型转换规则：字符串和数字比较的时候，会自动把字符串转为数字，然后再进行比较
+
+                ```sql
+                -- phone数据类型为varchar
+                select * from t_user where phone = 1300000001;
+                ```
+
+                - phone 字段为字符串，会自动把字符串转为数字，所以这条语句相当于：
+
+                    - CAST 函数是作用在了 phone 字段，而 phone 字段是索引，也就是对索引使用了函数！而前面我们也说了，**对索引使用函数是会导致索引失效的**
+
+                    ```sql
+                    select * from t_user where CAST(phone AS signed int) = 1300000001;
+                    ```
+
+            - 2.但是如果索引字段是整型类型，查询条件中的输入参数即使字符串，是**不会导致索引失效**，还是可以走索引扫描。
+
+                ```sql
+                -- id类型为int
+                explain select * from t_user where id = '1';
+                ```
+
+                - 这时因为字符串部分是输入参数，也就需要将字符串转为数字，所以这条语句相当于：
+
+                    - 可以看到，索引字段并没有用任何函数，CAST 函数是用在了输入参数，因此是可以走索引扫描的。
+
+                    ```sql
+                    select * from t_user where id = CAST("1" AS signed int);
+                    ```
+
+    - 3.联合索引要能正确使用需要遵循最左匹配原则，也就是按照最左优先的方式进行索引的匹配，否则就会导致索引失效。
+
+    - 4.在 `WHERE` 子句中，如果在 `OR` 前的条件列是索引列，而在 `OR` 后的条件列不是索引列，那么索引会失效。
+
+        ```sql
+        -- id 是主键，age 是普通列，从执行计划的结果看，是走了全表扫描。
+        select * from t_user where id = 1 or age = 18;
+        ```
+
+        - 解决办法：将 age 字段设置为索引即可
+            - 可以看到 type=index merge， index merge 的意思就是对 id 和 age 分别进行了扫描，然后将这两个结果集进行了合并，这样做的好处就是避免了全表扫描。
+
 ## DCL (Data Control Language) 数据控制语言
 
 - `GRANT`：授权用户或其他角色访问数据库对象或执行特定操作的权限。
@@ -5971,110 +7533,214 @@ SELECT * FROM demo_table WHERE c1 = 5 AND c2 = 10;
 ### GRANT 用户权限设置
 
 > ```sql
-> # 创建用户
+> -- 创建用户
 > CREATE USER 'username'@'host' IDENTIFIED BY 'password';
 >
-> # 授权
+> -- 授权
 > GRANT privileges ON databasename.tablename TO 'username'@'host'
 >
-> # 撤销权限
+> -- 撤销权限
 > REVOKE privileges ON databasename.tablename FROM 'username'@'host'
 > ```
 
 - 用户
-```sql
-# 查看所有用户
-SELECT user,host FROM mysql.user;
+    ```sql
+    -- 查看所有用户
+    SELECT user,host FROM mysql.user;
 
-# 详细查看所有用户
-SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';')
-AS query FROM mysql.user;
+    -- 详细查看所有用户
+    SELECT DISTINCT CONCAT('User: ''',user,'''@''',host,''';')
+    AS query FROM mysql.user;
 
-# 创建用户名为tz的用户，并设置密码
-create user 'tz'@'127.0.0.1'
-identified by 'YouPassword';
-# 创建用户名为tz的用户，密码为空
-create user 'tz'@'127.0.0.1';
-# 创建用户名为tz的用户，密码为空，并且运行所有ip地址
-create user 'tz'@'%';
+    -- 创建用户名为tz的用户，并设置密码
+    create user 'tz'@'127.0.0.1'
+    identified by 'YouPassword';
+    -- 创建用户名为tz的用户，密码为空
+    create user 'tz'@'127.0.0.1';
+    -- 创建用户名为tz的用户，密码为空，并且运行所有ip地址
+    create user 'tz'@'%';
 
-# 修改后。需要刷新
-FLUSH PRIVILEGES;
+    -- 修改后。需要刷新
+    FLUSH PRIVILEGES;
 
-# 删除用户
-DROP USER 'tz'@'127.0.0.1' identified by '12345678';
-DROP USER 'tz'@'127.0.0.1';
+    -- 删除用户
+    DROP USER 'tz'@'127.0.0.1' identified by '12345678';
+    DROP USER 'tz'@'127.0.0.1';
 
-# 当前用户修改密码的命令
-SET PASSWORD = PASSWORD("NewPassword");
+    -- 当前用户修改密码的命令
+    SET PASSWORD = PASSWORD("NewPassword");
 
-# 修改密码
-SET PASSWORD FOR 'tz'@'127.0.0.1' = PASSWORD('NewPassword');
-```
+    -- 修改密码
+    SET PASSWORD FOR 'tz'@'127.0.0.1' = PASSWORD('NewPassword');
+    ```
 
 - GRANT (授权)
-```sql
-# 设置只能 select china.cnarea_2019
-GRANT SELECT ON china.cnarea_2019 TO 'tz'@'127.0.0.1' IDENTIFIED BY 'YourPassword';
+    ```sql
+    -- 设置只能 select china.cnarea_2019
+    GRANT SELECT ON china.cnarea_2019 TO 'tz'@'127.0.0.1' IDENTIFIED BY 'YourPassword';
 
-# 修改权限后。需要刷新权限
-FLUSH PRIVILEGES;
+    -- 修改权限后。需要刷新权限
+    FLUSH PRIVILEGES;
 
-# 查看tz用户的权限。注意127.0.0.1和localhost是不同的
-SHOW GRANTS FOR 'tz'@'127.0.0.1';
-SHOW GRANTS FOR 'tz'@'localhost';
+    -- 查看tz用户的权限。注意127.0.0.1和localhost是不同的
+    SHOW GRANTS FOR 'tz'@'127.0.0.1';
+    SHOW GRANTS FOR 'tz'@'localhost';
 
-# 添加 insert 和 china所有表的权限
-grant select,insert on china.* to 'tz'@'127.0.0.1' identified by "YouPassword";
+    -- 添加 insert 和 china所有表的权限
+    grant select,insert on china.* to 'tz'@'127.0.0.1' identified by "YouPassword";
 
-# 添加所有数据库和表的权限
-grant all PRIVILEGES on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
-# 或者。2条命令等价
-grant all on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
+    -- 添加所有数据库和表的权限。这样做会有风险，具体看下面的MySQL 授权表运维注意事项
+    grant all PRIVILEGES on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
+    -- 或者。2条命令等价
+    grant all on *.* to 'tz'@'127.0.0.1' identified by "YouPassword";
 
-# 允许tz 用户授权于别的用户
-grant all on *.* to 'tz'@'127.0.0.1' with grant option identified by "YouPassword";
-```
+    -- 允许tz 用户授权于别的用户
+    grant all on *.* to 'tz'@'127.0.0.1' with grant option identified by "YouPassword";
+    ```
 
 - revoke (撤销):
-```sql
-revoke all privileges on *.* from 'tz'@'127.0.0.1';
-revoke grant option on *.* from 'tz'@'127.0.0.1';
+    ```sql
+    revoke all privileges on *.* from 'tz'@'127.0.0.1';
+    revoke grant option on *.* from 'tz'@'127.0.0.1';
 
-+-----------------------------------------------------------+
-| Grants for tz@127.0.0.1                                   |
-+-----------------------------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
-| GRANT SELECT, INSERT ON `china`.* TO `tz`@`127.0.0.1`     |
-| GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
-+-----------------------------------------------------------+
+    +-----------------------------------------------------------+
+    | Grants for tz@127.0.0.1                                   |
+    +-----------------------------------------------------------+
+    | GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
+    | GRANT SELECT, INSERT ON `china`.* TO `tz`@`127.0.0.1`     |
+    | GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
+    +-----------------------------------------------------------+
 
-revoke select, insert on china.* from 'tz'@'127.0.0.1';
+    revoke select, insert on china.* from 'tz'@'127.0.0.1';
 
-+-----------------------------------------------------------+
-| Grants for tz@127.0.0.1                                   |
-+-----------------------------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
-| GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
-+-----------------------------------------------------------+
+    +-----------------------------------------------------------+
+    | Grants for tz@127.0.0.1                                   |
+    +-----------------------------------------------------------+
+    | GRANT USAGE ON *.* TO `tz`@`127.0.0.1`                    |
+    | GRANT SELECT ON `china`.`cnarea_2019` TO `tz`@`127.0.0.1` |
+    +-----------------------------------------------------------+
 
-revoke select on china.cnarea_2019 from 'tz'@'127.0.0.1';
+    revoke select on china.cnarea_2019 from 'tz'@'127.0.0.1';
 
-+----------------------------------------+
-| Grants for tz@127.0.0.1                |
-+----------------------------------------+
-| GRANT USAGE ON *.* TO `tz`@`127.0.0.1` |
-+----------------------------------------+
+    +----------------------------------------+
+    | Grants for tz@127.0.0.1                |
+    +----------------------------------------+
+    | GRANT USAGE ON *.* TO `tz`@`127.0.0.1` |
+    +----------------------------------------+
 
-# 刷新权限
-FLUSH PRIVILEGES;
+    -- 刷新权限
+    FLUSH PRIVILEGES;
 
-# 删除用户
-drop user 'tz'@'127.0.0.1';
-```
+    -- 删除用户
+    drop user 'tz'@'127.0.0.1';
+    ```
 
 <span id="user"></span>
 
+#### [爱可生开源社区：技术分享 | MySQL 授权表运维注意事项](https://mp.weixin.qq.com/s/gqD_2AlH8fifDKmTduqenQ)
+
+- 我们在做权限授权时需要给到应用用户增删改查权限，比如下面的授权语句。这样的好处是当实例创建多个业务库时，无需再次给新的业务库授权，该权限默认对所有库有增删改查权限，主打一个方便
+    - 但实际这种授权方式会带来较大的权限风险，甚至导致数据库被攻击破坏。
+
+    ```sql
+    create user 'app'@'%' identified by 'app';
+    grant select,update,delete,insert on *.* to 'app'@'%';
+    ```
+
+- 我们基于以上的授权来做一个业务用户 提权（自己给自己增加额外的权限）操作
+
+    - 场景1：管理用户触发 `flush privileges` 刷新内存授权表触发提权。
+
+        - app 用户给自己提权。这里 `update` 成功了，但由于缺少 reload 或 super 权限，导致刷新到内存中失败了。
+            ```sql
+            update mysql.user set Select_priv='Y',Insert_priv='Y',Update_priv='Y',Delete_priv='Y',Create_priv='Y',Drop_priv='Y',Reload_priv='Y',Shutdown_priv='Y',Process_priv='Y',File_priv='Y',Grant_priv='Y',References_priv='Y',Index_priv='Y',Alter_priv='Y',Show_db_priv='Y',Super_priv='Y',Lock_tables_priv='Y' where user='app' and host='%';
+            Query OK, 1 row affected (0.01 sec)
+            Rows matched: 1  Changed: 1  Warnings: 0
+
+            flush privileges;
+            ERROR 1227 (42000): Access denied; you need (at least one of) the RELOAD privilege(s) for this operation
+            ```
+
+        - 某天 root 用户做了个 flush privileges 操作
+            ```sql
+            flush privileges;
+            Query OK, 0 rows affected (0.00 sec)
+            ```
+
+        - app 用户重新登录数据库查看自己的权限，提权成功。
+            ```sql
+            show grants\G
+            *************************** 1. row ***************************
+            Grants for app@%: GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, LOCK TABLES ON . TO app@% WITH GRANT OPTION
+            1 row in set (0.00 sec)
+            ```
+
+    - 场景2：重启数据库重新加载授权表到内存触发提权。
+
+        - app 用户给自己提权，这里 `update` 成功了，但由于缺少 reload 或 super 权限，导致刷新到内存中失败了
+            ```sql
+            update mysql.user set Select_priv='Y',Insert_priv='Y',Update_priv='Y',Delete_priv='Y',Create_priv='Y',Drop_priv='Y',Reload_priv='Y',Shutdown_priv='Y',Process_priv='Y',File_priv='Y',Grant_priv='Y',References_priv='Y',Index_priv='Y',Alter_priv='Y',Show_db_priv='Y',Super_priv='Y',Lock_tables_priv='Y' where user='app' and host='%';
+            Query OK, 1 row affected (0.01 sec)
+            Rows matched: 1  Changed: 1  Warnings: 0
+            ```
+
+            ```sql
+            flush privileges;
+            ERROR 1227 (42000): Access denied; you need (at least one of) the RELOAD privilege(s) for this operation
+            ```
+
+        - 重启数据库
+            ```sql
+            restart;
+            Query OK, 0 rows affected (0.00 sec)
+            ```
+
+        - app 用户重新登录数据库查看自己的权限，提权成功。
+            ```sql
+            show grants\G
+            *************************** 1. row ***************************
+            Grants for app@%: GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, LOCK TABLES ON . TO app@% WITH GRANT OPTION
+            1 row in set (0.00 sec)
+            ```
+
+- 场景总结
+
+    - 给普通用户授予 MySQL 鉴权相关表的权限均会带来风险
+        - 备注：鉴权表除了 `user` 表，还包括 `db`、`columns_priv`、`tables_priv`、`procs_priv`、proxies_priv 表。
+            - 即使只对鉴权表授予只读权限，如 `user` 表，也会被获取到 `authentication_string` 字段的密文串，通过其他方式做密码库匹配破解。
+
+    - 曾经遇到过一个场景，普通用户仅有 `user` 的查询权限，其通过查询该表信息发现 root@localhost 用户密码为空，于是直接用 root 用户访问数据库，类似于进行了提权操作。
+
+- 规避方式
+    - 不要对非管理员用户授予任何鉴权表的访问权限，即使是只读权限。
+    授权遵循最小权限原则。
+    - MySQL 8.0 增加了回收部分权限的参数 `partial_revokes`，可单独将 mysql 库的权限回收。示例如下
+
+    ```sql
+    -- 创建app用户并授予所有数据库增删改查权限
+    create user 'app'@'%' identified by 'app';
+    grant select,update,delete,insert on *.* to 'app'@'%';
+
+    -- 开启部分权限回收的参数
+    set global partial_revokes=on;
+
+    -- 单独回收app用户对mysql库的权限
+    revoke select,update,delete,insert on mysql.* from 'app'@'%';
+
+    -- 查看当前app用户的授权信息
+    -- 这里的权限是以交集的形式存在，必须两者都满足
+    show grants for app;
+    +-------------------------------------------------------------------+
+    | Grants for app@%                                                  |
+    +-------------------------------------------------------------------+
+    | GRANT SELECT, INSERT, UPDATE, DELETE ON *.* TO `app`@`%`          |
+    | REVOKE SELECT, INSERT, UPDATE, DELETE ON `mysql`.* FROM `app`@`%` |
+    +-------------------------------------------------------------------+
+
+    -- 以app用户登录数据库访问mysql.user表，报错无权限
+    mysql> select user,host from mysql.user;
+    ERROR 1142 (42000): SELECT command denied to user 'app'@'127.0.0.1' for table 'user'
+    ```
 #### 设置权限允许远程的ip连接mysql
 
 **语法:**
@@ -6085,24 +7751,24 @@ drop user 'tz'@'127.0.0.1';
 
 ```sql
 
-# 允许root从'192.168.100.208'主机china库下的所有表(WITH GRANT OPTION表示有修改权限的权限)
+-- 允许root从'192.168.100.208'主机china库下的所有表(WITH GRANT OPTION表示有修改权限的权限)
 grant all PRIVILEGES on china.* to
 'root'@'192.168.100.208'
 identified by 'YouPassword'
 WITH GRANT OPTION;
 
-# 允许root从'192.168.100.208'主机china库下的cnarea_2019表
+-- 允许root从'192.168.100.208'主机china库下的cnarea_2019表
 grant all PRIVILEGES on china.cnarea_2019 to
 'root'@'%'
 identified by 'YouPassword'
 WITH GRANT OPTION;
 
-# 允许所有用户连接所有库下的所有表(%:表示通配符)
+-- 允许所有用户连接所有库下的所有表(%:表示通配符)
 grant all PRIVILEGES on *.* to
 'root'@'%' identified by 'YouPassword'
 WITH GRANT OPTION;
 
-# 刷新权限
+-- 刷新权限
 FLUSH PRIVILEGES;
 ```
 
@@ -6114,21 +7780,21 @@ iptables -F
 mysql -u root -p 'YouPassword' -h 192.168.100.208
 ```
 
-### 配置(varibles)操作
+### varibles（变量）
 
 - 注意`variables` 的修改,永久保存要写入`/etc/my.cnf`
   [详细配置说明](https://github.com/jaywcjlove/mysql-tutorial/blob/master/chapter2/2.6.md#%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%86%85%E5%AE%B9)
 
 ```sql
-# 查看配置(变量)
+-- 查看配置(变量)
 show variables;
 
-# 查看指定变量
+-- 查看指定变量
 show variables like 'max_connections';
-# 或者
+-- 或者
 select @@max_connections
 
-# 查看字段前面包含max_connect的配置(通配符%)
+-- 查看字段前面包含max_connect的配置(通配符%)
 show variables like 'max_connect%';
 +--------------------+-------+
 | Variable_name      | Value |
@@ -6137,37 +7803,64 @@ show variables like 'max_connect%';
 | max_connections    | 151   |
 +--------------------+-------+
 
-# 设置自定义变量(重启后失效)
+-- 设置自定义变量(重启后失效)
 set @val = 1;
-# 查看刚才的变量
+-- 查看刚才的变量
 select @val;
 
-# 修改会话变量,该值将在会话内保持有效(重启后失效)
+-- 修改会话变量,该值将在会话内保持有效(重启后失效)
 set session sql_mode = 'TRADITIONAL';
 
-# 通过 select 查看
+-- 通过 select 查看
 select @@session.sql_mode;
-# 或者
+-- 或者
 show variables like 'sql_mode';
 
-# 修改全局变量, 仅影响更改后连接的客户端的相应会话值.(重启后失效)
+-- 修改全局变量, 仅影响更改后连接的客户端的相应会话值.(重启后失效)
 set global max_connect_errors=1000;
 
-# 通过 select 查看
+-- 通过 select 查看
 select @@global.max_connect_errors;
-# 或者
+-- 或者
 show variables like 'max_connect_errors';
 
-# 永久保存,要写入/etc/my.cnf
+-- 永久保存,要写入/etc/my.cnf
 echo "max_connect_errors=1000" >> /etc/my.cnf
 ```
 
-[mysql 的 sql_mode 合理设置](http://xstarcd.github.io/wiki/MySQL/MySQL-sql-mode.html)
+#### sql_mode
 
+- [技术分享 | 深入理解 MySQL 中的 SQL_MODE](https://mp.weixin.qq.com/s/8xeMxmPjcLOEw0ER80hJ-A)
 
-## TCL（Transaction Control Language）事务控制语言
+## TCL（Transaction Control Language）事务
 
 - TCL是事务控制语言，主要用来控制事务。例如：BEGIN、COMMIT、ROLLBACK等语句。
+
+- MYSQL事务分为
+
+    - 1.隐式事务
+        - 比如insert、update、delete语句，事务的开启、提交或回滚由mysql内部自动控制的，事务自动开启、提交或回滚。
+        - 因此一条SQL没有begin开启事务和Commit提交事务，也能自己提交事务
+
+    - 2.显示事务
+
+        - 显式事务是指在应用程序中明确指定事务的开始和结束，使用BEGIN、COMMIT和ROLLBACK语句来控制事务的执行，语法如下：
+
+            ```sql
+            BEGIN;
+            -- SQL statements
+            COMMIT;
+           ```
+
+    - `autocommit`为`ON`表示隐式事务开启了自动提交
+        ```sql
+        show variables like 'autocommit'
+        +---------------+-------+
+        | Variable_name | Value |
+        +---------------+-------+
+        | autocommit    | ON    |
+        +---------------+-------+
+        ```
 
 | 事务sql语句   | 操作           |
 | ------------- | -------------- |
@@ -6218,21 +7911,21 @@ flush table clone
 - `RELEASE SAVEPOINT savepoint_name;` // 删除指定保留点
 
 ```sql
-# 创建数据库
+-- 创建数据库
 create table tz (
     id int (8),
     name varchar(50),
     date DATE
 );
 
-# 声明一个名叫 abc 的事务保存点
+-- 声明一个名叫 abc 的事务保存点
 savepoint abc;
 
-# 插入数据
+-- 插入数据
 insert into tz (id,name,date) values
 (1,'tz','2020-10-24');
 
-# 回滚到 abc 事务保存点
+-- 回滚到 abc 事务保存点
 rollback to abc;
 ```
 
@@ -6463,250 +8156,132 @@ SELECT INET_ATON('192.168.172.3'); 3232279555 SELECT INET_NTOA(3232279555); 192.
 - 【强制】线上数据库的变更操作必须提供对应的回滚方案
 - 【强制】批量清洗数据，需要开发和DBA共同进行审查，应避开业务高峰期时段执行，并在执行过程中观察服务状态
 - 【强制】数据订正如删除和修改记录时，要先 select ，确认无误才能执行更新语句，避免出现误删除
-### EXPLAIN
-
-- [MySQL数据库联盟：一文搞懂MySQL执行计划](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485161&idx=1&sn=8952815f9fae79edfcb6da57ecf60c38&chksm=e84063a0df37eab6b035f2c59284fe48b79272327f6bf02efeecd2f9ff63e9353123fff11bda&cur_album_id=3234198021790154762&scene=190#rd)
-
-- ChatGPT并不能完全正确的优化，或者ChatGPT优化的SQL，需要我们再去校验，这个时候就需要用到执行计划的基本功了。
-
-- 我们重点关注的点如下：
-    - 1.使用全表扫描，性能最差，即type="ALL"
-    - 2.扫描行数过多，即rows>阈值
-    - 3.查询时使用了排序操作，也比较耗时，即Extra包含"Using filesort"
-    - 4.索引类型为index，代表全盘扫描了索引的数据，Extra信息为Using where，代表要搜索的列没有被索引覆盖，需要回表，性能较差。
-    - 以上几点都可能造成SQL性能的劣化，是我们需要额外关注的高风险sql。
-
-```sql
-EXPLAIN SELECT * FROM t1 WHERE b=100;\G
-+----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-| id | select_type | table | type | possible_keys | key   | key_len | ref   | rows | Extra |
-+----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-| 1  | SIMPLE      | t1    | ref  | idx_b         | idx_b | 5       | const | 1    |       |
-+----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-```
-
-- Explain的结果各字段解释
-
-    - 加粗的列为需要重点关注的项。
-
-    | 列名            | 解释                                                                                                      |
-    |-----------------|-----------------------------------------------------------------------------------------------------------|
-    | id              | 查询编号                                                                                                  |
-    | **select_type** | 查询类型：显示本行是简单还是复杂查询                                                                      |
-    | table           | 涉及到的表                                                                                                |
-    | partitions      | 匹配的分区：查询将匹配记录所在的分区。仅当使用 partition 关键字时才显示该列。对于非分区表，该值为 NULL。 |
-    | **type**        | 本次查询的表连接类型                                                                                      |
-    | possible_keys   | 可能选择的索引                                                                                            |
-    | **key**         | 实际选择的索引                                                                                            |
-    | **key_len**     | 被选择的索引长度：一般用于判断联合索引有多少列被选择了                                                    |
-    | ref             | 与索引比较的列                                                                                            |
-    | **rows**        | 预计需要扫描的行数，对InnoDB来说，这个值是估值，并不一定准确                                              |
-    | filtered        | 按条件筛选的行的百分比                                                                                    |
-    | **Extra**       | 附加信息                                                                                                  |
-- select_type各种值的解释
-
-    | select_type 的值     | 解释                                                        |
-    |----------------------|-------------------------------------------------------------|
-    | SIMPLE               | 简单查询(不使用关联查询或子查询)                            |
-    | PRIMARY              | 如果包含关联查询或者子查询，则最外层的查询部分标记为primary |
-    | UNION                | 联合查询中第二个及后面的查询                                |
-    | DEPENDENT UNION      | 满足依赖外部的关联查询中第二个及以后的查询                  |
-    | UNION RESULT         | 联合查询的结果                                              |
-    | SUBQUERY             | 子查询中的第一个查询                                        |
-    | DEPENDENT SUBQUERY   | 子查询中的第一个查询，并且依赖外部查询                      |
-    | DERIVED              | 用到派生表的查询                                            |
-    | MATERIALIZED         | 被物化的子查询                                              |
-    | UNCACHEABLE SUBQUERY | 一个子查询的结果不能被缓存，必须重新评估外层查询的每一行    |
-    | UNCACHEABLE UNION    | 关联查询第二个或后面的语句属于不可缓存的子查询              |
-
-- type各种值的解释
-
-    - 上表的这些情况，查询性能从上到下依次是最好到最差。
-
-    | type的值        | 解释                                                                       |
-    |-----------------|----------------------------------------------------------------------------|
-    | system          | 查询对象表只有一行数据且只能用于 MyISAM 和 Memory 引擎的表，这是最好的情况 |
-    | const           | 基于主键或唯一索引查询，最多返回一条结果                                   |
-    | eq_ref          | 表连接时基于主键或非 NULL 的唯一索引完成扫描                               |
-    | ref             | 基于普通索引的等值查询，或者表间等值连接                                   |
-    | fulltext        | 全文检索                                                                   |
-    | ref_or_null     | 表连接类型是 ref，但进行扫描的索引列中可能包含 NULL 值                     |
-    | index_merge     | 利用多个索引                                                               |
-    | unique_subquery | 子查询中使用唯一索引                                                       |
-    | index_subquery  | 子查询中使用普通索引                                                       |
-    | range           | 利用索引进行范围查询                                                       |
-    | index           | 全索引扫描                                                                 |
-    | ALL             | 全表扫描                                                                   |
-
-- key_len各种字段类型对应的长度
-
-    - explain 中的 key_len 列用于表示这次查询中，所选择的索引长度有多少字节，常用于判断联合索引有多少列被选择了。下表总结了常用字段类型的 key_len：
-
-    | 列类型                    | KEY_LEN                                                                   | 备注                                             |
-    |---------------------------|---------------------------------------------------------------------------|--------------------------------------------------|
-    | int                       | key_len = 4+1                                                             | int 为 4 bytes，允许为 NULL，加 1 byte           |
-    | int                       | not null key_len = 4                                                      | 不允许为 NULL                                    |
-    | bigint                    | key_len=8+1                                                               | bigint 为 8 bytes，允许为 NULL 加 1 byte         |
-    | bigint not null           | key_len=8                                                                 | bigint 为 8 bytes                                |
-    | char(30) utf8             | key_len=30*3+1                                                            | char(n)为：n * 3 ，允许为 NULL 加 1 byte         |
-    | char(30) not null utf8    | key_len=30*3                                                              | 不允许为 NULL                                    |
-    | varchar(30) not null utf8 | key_len=30*3+2                                                            | utf8 每个字符为 3 bytes，变长数据类型,加 2 bytes |
-    | varchar(30)               | utf8                                                                      | key_len=30*3+2+1                                 | utf8 每个字符为 3 bytes，允许为 NULL,加 1 byte,变长数据类型，加 2 bytes |
-    | datetime                  | key_len=8+1 (MySQL 5.6.4之前的版本)；key_len=5+1(MySQL 5.6.4及之后的版本) | 允许为 NULL，加 1 byte                           |
-
-- Extra常见值的解释
-
-    | Extra                         | 常见的值                                                                 | 解释                                                                          | 例子 |
-    |-------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------------------------------|------|
-    | Using filesort                | 将用外部排序而不是索引排序，数据较小时从内存排序，否则需要在磁盘完成排序 | explain select * from t1 order by create_time;                                |
-    | Using temporary               | 需要创建一个临时表来存储结构，通常发生对没有索引的列进行 GROUP BY 时     | explain select * from t1 group by create_time;                                |
-    | Using index                   | 使用覆盖索引                                                             | explain select a from t1 where a=111;                                         |
-    | Using where                   | 使用 where 语句来处理结果                                                | explain select * from t1 where create_time='2019-06-18 14:38:24';             |
-    | Impossible WHERE              | 对 where 子句判断的结果总是 false 而不能选择任何数据                     | explain select * from t1 where 1<0;                                           |
-    | Using join buffer (hash join) | 关联查询中，被驱动表的关联字段没索引                                     | explain select * from t1 straight_join t2 on (t1.create_time=t2.create_time); |
-    | Using index condition         | 先条件过滤索引，再查数据                                                 | explain select * from t1 where a >900 and a like '%9';                        |
-    | Select tables optimized away  | 使用某些聚合函数（比如 max、min）来访问存在索引的某个字段是              | explain select max(a) from t1;                                                |
-    | ......                        |                                                                          |                                                                               |
-
-#### 对比有无索引的执行计划
-
-- 准备工作
-
-    ```sql
-    -- 创建测试表
-    CREATE TABLE `t1` (
-     `id` int NOT NULL auto_increment,
-      `a` int DEFAULT NULL,
-      `b` int DEFAULT NULL,
-      `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-      `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
-      PRIMARY KEY (`id`),
-      KEY `idx_a` (`a`),
-      KEY `idx_b` (`b`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-    -- 创建存储过程。插入1000行数据
-    delimiter $$
-    create procedure insert_t1()
-    begin
-      declare i int;
-      set i=1;
-      while(i<=1000)do
-        insert into t1(a,b) values(i, i);
-        set i=i+1;
-      end while;
-    end$$
-    delimiter ;
-
-    -- 调用存储过程
-    call insert_t1();
-    ```
-
-- 对比有无索引的执行计划
-
-    - 条件字段是主键的执行计划
-
-        ```sql
-        explain select * from t1 where id=100;
-        +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
-        | id | select_type | table | type  | possible_keys | key     | key_len | ref   | rows | Extra |
-        +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
-        | 1  | SIMPLE      | t1    | const | PRIMARY       | PRIMARY | 4       | const | 1    |       |
-        +----+-------------+-------+-------+---------------+---------+---------+-------+------+-------+
-        ```
-
-        - type是const，表示基于主键或唯一索引的查询
-        - key 是PRIMARY，表示走了主键索引
-        - row 表示扫描的行数，只扫描了一行。
-
-    - 条件字段有索引的执行计划
-
-        ```sql
-        explain select * from t1 where b=100;
-        +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-        | id | select_type | table | type | possible_keys | key | key_len | ref | rows | Extra |
-        +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-        | 1  | SIMPLE      | t1    | ref  | idx_b         | idx_b | 5       | const | 1    |       |
-        +----+-------------+-------+------+---------------+-------+---------+-------+------+-------+
-        ```
-
-        - type，这里是ref，表示：基于普通索引的等值查询，或者表间等值连接
-        - key这个字段，这里可以看出来，是走了索引的。
-        - 然后再看rows，发现只扫描了1行
-
-    - 条件字段没索引的执行计划
-
-        ```sql
-        -- 删除b字段上的索引
-        alter table t1 drop index idx_b;
-        -- 再来看刚才这条语句的执行计划
-        explain select * from t1 where b=100;
-        +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
-        | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra       |
-        +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
-        | 1  | SIMPLE      | t1    | ALL  | <null>        | <null> | <null>  | <null> | 1000 | Using where |
-        +----+-------------+-------+------+---------------+--------+---------+--------+------+-------------+
-        ```
-
-        - type，是ALL，表示：全表扫描。
-        - key，是NULL，表示没走索引。
-        - rows，这里其实是扫描了很多行，这里是估值，所以不一定准确。
-
-- 获取正在执行语句的执行计划
-
-    - 这个通常用来分析正在执行的问题SQL。
-
-    ```sql
-    -- 执行一条慢查询
-    select *,sleep(100) from t1 limit 1;
-
-    -- 在另外一次窗口查看当前连接
-    show processlist;
-    +----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
-    | Id | User | Host | db | Command | Time | State | Info | Progress |
-    +----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
-    | 4  | root | localhost | martin | Query   | 16   | User sleep | select *,sleep(100) from t1 limit 1 | 0.0      |
-    | 9  | root | localhost | martin | Query   | 0    | starting   | show processlist                    | 0.0      |
-    +----+------+-----------+--------+---------+------+------------+-------------------------------------+----------+
-
-    -- 再来查询给定连接的执行计划
-    EXPLAIN FOR CONNECTION 4;
-    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
-    | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra |
-    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
-    | 1 | SIMPLE | t1 | ALL | <null> | <null> | <null> | <null> | 1000 |  |
-    +----+-------------+-------+------+---------------+--------+---------+--------+------+-------+
-    ```
-
-- 从MySQL 8.0.16开始，可以输出树状执行计划，并且能返回预估成本和预估的返回行数
-
-    ```sql
-    explain format=tree select * from t1 where a=100;
-    ```
-
-    - cost表示预估成本信息；
-    - rows表示预估扫描行数。
-
-
-- 从MySQL 8.0.18开始，引入了EXPLAIN ANALYZE
-
-    - 使用这个，会执行SQL，并返回有关执行成本，返回行数，执行时间，循环次数等信息
-
-    ```sql
-    explain analyze select * from t1 where a=100;
-    ```
-
-    - cost 表示预估的成本信息
-    - rows 前面的表示预估值，后面的表示实际返回的行数
-    - actual time 第一个值是获取第一行的实际时间，第二个值获取所有行的时间，如果循环了多次就是平均时间，单位毫秒
-    - loops 循环次数
 
 ### sql语句优化
 
-- 拆分复杂SQL为多个小SQL，避免大事务
-    - 简单的SQL容易使用到MySQL的QUERY CACHE；
-    - 减少锁表时间特别是使用MyISAM存储引擎的表；
-    - 可以使用多核CPU。
+- 把查询看作是一个任务, 它由多个子任务构成, 优化方法如下:
+
+    - 1.优化子任务的响应时间
+
+    - 2.减少子任务数量
+
+    - 拆分复杂SQL为多个小SQL，避免大事务
+
+- 查询慢的原因往往是访问的数据太多:
+
+    - 1.查询了不需要的数据:
+
+        - 查询大量的数据, 但只使用少量的数据
+
+    - 2.使用了语句`SELECT *` 查询了所有列, 特别是连接多个表还查询所有列
+
+#### 一条查询语句的执行过程
+
+![image](./Pictures/mysql/一条sql查询语句的执行过程.avif)
+
+- 1.通过连接器，客户端与MySQL服务器建立连接，并完成身份认证和权限验证过程。在此过程中，客户端需要提供用户名和密码以证明其合法性，服务器则会对这些信息进行核对。
+
+    - 之后client发送`查询`给server
+
+        - mysql的client/server协议是**半双工**, 要么server 发送 client, 要么client 发送 server
+
+            - client 发送一个数据包给 server
+
+            - server 返回多个数据包给 client
+
+                - server会将查询结果缓存至内存, 全部数据包返回客户端后, 才释放
+
+            - `max_allowed_packet` 变量可设置数据包大小
+
+- 2.检查是否开启`查询缓存`（Query Cache）： 如果命中返回结果给client, 否则进入下一个阶段
+    - 查询缓存：
+        - MySQL 服务层可以将一些查询的结果缓存起来，尤其是频繁执行的查询。如果客户端请求的查询已经存在于缓存中，MySQL 可以直接从缓存中返回结果，而无需重新执行查询。
+        - 但是缓存在生产环境一般是不开启的，除非经常有SQL一模一样的查询。缓存严格要求2次SQL请求要完全一样。
+            - SQL语句，连接的数据库，协议版本，字符集等因素不一样，都会导致缓存失效。
+        - 从8.0版本开始，MySQL不在使用缓存。
+
+- 3.进入`解析器`，之后进入`预处理器`
+
+    - 解析器：是 SQL 查询执行的第一步，它的主要职责是将用户发送的 SQL 语句解析成数据库能够理解和处理的内部结构。这个过程包括以下几个子阶段：
+
+        - `词法分析`：解析器首先对 SQL 语句进行词法分析。词法分析的任务是将 SQL 语句拆分成一系列有意义的“单词”或“标记”（Tokens），例如：表名，列名，操作符，关键字等。这个阶段的输出是一个由标记组成的列表，为后续的语法分析提供基础。
+
+        - `语法分析`：语法分析的任务是根据 SQL 语法规则将标记组合成一个层次化的结构，通常是 `解析树`（Parse Tree） 或 `抽象语法树`（Abstract Syntax Tree）。
+            - `解析树`：每个节点代表了 SQL 语句的一个语法结构单元。
+            - 在这一阶段，MySQL 会检查 SQL 语句的语法是否正确，并生成语法树。如果 SQL 语法不正确，解析器会报错并拒绝执行。
+
+    - 预处理器：
+
+        - `语义分析`：语义分析主要是检查 SQL 语句中的每个对象是否符合数据库的实际情况。
+            - 如表名、字段名是否存在
+            - 用户是否对相关表和列拥有执行权限（如 SELECT, INSERT, UPDATE 等）。
+            - 数据类型是否匹配等。
+
+- 4.进入`优化器`
+
+    - 逻辑优化：主要目的是通过调整 SQL 语句的结构来提高查询效率。
+
+        - 1.`消除冗余的子查询`：将某些子查询转换为连接或合并查询。
+        - 2.`重写查询`：
+
+            - `IN()`函数代替`OR`子句:
+                - `IN()`的时间复杂度是O(log n);
+                - `OR`的时间复杂度是O(n)
+            - `OR` 条件转换为 `UNION` 操作。
+        - 3.`查询合并`：将多个查询合并成一个查询。
+        - 4.`移除不必要的操作`：例如消除不需要的 `ORDER BY` 或 `DISTINCT`。
+
+    - 物理优化：优化器根据数据库的具体执行引擎、索引、统计信息等做出的决策。这个阶段会根据优化器评估的成本模型选择合适的执行计划。具体的优化措施包括：
+
+        - 1.选择合适的连接方式：比如选择 Nested Loop Join、Hash Join 或 Sort Merge Join。
+
+            - 例子：重新排序连接表的顺序
+        - 2.选择索引：通过选择合适的索引来加速数据访问。
+        - 3.选择合适的排序方式：通过使用索引扫描或临时表来避免全表扫描。
+
+    - 优化器会使用基于成本的模型（Cost-Based Optimization）来评估每种查询执行计划的成本，选择成本最低的执行计划。其核心是通过计算不同执行计划的资源消耗（如 CPU 时间、I/O 操作等），并选出最优的执行策略。
+
+        > 简单来说就是：优化器会预测并选择成本最低的执行计划
+
+        - 需要向存储引擎获取统计信息
+
+        - 动态优化:根据查询上下文, where的条件值等
+
+            - 静态优化:不依赖查询上下文
+
+        - 有很多原因会导致优化器选择错误的执行计划
+
+        - 不要自以为比优化器聪明
+
+
+- 5.执行器：根据优化器生成的执行计划来实际执行 SQL 查询。查询执行的最后环节，直接与 MySQL 的存储引擎进行交互。
+
+    - 执行器从`Buffer Pool`中获取数据页的数据，如果数据页没有，需要从磁盘中进行加载。
+
+    - 执行器的主要工作包括：
+        - 表扫描：根据查询条件决定是否使用索引、是否全表扫描。
+        - 连接操作：根据优化器选择的连接方式（如嵌套循环连接、哈希连接等）执行表之间的数据合并。
+        - 排序和聚合：执行查询中的 `ORDER BY`、`GROUP BY` 等操作。
+        - 数据返回：查询结果被返回给用户，修改操作则会提交事务。
+
+    - 执行器还需要**管理事务**的提交和回滚操作，确保数据的一致性和持久性。
+        - 这些操作会与 MySQL 的日志系统（`Undo Log`、`Redo Log`、`Binlog`） 密切交互，确保事务的 ACID 属性。
+
+    - `last_query_cost` 变量表示上一次查询大概需要随机页查找.这里为10个数据页
+
+        ```sql
+        SHOW STATUS LIKE 'last_query_cost';
+        +-----------------+-----------+
+        | Variable_name   | Value     |
+        +-----------------+-----------+
+        | Last_query_cost | 10.499000 |
+        +-----------------+-----------+
+        ```
+
+- 6.存储引擎负责实际的数据存储和检索工作，根据执行器的请求，读取或写入数据。
+
+- 7.如果开启了查询缓存（Query Cache）且查询结果能够命中缓存，查询结果会从缓存中直接返回。而如果没有开启Query Cache或缓存没有命中，MySQL会直接返回查询结果。
+
 
 #### select优化
 
@@ -6806,20 +8381,30 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
     from user where id between 1000000 and 1000020;
     ```
 
-- 尽量避免使用子查询，可以把子查询优化为join操作（子查询的结果集无法使用索引，子查询会产生临时表操作，如果子查询数据量大会影响效率，消耗过多的CPU及IO资源）
+- 尽量避免使用子查询，可以把子查询优化为join操作（子查询的结果集无法使用索引，子查询会产生`临时表`操作，如果子查询数据量大会影响效率，消耗过多的CPU及IO资源）
 
     - 从两个以上的表中查询数据，一般有两种实现方式：子查询和连接查询。
 
     ```sql
-    // 子查询。缺点是MySQL在执行子查询时，需要创建临时表。查询完成后，需要删除这些临时表，有一些额外的性能消耗。
+    -- 子查询。缺点是MySQL在执行子查询时，需要创建临时表。查询完成后，需要删除这些临时表，有一些额外的性能消耗。
     select * from order
     where user_id in (select id from user where status=1)
 
-    // 连接查询
+    -- 连接查询
     select o.* from order o
     inner join user u on o.user_id = u.id
     where u.status=1
     ```
+
+- 不推荐使用join（关联查询）的原因：
+
+    - 1.DB承担的业务压力大，能减少负担就减少。当表处于百万级别后，join导致性能下降；
+    - 2.分布式的分库分表。这种时候是不建议跨库join的。目前mysql的分布式中间件，跨库join表现不良。
+    - 3.修改表的schema，单表查询的修改比较容易，join写的sql语句要修改，不容易发现，成本比较大，当系统比较大时，不好维护。
+
+    - 解决方法：
+        - 查询id集的时候，使用`IN()`代替关联查询：可以让MySQL按照ID顺序进行查询，这可能比随机的关联要更高效。
+        - 子查询:在业务层，单表查询出数据后，作为条件给下一个单表查询。通过调整参数max_allowed_packet ，可以修改一条sql的最大值。建议在业务上做好处理，限制一次查询出来的结果集是能接受的。
 
 - 连接表不宜过多
 
@@ -7053,6 +8638,252 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
 
         - 如果可以建立联合索引，不建立单一索引，可以删除无用的单一索引。将部分查询功能迁移到其他类型的数据库，如Elastic Seach、HBase等，只需要在业务表中建立几个关键索引即可。
 
+#### group by 语句优化
+
+- [技术分享 | MySQL 生产环境 GROUP BY 优化实践](https://mp.weixin.qq.com/s/0H24lqZ9IxNMG5R_q62DyQ)
+
+- 一个生产环境上 GROUP BY 语句 的优化案例。
+
+    - SQL 优化前：执行时间 3s
+        ```sql
+        SELECT taskUniqueId,
+            max(reportTime) AS reportTime
+        FROM task_log_info
+        WHERE reportTime > '2024-04-07'
+        GROUP BY  taskUniqueId
+        ```
+
+    - SQL 优化后：执行时间 30ms！
+        ```sql
+        SELECT a.taskUniqueId,
+                reportTime
+        FROM task_log_info a
+        JOIN
+            (SELECT taskUniqueId,
+                max(id) AS id
+            FROM task_log_info
+            GROUP BY  taskUniqueId ) tmp
+            ON a.id=tmp.id
+                AND reportTime>='2024-04-07'
+        ```
+
+    - 注意：id 和 reporttime 字段值具有相关性的情况才可以这样修改。
+
+    - 两条 SQL 的 GROUP BY 使用了同一个索引，但是效率却相差很多，这到底是为什么呢？
+
+    - 结论：`Loose Index Scan`（松散索引扫描） 相对于 `Tight Index Scan`（紧凑索引扫描）， 在一些情况下可以大大减少扫描的行数。
+        - 使用 `Loose Index Scan` 时，`Extra: Using index for group-by`。
+
+- 对于 GROUP BY 在使用索引上的优化，分为两种情况讨论：
+
+    - 表上无索引。执行时，会生成临时表进行分组。可以通过索引来优化，来避免使用临时表。
+    - 表上有索引。 GROUP BY 语句有几种扫描算法：
+        - 松散索引扫描（Loose Index Scan）
+        - 紧凑索引扫描（Tight Index Scan）
+        - 两种算法结合
+
+```sql
+-- 创建表。4个字段，但只有前3个字段有索引
+CREATE TABLE t2 (
+  id INT AUTO_INCREMENT,
+  c1 CHAR(64) NOT NULL,
+  c2 CHAR(64) NOT NULL,
+  c3 CHAR(64) NOT NULL,
+  c4 CHAR(64) NOT NULL,
+  PRIMARY KEY(id),
+  KEY c1_c2_c3_idx (c1,c2,c3)
+) ENGINE=INNODB;
+
+-- 插入数据
+INSERT INTO t2 VALUES
+(null,'a','b','a','a'), (null,'a','b','a','a'),
+(null,'a','c','a','a'), (null,'a','c','a','a'),
+(null,'a','d','b','b'), (null,'a','b','b','b'),
+(null,'d','b','c','c'), (null,'e','b','c','c'),
+(null,'f','c','d','d'), (null,'k','c','d','d'),
+(null,'y','d','y','y'), (null,'f','b','f','y'),
+(null,'a','b','a','a'), (null,'a','b','a','a'),
+(null,'a','c','a','a'), (null,'a','c','a','a'),
+(null,'a','d','b','b'), (null,'a','b','b','b'),
+(null,'d','b','c','c'), (null,'e','b','c','c'),
+(null,'f','c','d','d'), (null,'k','c','d','d'),
+(null,'y','d','y','y'), (null,'f','b','f','y');
+
+-- 收集统计信息，否则可能影响测试
+ANALYZE TABLE t2;
+```
+
+##### 无索引情况
+
+- 不使用索引的 `GROUP BY`
+
+    - `Extra: Using temporary`：可以看到这里使用到了临时表。
+
+    ```sql
+    -- c4字段没有索引
+    explain select c4,count(*) from t2 group by c4 order by null;
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-----------------+
+    | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra           |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-----------------+
+    | 1  | SIMPLE      | t2    | ALL  | <null>        | <null> | <null>  | <null> | 24   | Using temporary |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+-----------------+
+
+    explain select c4,count(*) from t2 group by c4;
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+---------------------------------+
+    | id | select_type | table | type | possible_keys | key    | key_len | ref    | rows | Extra                           |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+---------------------------------+
+    | 1  | SIMPLE      | t2    | ALL  | <null>        | <null> | <null>  | <null> | 24   | Using temporary; Using filesort |
+    +----+-------------+-------+------+---------------+--------+---------+--------+------+---------------------------------+
+    ```
+
+- 使用索引的 `GROUP BY`
+
+    - `Extra: Using index & type: index`：表示全索引扫描。这种情况下，如果表数据量很大，还是会比较耗时的。
+
+    ```sql
+    -- c1字段有索引。这里为紧凑索引扫描（Tight Index Scan）
+    explain select c1,count(*) from t2 group by c1;
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    | id | select_type | table | type  | possible_keys | key          | key_len | ref    | rows | Extra       |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    | 1  | SIMPLE      | t2    | index | <null>        | c1_c2_c3_idx | 192     | <null> | 24   | Using index |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    ```
+
+##### 有索引的情况
+
+- 有索引并正常使用的情况，索引的访问有多种算法：
+
+    - 1.松散索引扫描（Loose Index Scan）：
+        - `Extra: Using index for group-by`：不需要扫描所有的索引记录，根据分组前缀（GROUY BY 的字段）跳跃扫描部分
+
+    - 2.紧凑索引扫描（Tight Index Scan）：
+        - `Extra: Using index`：需要扫描范围或全部的索引记录
+
+    - 3.两种算法结合使用
+
+- 1.松散索引扫描（Loose Index Scan）：
+    ```sql
+    -- 松散索引扫描（Loose Index Scan）：
+    explain SELECT c1,MIN(c2) FROM t2 GROUP BY c1;
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+--------------------------+
+    | id | select_type | table | type  | possible_keys | key          | key_len | ref    | rows | Extra                    |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+--------------------------+
+    | 1  | SIMPLE      | t2    | range | <null>        | c1_c2_c3_idx | 64      | <null> | 7    | Using index for group-by |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+--------------------------+
+
+    SELECT c1,MIN(c2),COUNT(*) FROM t2 GROUP BY c1;
+    +----+---------+----------+
+    | c1 | MIN(c2) | COUNT(*) |
+    +----+---------+----------+
+    | a  | b       | 12       |
+    | d  | b       | 2        |
+    | e  | b       | 2        |
+    | f  | b       | 4        |
+    | k  | c       | 2        |
+    | y  | d       | 2        |
+    +----+---------+----------+
+    ```
+
+    - 跳跃扫描部分索引，而不需要扫描全部。
+    ![image](./Pictures/mysql/group_by-松散索引扫描.avif)
+
+    - 使用场景
+        - 1.当需要获取每个分组的某条记录，而非对全部记录做聚合运算时可能会用到，比如：
+            - 最小值或最大值：`MIN()`、`MAX()`
+            - 统计类：`COUNT(distinct)`、`SUM(distinct)`、`AVG(distinct)`
+
+            - 注意：如果 SQL 语句中既有 1-2 个 `min`、`max`，也有 1-3 个 `count(distinct)`、`sum(distinct)`、`avg(distinct)` 时，无法用到 Loose index；两组分别出现的时候才可能会用到。
+
+        - 2.`distinct` 可以转换为 `GROUP BY` 进行处理。
+
+        - 使用到 Loose Index Scan 其他必要条件：
+
+            - 查询基于一个表。
+            - GROUP BY 的字段满足索引的最左匹配原则。
+            - 聚合函数使用的列，必须包含在索引上；且使用多个聚合函数时，必须使用相同的字段，且 GROUP BY 字段+聚合函数字段也必须满足最左匹配原则。
+            - 索引中字段必须是全字段索引，而不能是前缀索引，例如 INDEX(c1(10))
+
+            - 以上条件结合索引的结构就很好理解了。
+
+        - 另外，在选择是否使用 Loose Index Scan 时，也会受到 SQL、统计信息、成本等因素的影响。
+
+        ```sql
+        -- 场景 1
+        -- MIN()、MAX()
+        SELECT c1,MIN(c2),MAX(c2) FROM t2 GROUP BY c1;
+        SELECT c1,c2,MAX(c3),MIN(c3)  FROM t2 WHERE c2 > 'k' GROUP BY c1, c2;
+        SELECT c1,c2,MAX(c3),MIN(c3)  FROM t2 WHERE c3 > 'k' GROUP BY c1, c2;
+        SELECT c1,c2,c3,MAX(id) FROM t2  GROUP BY c1,c2,c3;
+        SELECT c1, c2 FROM t2 WHERE c3 = 'd' GROUP BY c1, c2;
+
+        -- 以下几种情况在当前数据量和数据分布下没有用到，和成本计算有关，结合后文成本对比的章节改变数据量和数据分布测试出来
+        SELECT c1,c2,MAX(c3),MIN(c3)  FROM t2 WHERE c1>='k' and c2 > 'f' GROUP BY c1, c2;
+        SELECT DISTINCT c1, c2 FROM t2 where c1>'k';
+        SELECT c1,c2,count(distinct c3) FROM t2 where c1>='k' and c2>'k' GROUP BY c1,c2;
+
+        -- count(distinct)、sum(distinct)、avg(distinct)
+        SELECT c1,count(distinct c2,c3) FROM t2 GROUP BY c1;
+        SELECT c1,c2,sum(distinct c3) FROM t2 GROUP BY c1,c2;
+        SELECT c1,c2,sum(distinct c3) FROM t2 where c2>'k' GROUP BY c1,c2;
+
+        -- 场景 2
+        SELECT DISTINCT c1, c2 FROM t2;
+
+        -- 无法使用到 Loose Index Scan
+        SELECT c1,count(distinct c2,c3),sum(distinct c2) FROM t2 GROUP BY c1;
+        ```
+
+- 2.紧凑索引扫描（Tight Index Scan）：
+
+    ```sql
+    -- 紧凑索引扫描（Tight Index Scan）：
+    explain SELECT c1,COUNT(*) FROM t2 GROUP BY c1;
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    | id | select_type | table | type  | possible_keys | key          | key_len | ref    | rows | Extra       |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    | 1  | SIMPLE      | t2    | index | <null>        | c1_c2_c3_idx | 192     | <null> | 24   | Using index |
+    +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------+
+    ```
+    ![image](./Pictures/mysql/group_by-紧凑索引扫描.avif)
+
+    - 对于无法使用到 Loose Index Scan 的一些 GROUP BY，在满足索引最左匹配原则情况下可能会用到 Tight Index Scan。
+
+    - 该种方式实际上是范围索引扫描或全部索引扫描，数据量大的情况下性能仍然可能会比较差，但是相比无索引还是可以避免使用临时表和全表扫描，在某些情况下有一定的优化作用。
+
+- 3.两种算法结合
+
+    - 对于统计类 AVG(DISTINCT) 即 SUM|COUNT|AVG(distinct)，可能会出现使用松散索引扫描（Loose Index Scan）成本大于紧凑索引扫描（Tight Index Scan）的情况。
+
+    - 两种方式在引擎层主要包含的成本：
+
+        - 1.`Loose Index Scan`
+            - 读取分组的第一条记录，得到分组前缀
+            - 根据分组前缀读取分组的第一条或最后一条记录返回给 SERVER 层
+        - 2.`Tight Index Scan`
+            - 从 ENGINE 层读取数据，返回给 SERVER 层
+            - SERVER 层判断是否符合 WHERE 条件的记录，并根据聚合函数进行处理
+        - 可以看到，对于 ENGINE 层的访问，`Loose Index Scan` 的成本有可能会高于 `Tight Index Scan`，且在 MySQL 中，引擎层读取数据页的成本常数是 1，SERVER 层判断一条记录的成本常数是 0.2。
+
+        - 至于 MIN/MAX 为什么不会出现 Loose Index Scan 成本 > Tight Index Scan 成本，我理解只有到组内值都是唯一的情况下才会出现吧？那这样也没有必要去分组求最值了。
+
+        - 在某些情况下，Loose Index Scan 的成本会高于 Tight Index Scan，比如：
+
+            - 当分组较多，但组内的记录数并不多或唯一值较高的情况，对于每一个分组，都需要扫描两次，能跳过的记录数很少的情况。即 Loose Index Scan 在分组字段的选择性相对不太高，组内的数据量相对较多的情况更适用。
+
+    - `Extra: Using index for group-by (scanning)`：该方式可以理解为 Loose Index Scan 的扩展或两种方式的结合（索引顺序扫描的同时进行去重）。
+
+        ![image](./Pictures/mysql/group_by-两种算法结合.avif)
+
+        ```sql
+        explain select count(distinct c1,c2) from t2;
+        +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------------------------------+
+        | id | select_type | table | type  | possible_keys | key          | key_len | ref    | rows | Extra                               |
+        +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------------------------------+
+        | 1  | SIMPLE      | t2    | range | <null>        | c1_c2_c3_idx | 128     | <null> | 13   | Using index for group-by (scanning) |
+        +----+-------------+-------+-------+---------------+--------------+---------+--------+------+-------------------------------------+
+        ```
+
 #### 增删改语句优化
 
 - 大批量插入数据
@@ -7090,27 +8921,7 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
 
 - 尽量不要使用物理删除（即直接删除，如果要删除的话提前做好备份），而是使用逻辑删除，使用字段delete_flag做逻辑删除，类型为tinyint，0表示未删除，1表示已删除
 
-#### [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247484892&idx=1&sn=6207963a72bddf9e6c5fa70a57297a64&chksm=e8406095df37e98399b5e2f5347478f6e09061e3c0679e0231e117d0b8c88b1e32d61e622c7f&scene=21#wechat_redirect)
-
-#### [MySQL数据库联盟：全网最全MySQL Prompt](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485114&idx=1&sn=9b09f028e20605ab9d1c561ac8303c7c&chksm=e84063f3df37eae564e6944793d124b28563101600e4727bc4158dff685cc959e54c6951267f&scene=178&cur_album_id=2861367280583032837#rd)
-
-#### [美团SQL优化工具SQLAdvisor](https://github.com/Meituan-Dianping/SQLAdvisor)
-
-### 查询优化
-
-- 把查询看作是一个任务, 它由多个子任务构成, 优化方法如下:
-
-    - 1.优化子任务的响应时间
-
-    - 2.减少子任务数量
-
-- 查询慢的原因往往是访问的数据太多:
-
-    - 1.查询了不需要的数据:
-
-        - 查询大量的数据, 但只使用少量的数据
-
-    - 2.使用了语句`SELECT *` 查询了所有列, 特别是连接多个表还查询所有列
+#### 慢查询优化
 
 - 慢查询日志记录以下3个指标:
 
@@ -7133,109 +8944,6 @@ EXPLAIN SELECT * FROM t1 WHERE b=100;\G
 
         - `EXPLAIN` 的`Extra` 字段为`Using where`时:表示从返回的数据过滤不匹配的记录
 
-#### 查询过程
-
-- 查询过程:
-
-    ![image](./Pictures/mysql/select-procedure.avif)
-
-    - 1.client发送查询给server
-
-        - mysql的client/server协议是**半双工**, 要么server 发送 client, 要么client 发送 server
-
-            - client 发送一个数据包给 server
-
-            - server 返回多个数据包给 client
-
-                - server会将查询结果缓存至内存, 全部数据包返回客户端后, 才释放
-
-            - `max_allowed_packet` 变量可设置数据包大小
-
-    - 2.server检查查询缓存, 如果命中返回结果给client, 否则进入下一个阶段
-
-    - 3.进入SQL解析器, 预处理, 优化器生成执行计划
-
-        - 如果出现任何错误(如语法错误), 都可能会终止查询
-
-        - 1.SQL解析器:生成解析树
-
-        - 1.预处理器:检测权限
-
-    - 4.根据执行计划, 调用存储引擎API查询
-
-        - 优化器会预测并选择成本最低的执行计划
-
-            - 需要向存储引擎获取统计信息
-
-            - 动态优化:根据查询上下文, where的条件值等
-
-                - 静态优化:不依赖查询上下文
-
-            - 有很多原因会导致优化器选择错误的执行计划
-
-            - 不要自以为比优化器聪明
-
-        - 优化类型:
-
-            - 重新排序连接表的顺序
-
-            - `IN()`函数代替`OR`子句: IN()的时间复杂度是log n; OR的时间复杂度是n
-
-        - `last_query_cost` 变量表示上一次查询大概需要随机页查找.这里为10个数据页
-
-            ```sql
-            SHOW STATUS LIKE 'last_query_cost';
-            +-----------------+-----------+
-            | Variable_name | Value |
-            +-----------------+-----------+
-            | Last_query_cost | 10.499000 |
-            +-----------------+-----------+
-            ```
-
-    - 5.返回结果给client
-
-#### hint(优化器提示)
-
-- 不要自以为比优化器聪明
-
-    - mysql版本升级后, 优化器提示可能会失效
-
-| 语句           | 操作                             |
-|----------------|----------------------------------|
-| STRAINGHT_JOIN | 按照语句的顺序进行join(关联查询) |
-
-#### [松散索引(loose index scan)](http://mysqlserverteam.com/what-is-the-scanning-variant-of-a-loose-index-scan/)
-
-- 松散索引:
-    ![image](./Pictures/mysql/lis-regular.avif)
-
-- 非松散索引:
-    ![image](./Pictures/mysql/lis-scanning.jpr)
-
-- `EXPLAIN` 的`Extra` 字段为`Using index for group-by`:表示使用了松散索引
-    - 在`GROUP BY` 分组中查询最大, 最小值可以使用松散索引
-    ```sql
-    -- 创建索引
-    CREATE INDEX salary ON people(salary)
-
-    EXPLAIN SELECT salary, MAX(id)
-    FROM people
-    GROUP BY salary\G
-
-    ***************************[ 1. row ]***************************
-    id            | 1
-    select_type   | SIMPLE
-    table         | people
-    type          | range
-    possible_keys | <null>
-    key           | salary
-    key_len       | 203
-    ref           | <null>
-    rows          | 10
-    Extra         | Using index for group-by
-    ```
-
-#### 慢查询优化
 
 - [慢SQL的治理经验](https://mp.weixin.qq.com/s/fqIOUT1YcUuLIL95IVPD_Q)
 
@@ -7362,8 +9070,78 @@ mysqldumpslow -s t -t 10 -g “left join” /var/log/mysql/mysql_slow.log
 mysqldumpslow -s r -t 10 -g 'left join' /var/log/mysqld/mysql_slow.log
 ```
 
-#### [pt-query-digest(percona-toolkit)：慢查询工具](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
+##### [pt-query-digest(percona-toolkit)：慢查询工具](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
+
+- pt-query-digest 主要功能是从日志、进程列表和tcpdump分析MySQL查询。
+    - 与mysqldumpshow工具相比，py-query_digest 工具的分析结果更具体，更完善。
 
 ```sh
 pt-query-digest /var/log/mysql/mysql_slow.log
+
+# 直接分析慢查询文件
+pt-query-digest /var/lib/mysql/slowtest-slow.log > slow_report.log
+
+# 分析最近12小时内的查询
+pt-query-digest --since=12h /var/lib/mysql/slowtest-slow.log > slow_report2.log
+
+# 分析指定时间范围内的查询
+pt-query-digest /var/lib/mysql/slowtest-slow.log --since '2017-01-07 09:30:00' --until '2017-01-07 10:00:00'> > slow_report3.log
+
+
+# 分析指含有select语句的慢查询
+pt-query-digest --filter '$event->{fingerprint} =~ m/^select/i' /var/lib/mysql/slowtest-slow.log> slow_report4.log
+
+# 针对某个用户的慢查询
+pt-query-digest --filter '($event->{user} || "") =~ m/^root/i' /var/lib/mysql/slowtest-slow.log> slow_report5.log
+
+# 查询所有所有的全表扫描或full join的慢查询
+pt-query-digest --filter '(($event->{Full_scan} || "") eq "yes") ||(($event->{Full_join} || "") eq "yes")' /var/lib/mysql/slowtest-slow.log> slow_report6.log
 ```
+
+
+- 报告分析
+
+    | 第一部分   | 总体统计结果                                                          |
+    |------------|-----------------------------------------------------------------------|
+    | Time range | 查询执行的时间范围询                                                  |
+    | unique     | 唯一查询数量，即对查询条件进行参数化以后，总共有多少个不同的查询询    |
+    | total      | 总计询                                                                |
+    | min        | 最小询                                                                |
+    | max        | 最大询                                                                |
+    | avg        | 平均询                                                                |
+    | 95%        | 把所有值从小到大排列，位置位于95%的那个数，这个数一般最具有参考价值询 |
+    | median     | 中位数，把所有值从小到大排列，位置位于中间那个数询                    |
+
+    | 第二部分 | 查询分组统计结果                                           |
+    |----------|------------------------------------------------------------|
+    | Rank     | 所有语句的排名，默认按查询时间降序排列，通过--order-by指定 |
+    | Response | 总的响应时间                                               |
+    | calls    | 执行次数，即本次分析总共有多少条这种类型的查询语句         |
+    | V/M      | 响应时间Variance-to-mean的比率                             |
+
+    | 第三部分                | 每一种查询的详细统计结果         |
+    |-------------------------|----------------------------------|
+    | ID                      | 查询的ID号，和上图的Query ID对应 |
+    | Databases               | 数据库名                         |
+    | Users                   | 各个用户执行的次数（占比）       |
+    | Query_time distribution | 查询时间分布, 长短体现区间占比。 |
+    | Tables                  | 查询中涉及到的表                 |
+    | Explain                 | SQL语句                          |
+
+#### [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247484892&idx=1&sn=6207963a72bddf9e6c5fa70a57297a64&chksm=e8406095df37e98399b5e2f5347478f6e09061e3c0679e0231e117d0b8c88b1e32d61e622c7f&scene=21#wechat_redirect)
+
+#### [MySQL数据库联盟：全网最全MySQL Prompt](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485114&idx=1&sn=9b09f028e20605ab9d1c561ac8303c7c&chksm=e84063f3df37eae564e6944793d124b28563101600e4727bc4158dff685cc959e54c6951267f&scene=178&cur_album_id=2861367280583032837#rd)
+
+#### 第三方优化工具
+
+##### [MySQLTuner-perl：性能诊断工具，主要检查参数设置的合理性包括日志文件、存储引擎、安全建议及性能分析。针对潜在的问题，给出改进的建议。是mysql优化的好帮手。](https://github.com/major/MySQLTuner-perl)
+
+```sh
+./mysqltuner.pl --socket /var/lib/mysql/mysql.sock
+```
+
+##### [tuning-primer.sh](https://github.com/BMDan/tuning-primer.sh)
+
+- 针于mysql的整体进行一个体检，对潜在的问题，给出优化的建议。
+
+##### [美团SQL优化工具SQLAdvisor](https://github.com/Meituan-Dianping/SQLAdvisor)

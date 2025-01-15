@@ -1753,6 +1753,8 @@
 
 - [HelloGitHub：开篇：免费开源的趣讲 ZooKeeper 教程（连载）](https://baijiahao.baidu.com/s?id=1689467683287740035&wfr=spider&for=pc)
 
+- [腾讯云开发者：大厂开始放弃ZooKeeper，还用学吗？](https://mp.weixin.qq.com/s/NfiMY5vlUIrsx8St5hUqcg)
+
 ## etcd
 
 - [阿里云开发者：学习分享｜Etcd/Raft 原理篇](https://www.163.com/dy/article/I83NV3JB0518E0HL.html)
