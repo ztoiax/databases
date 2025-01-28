@@ -83,12 +83,11 @@
   * [my.cnf配置文件](#mycnf配置文件)
   * [主从复制 (Master Slave Replication )](#主从复制-master-slave-replication-)
     * [传统binlog复制模式](#传统binlog复制模式)
-    * [MYSQL5.6的GTID复制模式](#mysql56的gtid复制模式)
       * [搭建](#搭建)
+    * [MYSQL5.6的GTID复制模式](#mysql56的gtid复制模式)
+      * [搭建](#搭建-1)
       * [GTID相关命令](#gtid相关命令)
     * [主从复制不会复制已经存在的数据库数据。因此需要自己导入](#主从复制不会复制已经存在的数据库数据因此需要自己导入)
-    * [主服务器配置](#主服务器配置)
-    * [从服务器配置](#从服务器配置)
     * [docker 主从复制](#docker-主从复制)
   * [高可用](#高可用)
     * [高可用方案](#高可用方案)
@@ -4253,6 +4252,120 @@ grep "^CREATE TABLE" createtb.sql |wc -l
 
 - 半同步复制：和全同步不同的是，半同步复制的逻辑是这样，从库写入日志成功后返回ACK确认给主库，主库收到至少一个从库的确认就认为写操作完成。
 
+#### 搭建
+
+- 主服务器配置
+
+    - `/etc/my.cnf` 文件配置
+
+        ```sh
+        [mysqld]
+        server-id=129            # 默认是 1 ,这个数字必须是唯一的
+        log_bin=centos7
+
+        binlog-do-db=tz          # 同步指定库tz
+        binlog-ignore-db=tzblock # 忽略指定库tzblock
+
+        # 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
+        binlog_format=row
+
+        # 设置一个 binlog 文件的最大字节。设置最大 100MB
+        max_binlog_size=100M
+
+        # 设置了 binlog 文件的有效期（单位：天）
+        expire_logs_days = 7
+
+        # 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
+        # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
+        # 执行n 次事务提交后，才fsync到磁盘
+        sync_binlog=1
+        ```
+
+    - 设置远程登陆的权限
+        ```sql
+        -- 启用slave权限
+        GRANT REPLICATION SLAVE ON *.* TO 'root'@'%';
+        -- 或者启用所有权限
+        grant all on *.* to  'root'@'%';
+
+        -- 刷新权限
+        FLUSH PRIVILEGES;
+        ```
+
+    - 重启mysql
+        ```sh
+        systemctl restart mysql
+        ```
+
+    - 查看主服务状态
+
+        ```sql
+        -- 日志目录 /var/lib/mysql/centos7.000001
+
+        show master status;
+        ERROR 2006 (HY000): MySQL server has gone away
+        No connection. Trying to reconnect...
+        Connection id:    7
+        Current database: tz
+
+        +----------------+----------+--------------+------------------+-------------------+
+        | File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
+        +----------------+----------+--------------+------------------+-------------------+
+        | centos7.000001 |      156 |              |                  |                   |
+        +----------------+----------+--------------+------------------+-------------------+
+        1 row in set (0.02 sec)
+        ```
+
+- 从服务器配置
+
+    - `/etc/my.cnf` 文件配置
+
+        ```ini
+        [mysqld]
+        server-id=128
+
+        replicate-do-db = tz     #只同步tz库
+        slave-skip-errors = all   #忽略因复制出现的所有错误
+        ```
+
+    - 进入slave服务器后，配置master服务器
+        ```sql
+        -- 关闭同步
+        stop slave;
+
+        -- 开启同步功能
+        CHANGE MASTER TO
+        MASTER_HOST = '192.168.100.208',
+        MASTER_USER = 'root',
+        MASTER_PASSWORD = 'YouPassword',
+        -- 在master上执行show master status;查看MASTER_LOG_FILE、MASTER_LOG_POS
+        MASTER_LOG_FILE='centos7.000001',
+        MASTER_LOG_POS=156;
+
+        -- 开启同步
+        start slave;
+        ```
+
+- 查看是否成功
+    ```sql
+    -- 可以看到Connecting和yes
+    show slave status\G;
+    *************************** 1. row ***************************
+                    Slave_IO_State: Connecting to master
+                       Master_Host: 192.168.100.208
+                       Master_User: root
+                       Master_Port: 3306
+                     Connect_Retry: 60
+                   Master_Log_File: centos7.000001
+               Read_Master_Log_Pos: 6501
+                    Relay_Log_File: tz-pc-relay-bin.000001
+                     Relay_Log_Pos: 4
+             Relay_Master_Log_File: centos7.000001
+                  Slave_IO_Running: Yes
+                 Slave_SQL_Running: Yes
+    ```
+
+
 ### MYSQL5.6的GTID复制模式
 
 - [运维记事：一文带你了解MySQL中的GTID](https://mp.weixin.qq.com/s/ba2KPKDCfA9keQihf8BcRQ)
@@ -4333,7 +4446,7 @@ grep "^CREATE TABLE" createtb.sql |wc -l
 - 从库配置同步的参数：
 
     - `master_auto_position` 标识主从关系使用的 GTID 协议。
-        - 相比之前 Binlog 复制模式由人为指定binlog的pos位点改为了MASTER_AUTO_POSITION=1自动获取binlog的pos位点的配置，MASTER_LOG_FILE 和 MASTER_LOG_POS 参数已经不需要了。
+        - 相比之前 Binlog 复制模式由人为指定binlog的pos位点改为了`MASTER_AUTO_POSITION`=1自动获取binlog的pos位点的配置，`MASTER_LOG_FILE` 和 `MASTER_LOG_POS` 参数已经不需要了。
 
     ```ini
     CHANGE MASTER TO
@@ -4418,7 +4531,7 @@ grep "^CREATE TABLE" createtb.sql |wc -l
 
     - mysql.gtid_executed表是由MySQL服务器提供给内部使用的。它允许副本在副本上禁用二进制日志记录时使用GTIDs，并允许在二进制日志丢失时保留GTID状态。
 
-        - RESET MASTER命令，gtid_executed表将被清除。
+        - `RESET MASTER`命令，gtid_executed表将被清除。
 
         - 服务意外停止的情况下，当前二进制日志文件中的gtid集不会保存在gtid_executed表。在恢复期间，这些gtid将从二进制日志文件添加到表中，以便可以继续复制。
 
@@ -4494,116 +4607,6 @@ grep "^CREATE TABLE" createtb.sql |wc -l
     sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /tmp/tz.sql
     # 再次运行
     mysql -uroot -p tz < /tmp/tz.sql
-    ```
-
-### 主服务器配置
-
-- `/etc/my.cnf` 文件配置
-
-    ```sh
-    [mysqld]
-    server-id=129            # 默认是 1 ,这个数字必须是唯一的
-    log_bin=centos7
-
-    binlog-do-db=tz          # 同步指定库tz
-    binlog-ignore-db=tzblock # 忽略指定库tzblock
-
-    # 设置 binlog_format 格式为row（默认）。如果是STATEMENT使用 uuid()函数主从数据会不一致
-    binlog_format=row
-
-    # 设置一个 binlog 文件的最大字节。设置最大 100MB
-    max_binlog_size=100M
-
-    # 设置了 binlog 文件的有效期（单位：天）
-    expire_logs_days = 7
-
-    # 默认值为0，最不安全。只写入到文件系统缓存（page cache），由系统自行判断什么时候执行fsync磁盘，因此会丢失数据
-    # 最安全的值为1。但这也是最慢的。每次都fsync到磁盘
-    # 执行n 次事务提交后，才fsync到磁盘
-    sync_binlog=1
-    ```
-
-- 设置远程登陆的权限
-    ```sql
-    # 启用slave权限
-    grant PRIVILEGES SLAVE on *.* to  'root'@'%';
-    # 或者启用所有权限
-    grant all on *.* to  'root'@'%';
-
-    # 刷新权限
-    FLUSH PRIVILEGES;
-    ```
-
-- 重启mariadb
-    ```sh
-    systemctl restart mariadb
-    ```
-
-- 查看主服务状态
-
-    ```sql
-    # 日志目录 /var/lib/mysql/centos7.000001
-
-    mysql> show master status;
-    ERROR 2006 (HY000): MySQL server has gone away
-    No connection. Trying to reconnect...
-    Connection id:    7
-    Current database: tz
-
-    +----------------+----------+--------------+------------------+-------------------+
-    | File           | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
-    +----------------+----------+--------------+------------------+-------------------+
-    | centos7.000001 |      156 |              |                  |                   |
-    +----------------+----------+--------------+------------------+-------------------+
-    1 row in set (0.02 sec)
-    ```
-
-### 从服务器配置
-
-- `/etc/my.cnf` 文件配置
-
-    ```sh
-    [mysqld]
-    server-id=128
-
-    replicate-do-db = tz     #只同步tz库
-    slave-skip-errors = all   #忽略因复制出现的所有错误
-    ```
-
-- 进入slave服务器后，配置master服务器
-    ```sql
-    -- 关闭同步
-    stop slave;
-
-    # 开启同步功能
-    CHANGE MASTER TO
-    MASTER_HOST = '192.168.100.208',
-    MASTER_USER = 'root',
-    MASTER_PASSWORD = 'YouPassword',
-    -- 在master上执行show master status;查看MASTER_LOG_FILE、MASTER_LOG_POS
-    MASTER_LOG_FILE='centos7.000001',
-    MASTER_LOG_POS=156;
-
-    -- 开启同步
-    start slave;
-    ```
-
-- 查看是否成功
-    ```sql
-    MariaDB [tz]> show slave status\G;
-    *************************** 1. row ***************************
-                    Slave_IO_State: Connecting to master
-                       Master_Host: 192.168.100.208
-                       Master_User: root
-                       Master_Port: 3306
-                     Connect_Retry: 60
-                   Master_Log_File: centos7.000001
-               Read_Master_Log_Pos: 6501
-                    Relay_Log_File: tz-pc-relay-bin.000001
-                     Relay_Log_Pos: 4
-             Relay_Master_Log_File: centos7.000001
-                  Slave_IO_Running: Connecting
-                 Slave_SQL_Running: Yes
     ```
 
 ### docker 主从复制

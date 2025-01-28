@@ -158,6 +158,8 @@
 
 - [AustinDatabases：MongoDB 大俗大雅，高端的知识讲“通俗” -- 2 嵌套和引用](https://mp.weixin.qq.com/s/hTtcdxq-fSWQNbQzVK3h3g)
 
+- [AustinDatabases：MongoDB 大俗大雅，高端知识讲“庸俗” --3 奇葩数据更新方法](https://mp.weixin.qq.com/s/Dzo8yHnplMkwB4FMKssr6A)
+
 ## 适合业务
 
 - 高并发web应用

@@ -6,6 +6,7 @@
   * [根据qps的架构部署](#根据qps的架构部署)
   * [软件架构](#软件架构)
     * [从单线程Reactor到redis6.0多线程架构演进](#从单线程reactor到redis60多线程架构演进)
+    * [Redis8.0](#redis80)
     * [Redis vs Memcached](#redis-vs-memcached)
     * [Redis vs Dragonfly](#redis-vs-dragonfly)
   * [基本命令](#基本命令)
@@ -231,6 +232,7 @@
     * [tiny-rdm：gui](#tiny-rdmgui)
     * [RedisLive: 监控可视化](#redislive-监控可视化)
     * [dbatools](#dbatools)
+    * [memtier_benchmark：性能测试](#memtier_benchmark性能测试)
 * [reference](#reference)
 * [online tool](#online-tool)
 
@@ -529,6 +531,35 @@
         - 3.等所有I/O线程完成读取后, 命令交由主线程处理, 将结果写入每个`client` 对象的buf
 
         - 4.I/O线程把`client`里的buf, 写回客户端
+
+### Redis8.0
+
+- [Redis开发运维实战：Redis Async IO Thread：突破百万级 QPS 的性能极限](https://mp.weixin.qq.com/s/1wGRF2czxF3rAAayvFuk3Q)
+
+- 在 Redis 8.0 M3 版本中实现了 Async IO Thread，进一步提升 Redis 性能，在部分场景中可突破百万 QPS。
+
+- 在 AMD Ryzen9 7950x 上的测试结果，在小 KV 场景，无论普通模式还是 TLS 模式，Redis 都能突破百万 QPS。为了贴合用户的真实使用场景，我在阿里云上购买了三台 ECS，型号为计算型 c8i, ecs.c8i.4xlarge, 16 vCPU 32 GiB。其中两台部署 Redis，组成主从架构；另外一台作为压测机，部署压测程序 `memtier_benchmark`
+
+- 测试分为两组，区别仅在 KV 大小，其他一致，300 万个 key，400 个 client， 压测时间为 60s, 写读比例有四种：1:0、0:1、1:1、1:10。除了100%读测试外（避免 Key Miss），每次测试前都会重启 Redis，清空数据。在测试时发现 IO 线程数在 6 的时候主线程基本打满，所以 io-threads 配置均为 6。压测程序需要使用多线程模式，否则根本无法压出性能极限，测试时线程数为 8。
+
+    - KV 大小 32 字节，QPS 和 P99 延迟如下：
+
+        ```sh
+        memtier_benchmark -s xxx --data-size 32 --ratio xxx --key-pattern P:P --key-minimum=1 --key-maximum 3000000  --distinct-client-seed --test-time 60 -c 50 -t 8  --hide-histogram
+        ```
+        ![avatar](./Pictures/redis/redis8.0性能-qps.avif)
+        ![avatar](./Pictures/redis/redis8.0性能-p99延迟.avif)
+
+    - KV 大小 512 字节，QPS 和 P99 延迟如下：
+        ```sh
+        memtier_benchmark -s xxx --data-size 512 --ratio xxx --key-pattern P:P --key-minimum=1 --key-maximum 3000000  --distinct-client-seed --test-time 60 -c 50 -t 8  --hide-histogram
+        ```
+        ![avatar](./Pictures/redis/redis8.0性能-qps1.avif)
+        ![avatar](./Pictures/redis/redis8.0性能-p99延迟1.avif)
+
+    - 从测试对比来看，新版本的 Async IO Thread 较 7.4 QPS 至多可提升 1 倍以上，P99 延迟下降 30% 以上。需要补充说明的一下，1:10 的写读比例压测时，7.4 版本 key miss 率超过了 50%，新版本为 35% 左右。
+
+    - 注：在发现 CPU 剩余比较充足后，尝试将 Redis 机器换成规格更低的 ecs.c8i.2xlarge, 8 vCPU 16 GiB, io-threads 配置仍为 6 时，发现性能下降 10% 以上，猜测可能是 vCPU 性能不够的原因。所以推荐大家在使用前，根据自己的机器配置和场景进行压测评估。
 
 ### Redis vs Memcached
 
@@ -12162,6 +12193,8 @@ watch -d -n 2 rma
 ### [dbatools](https://github.com/xiepaup/dbatools)
 
 ![avatar](./Pictures/redis/dbatools.avif)
+
+### [memtier_benchmark：性能测试](https://github.com/RedisLabs/memtier_benchmark)
 
 # reference
 

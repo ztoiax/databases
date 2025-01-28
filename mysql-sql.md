@@ -5881,6 +5881,8 @@ possible_keys 和 key
 
 - [爱可生开源社区：第 49 期：根据 EXPLAIN EXTRA 栏提示进行优化（一）](https://mp.weixin.qq.com/s/lc-9QNmI00nJ1Z9OAw_lJw)
 
+- [爱可生开源社区：第 50 期：根据 EXPLAIN EXTRA 栏提示进行优化（二）](https://mp.weixin.qq.com/s/U9JDFEpfxdMN-nul49ggaA)
+
 | Extra                         | 常见的值                                                                 | 解释                                                                          | 例子 |
 |-------------------------------|--------------------------------------------------------------------------|-------------------------------------------------------------------------------|------|
 | Using filesort                | 将用外部排序而不是索引排序，数据较小时从内存排序，否则需要在磁盘完成排序 | explain select * from t1 order by create_time;                                |
