@@ -68,6 +68,49 @@
 * [数据存储结构](#数据存储结构)
 * [数据库范式（Normal Form ）](#数据库范式normal-form-)
 * [ER模型](#er模型)
+* [业务](#业务)
+* [第三方工具](#第三方工具)
+  * [sql](#sql)
+  * [客户端tui](#客户端tui)
+  * [AI](#ai)
+  * [画图](#画图)
+  * [gui客户端工具](#gui客户端工具)
+  * [BI数据可视化工具](#bi数据可视化工具)
+* [中间件](#中间件)
+  * [ShardingSphere：分布式数据库中间件](#shardingsphere分布式数据库中间件)
+  * [Mycat：分布式数据库中间件](#mycat分布式数据库中间件)
+  * [MySQL Proxy](#mysql-proxy)
+  * [ProxySQL：MySQL 代理中间件](#proxysqlmysql-代理中间件)
+* [数据迁移](#数据迁移)
+  * [数据迁移案例](#数据迁移案例)
+    * [爱可生开源社区：技术分享 | 一次数据库迁移](#爱可生开源社区技术分享--一次数据库迁移)
+  * [数据迁移工具（支持多种数据库）](#数据迁移工具支持多种数据库)
+    * [Maxwell](#maxwell)
+    * [canal](#canal)
+      * [安装](#安装)
+      * [docker安装](#docker安装)
+      * [配置kafka](#配置kafka)
+      * [Se7en的架构笔记：Canal Admin 高可用集群使用教程](#se7en的架构笔记canal-admin-高可用集群使用教程)
+    * [Debezium](#debezium)
+    * [[debezium](https://github.com/debezium/debezium](#debeziumhttpsgithubcomdebeziumdebezium)
+    * [CloudCanal：可视化数据同步迁移工具](#cloudcanal可视化数据同步迁移工具)
+    * [Datax：离线数据同步工具](#datax离线数据同步工具)
+  * [ETL数据迁移](#etl数据迁移)
+    * [ETL构建企业级数据仓库五步法的流程](#etl构建企业级数据仓库五步法的流程)
+    * [kettle：ETL工具](#kettleetl工具)
+* [版本控制](#版本控制)
+  * [[Archery](https://github.com/hhyo/Archery](#archeryhttpsgithubcomhhyoarchery)
+  * [Yearning](#yearning)
+  * [Flyway](#flyway)
+  * [Liquibase](#liquibase)
+  * [Bytebase](#bytebase)
+* [性能测试](#性能测试)
+* [数据库发展](#数据库发展)
+  * [数据库流行度](#数据库流行度)
+  * [国产数据库](#国产数据库-1)
+    * [白鳝的洞穴：体系化与碎片化孰优孰劣？](#白鳝的洞穴体系化与碎片化孰优孰劣)
+    * [InfoQ：2024 中国数据库十大发展趋势总结](#infoq2024-中国数据库十大发展趋势总结)
+  * [数据库历史](#数据库历史)
 * [dba行业](#dba行业)
   * [学习](#学习)
     * [白鳝的洞穴：没有一个天才不勤奋](#白鳝的洞穴没有一个天才不勤奋)
@@ -83,33 +126,6 @@
     * [非法加冯：DBA还是一份好工作吗？](#非法加冯dba还是一份好工作吗)
     * [AustinDatabases：临时工说：云DBA 该做什么，云灭了DBA 不可能，完全不可能](#austindatabases临时工说云dba-该做什么云灭了dba-不可能完全不可能)
     * [非法加冯：云计算泥石流：下云合订本](#非法加冯云计算泥石流下云合订本)
-* [业务](#业务)
-* [第三方工具](#第三方工具)
-  * [sql](#sql)
-  * [客户端tui](#客户端tui)
-  * [AI](#ai)
-  * [画图](#画图)
-  * [gui客户端工具](#gui客户端工具)
-  * [BI数据可视化工具](#bi数据可视化工具)
-* [数据迁移](#数据迁移)
-  * [数据迁移案例](#数据迁移案例)
-    * [爱可生开源社区：技术分享 | 一次数据库迁移](#爱可生开源社区技术分享--一次数据库迁移)
-  * [数据迁移工具（支持多种数据库）](#数据迁移工具支持多种数据库)
-    * [CloudCanal：可视化数据同步迁移工具](#cloudcanal可视化数据同步迁移工具)
-    * [DataX-Web：异构数据迁移工具](#datax-web异构数据迁移工具)
-  * [ETL数据迁移](#etl数据迁移)
-    * [ETL构建企业级数据仓库五步法的流程](#etl构建企业级数据仓库五步法的流程)
-    * [ETL工具](#etl工具)
-      * [kettle](#kettle)
-      * [canal](#canal)
-        * [安装](#安装)
-        * [docker安装](#docker安装)
-        * [配置kafka](#配置kafka)
-* [数据库流行度](#数据库流行度)
-  * [国产数据库](#国产数据库-1)
-    * [白鳝的洞穴：体系化与碎片化孰优孰劣？](#白鳝的洞穴体系化与碎片化孰优孰劣)
-  * [数据库历史](#数据库历史)
-* [性能测试](#性能测试)
 * [新闻](#新闻)
 
 <!-- mtoc-end -->
@@ -1288,6 +1304,885 @@ http://127.0.0.1:3000
 
     ![image](./Pictures/database_concept/ER图.avif)
 
+# 业务
+
+- 2019年淘宝 11.11 活动。去年 11.11 一共成交了 12.92 亿笔订单，在电商领域是核心业务。算了一下，差不多每秒 15000 笔下单的操作。
+
+    - 看起来还好并不高，但这是个平均值，我们要看峰值。11.11 前 1 小时肯定是最高峰的，根据我的经验，峰值少说应该是平均值的 10 倍，但 11.11 少说是 20 倍。
+
+    - 每笔事务里有 5 - 6 次 SQL Query 操作，那 QPS 就可能达到 150 万。
+
+# 第三方工具
+
+- [ingestr：不同数据库的数据源导入导出](https://github.com/bruin-data/ingestr)
+
+## sql
+
+- [natural-sql：文本生成sql的llm模型](https://github.com/cfahlgren1/natural-sql)
+
+- [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
+
+- [sqlfluff: sql语句语法检查](https://github.com/sqlfluff/sqlfluff)
+
+- [sql-formatter：sql语句格式化的js库](https://github.com/sql-formatter-org/sql-formatter)
+
+- [Migrate：数据库迁移/变更工具](https://github.com/golang-migrate/migrate)
+
+    - 支持 MySQL、MariaDB、PostgreSQL、SQLite、Neo4j、ClickHouse 等不同类型的数据库。
+
+- [sqlmap: 自动检测和利用 SQL 注入漏洞，获得数据库服务器的权限。](https://github.com/sqlmapproject/sqlmap)
+
+- [SQLGlot：sql转换器，支持20多种如DuckDB, Presto / Trino, Spark / Databricks, Snowflake, and BigQuery.](https://github.com/tobymao/sqlglot)
+    ```py
+    import sqlglot
+
+    # SQL 转 Spark
+    sql = """WITH baz AS (SELECT a, c FROM foo WHERE a = 1) SELECT f.a, b.b, baz.c, CAST("b"."a" AS REAL) d FROM foo f JOIN bar b ON f.a = b.a LEFT JOIN baz ON f.a = baz.a"""
+    print(transpile(sql, write="spark", identify=True, pretty=True)[0])
+    ```
+
+- [qstudio：分析sql执行结果的桌面工具](https://github.com/timeseries/qstudio)
+
+## 客户端tui
+
+- [harlequin：sql tui](https://github.com/tconbeer/harlequin)
+    ```sh
+    // sqlite
+    harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
+
+    // DuckDB
+    harlequin "path/to/duck.db" "another_duck.db"
+
+    // mysql
+    pip install harlequin-mysql
+    harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
+    ```
+
+- [lazysql：支持MySQL、 PostgreSQL、 SQLite、 MSSQL、 MongoDB](https://github.com/jorgerojas26/lazysql)
+
+- [peepdb：支持MySQL, PostgreSQL, MariaDB, SQLite, MongoDB and Firebase.](https://github.com/PeepDB-dev/peepdb)
+
+## AI
+
+- [sqlchat](https://github.com/sqlchat/sqlchat)
+
+- [DB-GPT:local GPT](https://github.com/csunny/DB-GPT)
+
+- [Chat with your SQL database 📊. Accurate Text-to-SQL Generation via LLMs using RAG](https://github.com/vanna-ai/vanna)
+
+- [vanna](https://github.com/vanna-ai/vanna)
+    - 与你的 SQL 数据库聊天。该项目使用 LLM+RAG+数据库技术，让用户能够通过自然语言查询 SQL 数据库，用生成的 SQL 回答你的问题。
+
+## 画图
+
+- [dbdiagram：在线创建数据库的实体-关系图的工具](https://dbdiagram.io)
+
+- [drawdb：数据库实体关系（DBER）在线编辑器，无需注册即可直接在浏览器中使用。它提供了直观、可视化的操作界面，用户通过点击即可构建数据库表和导出建表语句，还可以导入建表语句，实现可视化编辑、错误检查等。支持 MySQL、PostgreSQL、SQLite、MariaDB、SQL Server 共 5 种常用的关系数据库。](https://github.com/drawdb-io/drawdb)
+    - [在线运行](https://drawdb.vercel.app/editor)
+
+- [chartdb：在线画数据库架构图](https://app.chartdb.io/diagrams/hwomiaf01nirsyqekjqdx9gbg)
+
+## gui客户端工具
+
+- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
+
+- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
+
+- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
+
+- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
+
+- [Navicat Premium Lite](https://navicat.com/en/products/navicat-premium-lite)：Navicat的免费版
+
+- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
+
+- [OmniDB](https://github.com/OmniDB/OmniDB)：支持多种数据库系统，如 PostgreSQL、MySQL、Oracle 等。它提供了丰富的功能，包括查询编辑、数据可视化等。它以其轻量级、跨平台兼容性以及响应式设计而著称，提供了统一的工作空间，使得用户可以在不离开当前页面的情况下管理不同的数据库系统。主要功能包括数据库连接管理、智能SQL编辑器、交互式表格、多主题支持、选项卡式SQL编辑器等。
+
+    - OmniDB 的优点是其轻量级的设计理念，跨平台特性以及对多种浏览器的支持，使得无论是Windows、Mac还是Linux用户都能享受到一致的使用体验。缺点是在处理大规模数据集或执行复杂查询时可能不如某些专用工具那样高效。
+
+- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
+
+- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
+
+- [dbgate](https://github.com/dbgate/dbgate) 是一款跨平台数据库管理工具，它适用于 MySQL、PostgreSQL、SQL Server、MongoDB、SQLite 及其他数据库，可在 Windows、Linux、Mac 运行。dbgate 还可以作为 Web 应用程序运行，使用户能够通过浏览器轻松访问和管理数据库。
+
+- [mayfly-go](https://github.com/dromara/mayfly-go)web 版 linux(终端[终端回放] 文件 脚本 进程 计划任务)、数据库（mysql postgres oracle sqlserver 达梦 高斯 sqlite）、redis(单机 哨兵 集群)、mongo 等集工单流程审批于一体的统一管理操作平台
+
+- [FastoNoSQL](https://github.com/fastogt/fastonosql)支持Redis, Memcached, SSDB, LevelDB, RocksDB, UnQLite, LMDB, ForestDB, Pika, Dynomite, KeyDB
+
+- [Chat2DB](https://github.com/chat2db/Chat2DB)集成了AI和BI报表功能的新一代数据库管理系统。支持MySQL, PostgreSQL, H2, Oracle, SQLServer, SQLite, MariaDB, ClickHouse, DM, Presto, DB2, OceanBase, Hive, KingBase, MongoDB, Redis, Snowflake
+
+- [whodb](https://github.com/clidey/whodb?tab=readme-ov-file)一个基于浏览器的数据库管理工具，支持 Postgres、MySQL、SQLite、MongoDB、 Redis。
+
+- [SQLark：达梦出品](https://ask.sqlark.com/)支持DM 7.0 及以上，Oracle 11g 及以上，MySQL 5.7、8.0
+
+## BI数据可视化工具
+
+- [（视频）搞大屏的小北BI：BI 四大门派对决，你选哪一派？十大 BI 工具，哪一个更适合你？](https://www.bilibili.com/video/BV1vdcEe3EdT)
+
+- [dataease：由飞致云企业开发，同时还开发过1panel项目，由于是国产因此本地化比较好，Tableau、帆软的开源替代。](https://github.com/dataease/dataease)
+    - [在线体验](https://demo.dataease.cn/#/login?redirect=/workbranch/index)
+
+- [superset](https://github.com/apache/superset)
+
+- [metabase](https://github.com/metabase/metabase)
+
+# 中间件
+
+| 中间件         | 支持数据库类型                    | 功能                             | 性能                             | 生态支持                           |
+| -              | -                                 | -                                | -                                | -                                  |
+| ShardingSphere | 多种数据库（MySQL, PostgreSQL等） | 数据分片、读写分离、分布式事务   | 高性能，适合大规模分布式系统     | 社区活跃，Apache顶级项目，文档齐全 |
+| MySQL Proxy    | 主要支持MySQL                     | 基本的读写分离和负载均衡         | 性能一般，适合中小规模应用       | 社区维护较少，官方不再更新         |
+| Mycat          | MySQL, PostgreSQL, Oracle等       | 数据分片、读写分离、全局表、缓存 | 中等到高性能，适合中大型应用     | 社区活跃，文档较为齐全             |
+| ProxySQL       | MySQL及其兼容数据库               | 高级读写分离、查询重写、故障切换 | 高性能，优化了查询路由和负载均衡 | 社区活跃，官方支持，文档齐全       |
+
+## [ShardingSphere：分布式数据库中间件](https://github.com/apache/shardingsphere)
+
+- ShardingSphere 是一套开源的分布式数据库中间件解决方案，主要在应用程序和数据库之间，提供数据分片、分布式事务、读写分离、数据库网关、数据加密等功能，本身不直接存储数据，而是通过对SQL的分析、拦截和处理，将SQL 分发到不同的数据库实例或表中，最终返回聚合的查询结果。他主要包括 ShardingSphere-JDBC、ShardingSphere-Proxy、ShardingSphere-Scaling 三个核心组件。目前，ShardingSphere 是 Apache 基金会的顶级开源项目，由 Apache 基金会孵化和维护，其中SphereEx 公司深度参与。
+
+- ShardingSphere 的优点有轻量级可嵌入应用，扩展性强可动态添加数据源和规则，支持多种数据库，高性能，兼容性好完全兼容 JDBC 和数据库客户端。缺点是在超大规模分片场景下配置复杂度较高，跨分片复杂查询，如多表 JOIN的性能优化有限，且对某些数据库特有功能，比如 Oracle 高级分区等兼容性需定制化适配。
+
+## [Mycat：分布式数据库中间件](https://github.com/MycatOne/Mycat2)
+
+- Mycat 是一款开源的分布式数据库中间件，最初由阿里集团内部项目 Cobar 演化而来。它实现了MySQL协议，可作为数据库代理，前端能用MySQL客户端工具访问，后端能通过MySQL原生协议与多个MySQL服务器通信，也能用JDBC协议与主流数据库服务器通信。Mycat的主要功能包括分库分表、故障切换，基于Nio实现，多租户方案、分布式事务、全局序列号等。
+
+- Mycat的优点是功能和支持数据库类型丰富、有活跃的社区和比较丰富的文档，以及在高并发场景下的高性能表现；缺点是维护复杂性，在复杂SQL 的解析处理，以及在多维读写场景下的使用限制等。
+
+## [MySQL Proxy](https://github.com/mysql/mysql-proxy)
+
+- MySQL Proxy是一款 Oracle 官方提供的MySQL 数据库中间件。它主要用于监测、分析或改变客户端与MySQL服务器之间的通信，把前台应用的连接请求转交给后台的数据库，并结合相关脚本，可实现复杂的连接控制与过滤，从而实现读写分离和负载平衡的效果。另外，对于应用而言 MySQL Proxy 是完全透明的，应用只需连接到MySQL Proxy的监听端口，主要功能包括负载平衡、故障分析、查询分析、查询过滤和修改等。
+
+- MySQL Proxy 的优点在于配置相对简单，通过一些基本参数设置就能快速实现如读写分离等功能，并且具有较好的灵活性，并可以根据具体业务需求定制复杂的逻辑。缺点是相比其他数据库中间件，在功能丰富度上可能有所欠缺。
+
+## [ProxySQL：MySQL 代理中间件](https://github.com/sysown/proxysql)
+
+- ProxySQL 是一个 MySQL 代理中间件，可以对客户端的 SQL 请求进行路由和负载均衡，并会监控主从节点的状态，将读请求分发到从服务器上，将写请求转发到主服务器上。当主服务器出现故障时，ProxySQL 可以自动将写请求切换到备用的主服务器上。Porxy 不仅可以实现故障切换，也可以实现读写分离；缺点是增加了中间件的复杂度，可能会引入一定的性能开销，并需要对 ProxySQL 进行额外的配置和维护。
+
+# 数据迁移
+
+## 数据迁移案例
+
+### [爱可生开源社区：技术分享 | 一次数据库迁移](https://mp.weixin.qq.com/s/wqjmTi1IG74wSDQx0Kl8gA)
+
+- 总的来说数据库迁移总共分三步，和把大象装冰箱差不多。
+
+    - 1.迁移前准备
+    - 2.进行迁移
+    - 3.数据验证
+
+- 背景描述
+
+    - 客户共有三套业务库，需要迁移至新的实例中，这里称为业务 A，业务 B，业务 C。其中业务 B 和业务 C 需要合并成一套。
+
+- 迁移前准备
+
+    - 迁移前准备包含：环境信息收集，数据同步，迁移前确认
+
+    ![image](./Pictures/mysql/数据迁移案例-迁移前后清单.avif)
+
+    - 数据同步的部分我们需要明确的是，当该步骤完成后应该保证旧实例与新实例数据实时同步，在迁移下发窗口只进行单纯的迁移以及数据验证。
+
+- 数据同步步骤
+
+    - 1.创建新实例
+
+        - 创建新的实例时，尤其需要注意对比旧实例的配置文件，防止由于配置不同，导致数据在新实例出现异常。
+
+    - 2.备份旧实例数据，导入新实例
+
+        - 由于客户旧实例环境只能使用 mysqldump 备份，所以备份还原使用的是 mysqldump。
+
+        - 业务 A 是可以直接全库备份的，但需要注意，全库备份不仅要备份数据，还要备份触发器，存储过程，事件。
+
+            ```sh
+            # 全库备份
+            mysqldump -h127.0.0.1 -P3306 -uroot -p --default-character-set=utf8mb4 --single-transaction --master-data=2 --flush-logs --hex-blob --triggers --routines --events --all-databases > all_db.sql
+            ```
+
+        - 业务 B 以及业务 C 由于需要进行合并，并且这两个业务在各自实例中都是使用了一个单独的库，所以备份时进行单库备份。
+
+            ```sh
+            # 单库备份
+            mysqldump -h127.0.0.1 -uroot -P3306 -p --default-character-set=utf8mb4 --master-data=2 --flush-logs --single-transaction --set-gtid-purged=off --hex-blob --databases  databasename  > one_database.sql
+            ```
+
+        - 在导入完成时需要注意，MySQL 5.7 全库备份时不会备份 mysql.proc 下的系统自身的存储过程，可以在执行完导入后先执行一次升级。
+
+            ```sh
+            # 执行升级
+            mysql_upgrade --upgrade-system-tables --skip-verbose --force
+            ```
+
+    - 3.建立复制保证数据实时同步。
+
+        - 将旧实例与新实例建立复制关系，保证数据实时同步 新实例与旧实例建立复制的地址建议使用 vip 进行，这样能够保证当前使用复制地址的可靠性，若无 vip 或者必须使用旧实例的从库地址进行级联复制，则一定要确保各级复制的正常运行。
+
+        - 首先需要有复制用户，用来建立复制，若无法提供则需要专门创建一个迁移用的复制用户，该用户建议迁移结束后进行回收。
+
+        - 业务 A 旧实例与新实例的复制建立比较简单直接正常建立就没问题。
+
+            ```
+            # 新实例的主库执行，建立旧实例到新实例的复制
+            CHANGE MASTER TO MASTER_HOST='10.186.60.201',
+            MASTER_USER='repl',
+            MASTER_PORT=3307,
+            MASTER_PASSWORD='repl',
+            MASTER_AUTO_POSITION = 1;
+
+            start slave;
+            ```
+
+        - 业务 B 与 C 需要合并，所以这次保证数据实时同步采用了多源复制的方式。
+
+            ```
+            # 在新实例的主库执行，将业务B与C的数据都复制到新实例中。
+            CHANGE MASTER TO MASTER_HOST='10.186.60.209',
+            MASTER_USER='repl',
+            MASTER_PORT=3307,
+            MASTER_PASSWORD='repl',
+            MASTER_AUTO_POSITION = 1 FOR CHANNEL 'channel1';
+
+            CHANGE MASTER TO MASTER_HOST='10.186.60.210',
+            MASTER_USER='repl',
+            MASTER_PORT=3307,
+            MASTER_PASSWORD='repl',
+            MASTER_AUTO_POSITION = 1 FOR CHANNEL 'channel2';
+
+            start slave;
+            ```
+
+- 迁移前确认
+
+    - 迁移前确认事项我这边同样是列了清单，具体事项需要根据具体情况修改。
+    ![image](./Pictures/mysql/数据迁移案例-检查清单.avif)
+
+    - 其中 OM 是旧主实例，NM 是新主实例，OS 是旧从实例，NS 是新从实例。
+
+    - 迁移检查需要在迁移前多次确认，比如在迁移准备完成时确认一次，迁移正式开始前再确认一次。
+
+- 进行迁移
+
+    - 1.确认无流量写入
+
+        - 下发开始后首先需要确认业务是否全部停止，是否还有流量写入，
+
+        - 我们也可以查看 gtid 是否还有变化判断。
+        ```sql
+        # 查看实例状态
+        show master status\G
+        ```
+
+    - 2.解绑旧集群的 VIP，设置旧实例为只读
+
+        - 在确认无流量写入后，解除旧集群 vip，设置旧实例为只读模式，防止有数据再次写入。
+        ```sql
+        # 解绑vip
+        ip addr del 10.186.60.201/25 dev eth0
+
+        # 设置旧实例为只读库，防止数据写入
+        show global variables like '%read_on%';
+        set global super_read_only=1;
+        show global variables like '%read_on%';
+        ```
+
+    - 3.断开新老集群复制
+
+        ```sql
+        # 断开复制
+        stop slave;
+        ```
+
+        - 做完该步骤，新老集群状态应该完全一致，可以对比新老集群状态。
+
+- 数据验证
+    - 在确认新老集群状态一致后，可以由业务部门进行数据验证。
+
+## 数据迁移工具（支持多种数据库）
+
+| 工具       | 数据库类型       | 实时性 | 性能                               | 生态支持                         | 适用场景                    |
+| -          | -                | -      | -                                  | -                                | -                           |
+| Maxwell    | MySQL            | 实时   | 性能较好，适合中小规模数据同步     | 社区活跃，文档较为齐全           | MySQL 的数据增量同步        |
+| Canal      | MySQL            | 实时   | 性能良好，适合大规模数据同步       | 阿里开源，社区活跃，文档丰富     | MySQL 的数据增量同步        |
+| RedisShake | Redis            | 实时   | 高性能，适合大规模数据同步和迁移   | 阿里开源，社区活跃，文档较全     | Redis数据同步、迁移和备份   |
+| MongoShake | MongoDB          | 实时   | 高性能，适合大规模数据同步和迁移   | 阿里开源，社区活跃，文档较全     | MongoDB数据同步、迁移和备份 |
+| Debezium   | 主流数据库均支持 | 实时   | 性能依赖于具体连接器，适合中等规模 | 社区活跃，丰富的第三方集成和支持 | 分布式系统的变更数据捕获    |
+| Kettle     | 主流数据库均支持 | 离线   | 中等到高性能，适合复杂ETL任务      | 开源项目，广泛使用，文档齐全     | 复杂ETL任务，数据集成和转换 |
+| DataX      | 主流数据库均支持 | 离线   | 高性能，适合大数据量同步           | 阿里开源，文档齐全，社区活跃     | 高效的大数据量同步          |
+
+- [数仓与大数据：数据仓库ETL工具全解](https://mp.weixin.qq.com/s/JTE3K6VfiYEAOSyYgN-KPA)
+
+### [Maxwell](https://github.com/zendesk/maxwell)
+
+- Maxwell 是一个开源的 MySQL 实时数据同步工具，由 Zendesk 开发并开源。他的原理是通过实时捕获 MySQL 的binlog，将数据以 JSON 格式输出到Kafka、Kinesis 以及其他流平台中，以实现MySQL 数据库实时数据同步、数据复制、数据集成。
+
+- 他的原理是监听MySQL 的binlog， 会记录数据库中所有的DML，然后对其进行解析，将二进制格式的 binlog 转换为易于理解的 JSON 格式。优点是实时性强、对数据库入侵小、数据输出格式友好、支持多种目标数据，缺点是不支持全量数据同步，也不支持DDL的变更。
+
+### [canal](https://github.com/alibaba/canal)
+
+- [李文周：Canal介绍和使用指南](https://mp.weixin.qq.com/s/9jDlMssry-_UWzSm1R-Ypg)
+
+- Canal 是阿里开源的一款 MySQL 数据库增量日志解析工具，提供增量数据订阅和消费。使用Canal能够实现异步更新数据，配合MQ使用可在很多业务场景下发挥巨大作用。
+    ![image](./Pictures/mysql/canal.avif)
+
+    - 优点：支持实时数据同步、性能强大、目标数据源丰富，同时有良好的生态社区。
+    - 缺点：不支持全量以及DDL，也缺乏web管理同时对负责的数据类型，如几何、JSON 等类型存在一定局限性。
+
+- MySQL主备复制原理
+    - MySQL master 将数据变更写入二进制日志( binary log, 其中记录叫做二进制日志事件binary log events，可以通过 show binlog events 进行查看)
+    - MySQL slave 将 master 的 binary log events 拷贝到它的中继日志(relay log)
+    - MySQL slave 重放 relay log 中事件，将数据变更反映它自己的数据
+
+- Canal 工作原理
+    - Canal 模拟 MySQL slave 的交互协议，伪装自己为 MySQL slave ，向 MySQL master 发送 dump 协议
+    - MySQL master 收到 dump 请求，开始推送 binary log 给 slave (即 Canal )
+    - Canal 解析 binary log 对象(原始为 byte 流)
+
+[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
+
+#### 安装
+
+- [canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
+
+- 1.需要先开启MySQL的 Binlog 写入功能。`my.cnf`配置
+    ```ini
+    [mysqld]
+    log-bin=mysql-bin # 开启 binlog
+    binlog-format=ROW # 选择 ROW 模式
+    server_id=1 # 配置 MySQL replaction 需要定义，不要和 canal 的 slaveId 重复
+    ```
+
+    - 重启mysql
+
+    - 验证
+        ```sql
+        -- 查看是否开启了binlog
+        show variables like 'log_bin';
+        +---------------+-------+
+        | Variable_name | Value |
+        +---------------+-------+
+        | log_bin       | ON    |
+        +---------------+-------+
+
+        -- 查看是否为row格式
+        show variables like 'binlog_format';
+        +---------------+-------+
+        | Variable_name | Value |
+        +---------------+-------+
+        | binlog_format | ROW   |
+        +---------------+-------+
+        ```
+
+- 2.添加授权
+    ```sql
+    -- 下面的命令是先创建一个名为canal的账号，密码为canal。再对其进行授权，如果已有账户可直接 grant。
+    CREATE USER canal IDENTIFIED BY 'canal';
+    GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
+    -- GRANT ALL PRIVILEGES ON *.* TO 'canal'@'%' ;
+    FLUSH PRIVILEGES;
+    ```
+
+- 3.安装canal
+
+    - 在[release页面](https://github.com/alibaba/canal/releases) 下载
+
+    ```sh
+    # 这里的版本为1.0.17
+    curl -LO https://github.com/alibaba/canal/releases/download/canal-1.1.7/canal.deployer-1.1.7.tar.gz
+
+    # 解压缩
+    x canal.deployer-1.1.7.tar.gz
+
+    # 一共5个目录
+    cd canal.deployer-1.1.7
+    ll
+    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I bin/
+    drwxr-xr-x 5 - tz tz 20 Apr 17:31 -I conf/
+    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I lib/
+    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I logs/
+    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I plugin/
+    ```
+
+- 4.修改配置文件`canal.deployer-1.1.7/conf/example/instance.properties`
+
+    - 将canal.instance.master.address修改为你的MySQL地址。
+    - 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
+    - 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
+
+    ```
+    canal.instance.master.address=127.0.0.1:3306
+    canal.instance.tsdb.dbUsername=canal
+    canal.instance.tsdb.dbPassword=canal
+    ```
+- 启动
+
+    ```sh
+    sh bin/startup.sh
+    ```
+
+- 查看server日志
+    ```sh
+    cat logs/canal/canal_stdout.log
+    ```
+
+- 关闭
+    ```sh
+    sh bin/stop.sh
+    ```
+
+#### docker安装
+
+```sh
+# 拉取canal
+docker pull canal/canal-server:latest
+
+# 启动容器
+docker run -d --name canal-server -p 11111:11111 canal/canal-server
+
+# 进入容器
+docker exec -it canal-server /bin/bash
+
+# 修改配置
+# 将canal.instance.master.address修改为你的MySQL地址。
+# 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
+# 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
+vi canal-server/conf/example/instance.properties
+
+# 重启容器
+docker container restart canal-server
+```
+
+- 启动Canal Server之后，我们可以使用Canal客户端连接Canal进行消费，本文以Go客户端canal-go为例，演示如何从canal-server消费数据。
+
+```go
+package main
+
+import (
+ "fmt"
+ "time"
+
+ pbe "github.com/withlin/canal-go/protocol/entry"
+
+ "github.com/golang/protobuf/proto"
+ "github.com/withlin/canal-go/client"
+)
+
+// canal-go client demo
+
+func main() {
+ // 连接canal-server
+ connector := client.NewSimpleCanalConnector(
+  "127.0.0.1", 11111, "", "", "example", 60000, 60*60*1000)
+ err := connector.Connect()
+ if err != nil {
+  panic(err)
+ }
+
+ // mysql 数据解析关注的表，Perl正则表达式.
+ err = connector.Subscribe(".*\\..*")
+ if err != nil {
+  fmt.Printf("connector.Subscribe failed, err:%v\n", err)
+  panic(err)
+ }
+
+ // 消费消息
+ for {
+  message, err := connector.Get(100, nil, nil)
+  if err != nil {
+   fmt.Printf("connector.Get failed, err:%v\n", err)
+   continue
+  }
+  batchId := message.Id
+  if batchId == -1 || len(message.Entries) <= 0 {
+   time.Sleep(time.Second)
+   fmt.Println("===暂无数据===")
+   continue
+  }
+  printEntry(message.Entries)
+ }
+}
+
+func printEntry(entries []pbe.Entry) {
+ for _, entry := range entries {
+  // 忽略事务开启和事务关闭类型
+  if entry.GetEntryType() == pbe.EntryType_TRANSACTIONBEGIN || entry.GetEntryType() == pbe.EntryType_TRANSACTIONEND {
+   continue
+  }
+  // RowChange对象，包含了一行数据变化的所有特征
+  rowChange := new(pbe.RowChange)
+  // protobuf解析
+  err := proto.Unmarshal(entry.GetStoreValue(), rowChange)
+  if err != nil {
+   fmt.Printf("proto.Unmarshal failed, err:%v\n", err)
+  }
+  if rowChange == nil {
+   continue
+  }
+  // 获取并打印Header信息
+  header := entry.GetHeader()
+  fmt.Printf("binlog[%s : %d],name[%s,%s], eventType: %s\n",
+   header.GetLogfileName(),
+   header.GetLogfileOffset(),
+   header.GetSchemaName(),
+   header.GetTableName(),
+   header.GetEventType(),
+  )
+  //判断是否为DDL语句
+  if rowChange.GetIsDdl() {
+   fmt.Printf("isDdl:true, sql:%v\n", rowChange.GetSql())
+  }
+
+  // 获取操作类型：insert/update/delete等
+  eventType := rowChange.GetEventType()
+  for _, rowData := range rowChange.GetRowDatas() {
+   if eventType == pbe.EventType_DELETE {
+    printColumn(rowData.GetBeforeColumns())
+   } else if eventType == pbe.EventType_INSERT || eventType == pbe.EventType_UPDATE {
+    printColumn(rowData.GetAfterColumns())
+   } else {
+    fmt.Println("---before---")
+    printColumn(rowData.GetBeforeColumns())
+    fmt.Println("---after---")
+    printColumn(rowData.GetAfterColumns())
+   }
+  }
+ }
+}
+
+func printColumn(columns []*pbe.Column) {
+ for _, col := range columns {
+  fmt.Printf("%s:%s  update=%v\n", col.GetName(), col.GetValue(), col.GetUpdated())
+ }
+}
+```
+
+#### 配置kafka
+
+- Canal 1.1.1版本之后，默认支持将Canal Server接收到的binlog数据直接投递到MQ，目前默认支持的MQ系统有Kafka、RocketMQ、RabbitMQ、PulsarMQ。
+
+- 加入mq配置`canal.deployer-1.1.7/conf/example/instance.properties`
+    ```
+    # mq config
+    # 设置默认的topic
+    canal.mq.topic=example
+    # 针对库名或者表名发送动态topic
+    #canal.mq.dynamicTopic=mytest,.*,mytest.user,mytest\\..*,.*\\..*
+    canal.mq.partition=0
+    # hash partition config
+    #canal.mq.partitionsNum=3
+    #库名.表名: 唯一主键，多个表之间用逗号分隔
+    #canal.mq.partitionHash=mytest.person:id,mytest.role:id
+    ```
+
+    - `canal.mq.dynamicTopic`配置说明。
+
+        - Canal 1.1.3版本之后, 支持配置格式为：schema 或 schema.table，多个配置之间使用逗号或分号分隔。
+
+            - 例子1：test\\.test 指定匹配的单表，发送到以test_test为名字的topic上
+            - 例子2：.*\\..* 匹配所有表，则每个表都会发送到各自表名的topic上
+            - 例子3：test 指定匹配对应的库，一个库的所有表都会发送到库名的topic上
+            - 例子4：test\\..* 指定匹配的表达式，针对匹配的表会发送到各自表名的topic上
+            - 例子5：test,test1\\.test1，指定多个表达式，会将test库的表都发送到test的topic上，test1\\.test1的表发送到对应的test1_test1 topic上，其余的表发送到默认的canal.mq.topic值
+
+        - 为满足更大的灵活性，Canal还允许对匹配条件的规则指定发送的topic名字，配置格式：topicName:schema 或 topicName:schema.table。
+
+            - 例子1: test:test\\.test 指定匹配的单表，发送到以test为名字的topic上
+            - 例子2: test:.*\\..* 匹配所有表，因为有指定topic，则每个表都会发送到test的topic下
+            - 例子3: test:test 指定匹配对应的库，一个库的所有表都会发送到test的topic下
+            - 例子4：testA:test\\..* 指定匹配的表达式，针对匹配的表会发送到testA的topic下
+            - 例子5：test0:test,test1:test1\\.test1，指定多个表达式，会将test库的表都发送到test0的topic下，test1\\.test1的表发送到对应的test1的topic下，其余的表发送到默认的canal.mq.topic值
+
+- 修改canal 配置文件 `canal.deployer-1.1.7/conf/canal.properties`
+
+    ```
+    # ...
+    # 可选项: tcp(默认), kafka,RocketMQ,rabbitmq,pulsarmq
+    canal.serverMode = kafka
+    # ...
+
+    # 是否为flat json格式对象
+    canal.mq.flatMessage = true
+    # Canal的batch size, 默认50K, 由于kafka最大消息体限制请勿超过1M(900K以下)
+    canal.mq.canalBatchSize = 50
+    # Canal get数据的超时时间, 单位: 毫秒, 空为不限超时
+    canal.mq.canalGetTimeout = 100
+    canal.mq.accessChannel = local
+
+    ...
+
+    ######################################
+    #######                    Kafka                   ##########
+    ######################################
+    # 此处配置修改为你的Kafka环境地址
+    kafka.bootstrap.servers = 127.0.0.1:9092
+    kafka.acks = all
+    kafka.compression.type = none
+    kafka.batch.size = 16384
+    kafka.linger.ms = 1
+    kafka.max.request.size = 1048576
+    kafka.buffer.memory = 33554432
+    kafka.max.in.flight.requests.per.connection = 1
+    kafka.retries = 0
+
+    kafka.kerberos.enable = false
+    kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
+    kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
+
+    # sasl demo
+    # kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
+    # kafka.sasl.mechanism = SCRAM-SHA-512
+    # kafka.security.protocol = SASL_PLAINTEXT
+    ```
+
+- 按上述修改Canal配置后，重启Canal服务即可。
+
+#### [Se7en的架构笔记：Canal Admin 高可用集群使用教程](https://mp.weixin.qq.com/s/RPIxKAPKgyQv02XJDiRMfA)
+
+### [Debezium](https://github.com/debezium/debezium)
+
+- Debezium 是一款开源的变更数据捕获（Change Data Capture, CDC）工具，能够实时监控数据库的变更，支持多种主流数据库，如 MySQL、PostgreSQL、MongoDB、SQL Server 等，支持全量迁移以及增量数据同步。增量实现是通过读取数据库的事务日志（如 MySQL 的 binlog、PostgreSQL 的 WAL 日志等）来捕获数据变更
+
+- Debezium 的优点是实时性高，支持多种数据库，通过消息队列作为中间层，将数据生产者（源数据库）和消费者（目标系统）解耦，提高了系统的灵活性和可维护性。缺点是配置复杂，全量迁移时，在一些场景需要通过快照一致性读实现。
+
+
+### [debezium](https://github.com/debezium/debezium
+
+- Debezium 是一款开源的变更数据捕获（Change Data Capture, CDC）工具，能够实时监控数据库的变更，支持多种主流数据库，如 MySQL、PostgreSQL、MongoDB、SQL Server 等，支持全量迁移以及增量数据同步。增量实现是通过读取数据库的事务日志（如 MySQL 的 binlog、PostgreSQL 的 WAL 日志等）来捕获数据变更
+
+- Debezium 的优点是实时性高，支持多种数据库，通过消息队列作为中间层，将数据生产者（源数据库）和消费者（目标系统）解耦，提高了系统的灵活性和可维护性。缺点是配置复杂，全量迁移时，在一些场景需要通过快照一致性读实现。
+
+### [CloudCanal：可视化数据同步迁移工具](https://www.clougence.com/)
+
+- [Se7en的架构：笔记可视化数据同步迁移工具 CloudCanal](https://mp.weixin.qq.com/s/fRACj3W1Yn0o9k_MqKyaeQ)
+
+- [cloudcanal-exporter：prometheus监控](https://github.com/dream-mo/cloudcanal-exporter)
+
+### [Datax：离线数据同步工具](https://github.com/alibaba/DataX)
+
+- [DataX-Web：异构数据迁移工具](https://github.com/WeiYe-Jing/datax-web)
+
+- DataX 是阿里巴巴集团内被广泛使用的离线数据同步工具/平台，实现包括 MySQL、SQL Server、Oracle、PostgreSQL、HDFS、Hive、HBase、OTS、ODPS 等各种异构数据源之间高效的数据同步功能。通过将不同数据源的同步抽象为从源头数据源读取数据的Reader插件，以及向目标端写入数据的Writer插件，因此理论上可以支持任意数据源类型的数据同步工作。主要功能包括从不同数据源读取数据（如关系型数据库、NoSQL 数据库、文件系统等）、高效的数据转换、清洗和过滤、以及将处理后的数据写入目标数据源。
+
+- DataX 的优点在于其对异构数据源的强大兼容性、高度可定制的数据转换能力、以及模块化的设计使得扩展新插件变得简单，配置和使用也较为简单，同时拥有活跃的社区支持。缺点是对于某些高级需求，如实时数据同步则需要结合其他技术来实现。DataX 是离线数据迁移、同步的首选工具。
+
+- 优点：
+    - 支持多种同步模式（全量、增量、混合）。
+    - 支持MongoDB集群和副本集的同步。
+    - 高性能，支持大规模数据传输。
+
+- 缺点：
+    - 仅支持MongoDB数据库，适用范围有限。
+    - 对于某些复杂场景的配置和调优较为复杂。
+
+- 使用场景：
+    - MongoDB数据迁移：在不影响业务运行的情况下，将数据从一个MongoDB集群迁移到另一个集群。
+    - 灾备恢复：将MongoDB数据同步到备份集群，用于灾难恢复。
+    - 数据同步：在多环境下同步MongoDB数据，保持数据一致性。
+
+- [DBA实战：DataX 异构数据迁移工具：实现 Web 页面轻松操作](https://mp.weixin.qq.com/s/DiwSXFU15QZVwOT9MrUCUg)
+
+
+## ETL数据迁移
+
+- ETL是数据抽取（Extract）、转换（Transform）、加载（Load ）的简写，它是将OLTP系统中的数据经过抽取，并将不同数据源的数据进行转换、整合，得出一致性的数据，然后加载到数据仓库中。简而言之ETL是完成从 OLTP系统到OLAP系统的过程
+
+- 数据仓库的架构
+    - 星型架构中间为事实表，四周为维度表， 类似星星
+    - 雪花型架构中间为事实表，两边的维度表可以再有其关联子表，而在星型中只允许一张表作为维度表与事实表关联，雪花型一维度可以有多张表，而星型 不可以。
+    - 考虑到效率时，星型聚合快，效率高，不过雪花型结构明确，便于与OLTP系统交互。
+
+- ETL和SQL的区别与联系
+
+    - ETL的优点：
+        - 比如我有两个数据源，一个是数据库的表，另外一个是excel数据，而我需要合并这两个数据，通常这种东西在SQL语句中比较难实现。但是ETL却有很多现成的组件和驱动，几个组件就搞定了。
+        - 比如跨服务器，并且服务器之间不能建立连接的数据源，比如我们公司系统分为一期和二期，存放的数据库是不同的，数据结构也不相同，数据库之间也不能建立连接，这种情况下，ETL就显得尤为重要和突出。
+
+    - SQL的优点：效率高的多
+
+### ETL构建企业级数据仓库五步法的流程
+
+- 1.确定主题
+    - 即 确定数据分析或前端展现的某一方面的分析主题，例如我们分析某年某月某一地区的啤酒销售情况，就是一个主题。主题要体现某一方面的各分析角度（维度）和统 计数值型数据（量度），确定主题时要综合考虑，一个主题在数据仓库中即为一个数据集市，数据集市体现了某一方面的信息，多个数据集市构成了数据仓库。
+
+- 2.确定量度
+    - 在 确定了主题以后，我们将考虑要分析的技术指标，诸如年销售额此类，一般为数值型数据，或者将该数据汇总，或者将该数据取次数，独立次数或取最大最小值 等，这样的数据称之为量度。量度是要统计的指标，必须事先选择恰当，基于不同的量度可以进行复杂关键性能指标（KPI）等的计算。
+
+- 3.确定事实数据粒度
+    - 在 确定了量度之后我们要考虑到该量度的汇总情况和不同维度下量度的聚合情况，考虑到量度的聚合程度不同，我们将采用“最小粒度原则”，即将量度的粒度设置 到最小，例如我们将按照时间对销售额进行汇总，目前的数据最小记录到天，即数据库中记录了每天的交易额，那么我们不能在ETL时将数据进行按月或年汇总， 需要保持到天，以便于后续对天进行分析。而且我们不必担心数据量和数据没有提前汇总带来的问题，因为在后续的建立CUBE时已经将数据提前汇总了。
+
+- 4.确定维度
+
+    - 维 度是要分析的各个角度，例如我们希望按照时间，或者按照地区，或者按照产品进行分析，那么这里的时间、地区、产品就是相应的维度，基于不同的维度我们可 以看到各量度的汇总情况，我们可以基于所有的维度进行交叉分析。这里我们首先要确定维度的层次（Hierarchy）和级别（Level），维度的层次是指该维度的所有级别，包括各级别的属性；维度的级别是指该维度下的成员，例如当建立地区维度时我们将地区维度作为一 个级别，层次为省、市、县三层，考虑到维度表要包含尽量多的信息，所以建立维度时要符合“矮胖原则”，即维度表要尽量宽，尽量包含所有的描述性信息，而不 是统计性的数据信息。
+
+    - 还有一种常见的情况，就是父子型维度，该维度一般用于非叶子节点含有成员等情况，例如公司员工 的维度，在统计员工的工资时，部 门主管的工资不能等于下属成员工资的简单相加，必须对该主管的工资单独统计，然后该主管部门的工资等于下属员工工资加部门主管的工资，那么在建立员工维度 时，我们需要将员工维度建立成父子型维度，这样在统计时，主管的工资会自动加上，避免了都是叶子节点才有数据的情况。
+
+    - 另外，在建立维度表时要充 分使用代理键，代理键是数值型的ID号码，好处是代理键唯一标识了每一维度成员信息，便于区分，更重要的是在聚合时由于数值型匹 配，JOIN效率高，便于聚合，而且代理键对缓慢变化维度有更重要的意义，它起到了标识历史数据与新数据的作用，在原数据主键相同的情况下，代理键起到了 对新数据与历史数据非常重要的标识作用。
+
+    - 有时我们也会遇到维度缓慢变化的情况，比如增加了新的产品，或者产品的ID号码修改了，或者产品增加了一个新的属性，此时某一维度的成员会随着新的数据的加入而增加新的维度成员，这样我们要考虑到缓慢变化维度的处理，对于缓慢变化维度，有三种情况：
+
+        - 1.缓慢变化维度第一种类型：历史数据需要修改。这样新来的数据要改写历史数据，这时我们要使用UPDATE，例如产品的ID号码为123，后来发现ID 号码错误了，需要改写成456，那么在修改好的新数据插入时，维度表中原来的ID号码会相应改为456，这样在维度加载时要使用第一种类型，做法是完全更 改。
+
+        - 2.缓慢变化维度第二种类型：历史数据保留，新增数据也要保留。这时要将原数据更新，将新数据插入，需要使用UPDATE / INSERT，比如某一员工2005年在A部门，2006年时他调到了B部门。那么在统计2005年的数据时就应该将该员工定位到A部门；而在统计 2006年数据时就应该定位到B部门，然后再有新的数据插入时，将按照新部门（B部门）进行处理，这样我们的做法是将该维度成员列表加入标识列，将历史的 数据标识为“过期”，将目前的数据标识为“当前的”。另一种方法是将该维度打上时间戳，即将历史数据生效的时间段作为它的一个属性，在与原始表匹配生成事 实表时将按照时间段进行关联，这样的好处是该维度成员生效时间明确。
+
+        - 3.缓慢变化维度第三种类型：新增数据维度成员改变了属性。例如某一维度成 员新加入了一列，该列在历史数据中不能基于它浏览，而在目前数据和将来数据中可 以按照它浏览，那么此时我们需要改变维度表属性，即加入新的列，那么我们将使用存储过程或程序生成新的维度属性，在后续的数据中将基于新的属性进行查看。
+
+- 5.创建事实表
+
+    - 在确定好事实数据和维度后，我们将考虑加载事实表。
+
+    - 在公司的大量数据堆积如山时，我们想看看里面究竟是什么，结果发现里面是一笔笔生产记录，一笔笔交易记录… 那么这些记录是我们将要建立的事实表的原始数据，即关于某一主题的事实记录表。
+
+    - 我 们的做法是将原始表与维度表进行关联，生成事实表。注意在关联时有为空的数据时（数据源脏），需要使用外连接，连接后我们将 各维度的代理键取出放于事实表中，事实表除了各维度代理键外，还有各量度数据，这将来自原始表，事实表中将存在维度代理键和各量度，而不应该存在描述性信 息，即符合“瘦高原则”，即要求事实表数据条数尽量多（粒度最小），而描述性信息尽量少。
+
+    - 如果考虑到扩展，可以将事实表加一唯一标识列，以为了以后扩展将该事实作为雪花型维度，不过不需要时一般建议不用这样做。
+
+    - 事 实数据表是数据仓库的核心，需要精心维护，在JOIN后将得到事实数据表，一般记录条数都比较大，我们需要为其设置复合主键和索引，以为了数据的完整性和 基于数据仓库的查询性能优化，事实数据表与维度表一起放于数据仓库中，如果前端需要连接数据仓库进行查询，我们还需要建立一些相关的中间汇总表或物化视图，以方便查询。
+
+### [kettle：ETL工具](https://github.com/pentaho/pentaho-kettle)
+
+- Kettle 是 Pentaho 公司开发的一款强大的开源 ETL（Extract, Transform, Load）工具，被广泛应用于数据集成、数据迁移和数据同步等场景。他的主要功能包括数据抽取、转换、加载、调度以及图形化界面管理，核心组件spoon、pan、kitchen以及carte。
+
+- Kettle 的优点是支持多种数据源，具有良好的扩展性，同时提供了直观易用的图形化界面，降低了学习难度，另外繁荣的繁荣、活跃的社区也降低了使用成本。由于kettle的数据抽取通常是直接访问数据库的表，通过SQL形式拉取，这对数据库入侵较大，实时性也较低。
+
+- [Kettle实战100篇博文](https://github.com/xiaoymin/KettleInAction100)
+
+- [kettle-scheduler：一款简单易用的Kettle调度监控平台](https://github.com/zhaxiaodong9860/kettle-scheduler)
+
+# 版本控制
+
+| 工具      | 数据库类型                  | 功能                                        | 使用场景                                        | 生态支持                     |
+| -         | -                           | -                                           | -                                               | -                            |
+| Archery   | MySQL, PostgreSQL, Oracle等 | 数据库审核、SQL工单管理、权限管理           | 中小企业，主要针对MySQL                         | 社区活跃，文档较为齐全       |
+| Yearning  | MySQL, PostgreSQL, Oracle等 | 数据库审核、SQL工单管理、权限管理           | 中小企业，主要针对MySQL                         | 社区活跃，文档较为齐全       |
+| Flyway    | 多种数据库                  | 数据库版本控制、变更管理                    | 企业级，大部分数据库类型，SQL审核、权限管理较弱 | 社区活跃，官方支持，文档齐全 |
+| Liquibase | 多种数据库                  | 数据库版本控制、变更管理                    | 企业级，大部分数据库类型，SQL审核、权限管理较弱 | 社区一般，国内流行度一般     |
+| Bytebase  | 多种数据库                  | 数据库版本控制、SQL工单、变更管理、安全管理 | 企业级，大部分数据库类型                        |
+
+## [Archery](https://github.com/hhyo/Archery
+
+Archery 是一个由国内开发者团队开发并开源的数据库管理和操作平台，支持多种数据库类型，如 MySQL、PostgreSQL 等。它除了提供数据库管理的基本功能，还集成了多种高级功能，包括 SQL 审核、查询、备份恢复以及数据闪回等。他的数据闪回是通过解析数据库的事务日志，提取出特定时间段内的操作，并生成反向 SQL 语句；SQL 审核是通过内置的规则引擎，对提交的 SQL 语句进行语法检查和逻辑验证。
+
+Archery 的优点是功能丰富、简单易用，提供直观的图形化界面，简化数据库管理操作，降低用户的学习成本，社区活跃度较高，有持续的更新和改进；缺点是主要支持MySQL，其他数据库类型的功能相对较少。另外，对非表对象的管理、SQL 审核规则丰富度上均待改进。但整体仍然是一款功能强大的数据库管理和操作平台，特别适用于中小企业。
+
+## [Yearning](https://github.com/cookieY/Yearning)
+
+Yearning 是一个由国内开发者团队开发的数据库管理和操作平台，主要用于 MySQL 系，主要功能包括 SQL 审核、查询管理、备份恢复以及数据闪回等。在数据库闪回、SQL审核等功能的实现原理和 Archery 类似，也是基于MySQL 的binlog 以及内嵌SQL 审核规则引擎。
+
+Yearning  的优点是功能丰富、简单易用，提供直观的图形化界面，简化数据库管理操作，降低用户的学习成本，社区活跃度也较高；缺点是只支持MySQL 系，其他数据库类型均不支持，包括像常见的Oracle、Postgres 等关系型数据库均不支持。
+
+## [Flyway](https://github.com/flyway/flyway)
+
+Flyway 是一款开源的数据库版本控制、生产变更的工具，最初是由 Boxfuse 公司开发和维护的，目前 Flyway 被 Redgate 收购，并由 Redgate 负责进一步的开发和维护工作。主要功能包括：数据库生成变更、版本管理、重复性迁移、数据管理等。他的原理是通过在目标数据库中创建一个 schema_version 表，用于记录所有已应用的迁移。当运行 Flyway 时，扫描指定的目录或类路径下的迁移文件，并与 schema_version 表中的记录进行比较，以确定哪些迁移尚未应用。
+
+Flyway 的优点是开源社区活跃、简单易用、轻量级、灵活性高。缺点是不具备一些高级特性，比如生产变更时审核规则较少，以及 GUI 能力较弱。
+
+## [Liquibase](https://github.com/liquibase/liquibase)
+
+Liquibase 是一个开源的数据库变更管理工具，可高效的帮助开发人员和 DBA 管理数据库模式（schema）和数据变更。他的实现原理是通过版本化的方式管理和应用数据库变更，确保数据库在不同环境中的一致性和可追溯性，具体是在目标数据库中创建一个 DATABASECHANGELOG 表，用于记录所有已应用的变更。每次运行 Liquibase 时，扫描变更日志文件，并与 DATABASECHANGELOG 表中的记录进行比较，以确定哪些变更尚未应用。
+
+Liquibase 的优点是社区活跃、生态丰富、简单易用；缺点是在国内流行度不如flyway，以及国内用户的使用习惯和其产品定位有一定差距，比如 GUI 的数据对象的管控能力一般。
+
+## [Bytebase](https://github.com/bytebase/bytebase)
+Bytebase 是一款国产开源的数据库 DevSecOps 工具，旨在帮助 DBA 管控数据库操作，安全团队保障数据安全时，也尽量不影响开发团队的研发效率。他主要功能包括数据库变更管理、版本管理、SQL 查询窗口、动态脱敏、SQL 审计和优化建议、支持 Web 界面和 API。
+
+Bytebase 的优点是用户界面友好、理念先进，提供完备的 REST 和 gRPC API，以及 GitOps 流程。缺点是国内的信创数据库支持有限，以及开源版本和商业版本能力差距较大。
+
+# 性能测试
+
+- [ClickBench：a Benchmark For Analytical DBMS](https://benchmark.clickhouse.com/)
+
+# 数据库发展
+ Archery
+Archery 是一个由国内开发者团队开发并开源的数据库管理和操作平台，支持多种数据库类型，如 MySQL、PostgreSQL 等。它除了提供数据库管理的基本功能，还集成了多种高级功能，包括 SQL 审核、查询、备份恢复以及数据闪回等。他的数据闪回是通过解析数据库的事务日志，提取出特定时间段内的操作，并生成反向 SQL 语句；SQL 审核是通过内置的规则引擎，对提交的 SQL 语句进行语法检查和逻辑验证。
+
+Archery 的优点是功能丰富、简单易用，提供直观的图形化界面，简化数据库管理操作，降低用户的学习成本，社区活跃度较高，有持续的更新和改进；缺点是主要支持MySQL，其他数据库类型的功能相对较少。另外，对非表对象的管理、SQL 审核规则丰富度上均待改进。但整体仍然是一款功能强大的数据库管理和操作平台，特别适用于中小企业。
+
+更多信息见开源地址
+
+https://github.com/hhyo/Archery
+Yearning
+Yearning 是一个由国内开发者团队开发的数据库管理和操作平台，主要用于 MySQL 系，主要功能包括 SQL 审核、查询管理、备份恢复以及数据闪回等。在数据库闪回、SQL审核等功能的实现原理和 Archery 类似，也是基于MySQL 的binlog 以及内嵌SQL 审核规则引擎。
+
+Yearning  的优点是功能丰富、简单易用，提供直观的图形化界面，简化数据库管理操作，降低用户的学习成本，社区活跃度也较高；缺点是只支持MySQL 系，其他数据库类型均不支持，包括像常见的Oracle、Postgres 等关系型数据库均不支持。
+
+更多信息见开源地址
+
+https://github.com/cookieY/Yearning
+Flyway
+Flyway 是一款开源的数据库版本控制、生产变更的工具，最初是由 Boxfuse 公司开发和维护的，目前 Flyway 被 Redgate 收购，并由 Redgate 负责进一步的开发和维护工作。主要功能包括：数据库生成变更、版本管理、重复性迁移、数据管理等。他的原理是通过在目标数据库中创建一个 schema_version 表，用于记录所有已应用的迁移。当运行 Flyway 时，扫描指定的目录或类路径下的迁移文件，并与 schema_version 表中的记录进行比较，以确定哪些迁移尚未应用。
+
+Flyway 的优点是开源社区活跃、简单易用、轻量级、灵活性高。缺点是不具备一些高级特性，比如生产变更时审核规则较少，以及 GUI 能力较弱。
+
+更多信息见开源地址
+
+https://github.com/flyway/flyway
+Liquibase
+Liquibase 是一个开源的数据库变更管理工具，可高效的帮助开发人员和 DBA 管理数据库模式（schema）和数据变更。他的实现原理是通过版本化的方式管理和应用数据库变更，确保数据库在不同环境中的一致性和可追溯性，具体是在目标数据库中创建一个 DATABASECHANGELOG 表，用于记录所有已应用的变更。每次运行 Liquibase 时，扫描变更日志文件，并与 DATABASECHANGELOG 表中的记录进行比较，以确定哪些变更尚未应用。
+
+Liquibase 的优点是社区活跃、生态丰富、简单易用；缺点是在国内流行度不如flyway，以及国内用户的使用习惯和其产品定位有一定差距，比如 GUI 的数据对象的管控能力一般。
+
+更多信息见开源地址
+
+https://github.com/liquibase/liquibase
+Bytebase
+Bytebase 是一款国产开源的数据库 DevSecOps 工具，旨在帮助 DBA 管控数据库操作，安全团队保障数据安全时，也尽量不影响开发团队的研发效率。他主要功能包括数据库变更管理、版本管理、SQL 查询窗口、动态脱敏、SQL 审计和优化建议、支持 Web 界面和 API。
+
+Bytebase 的优点是用户界面友好、理念先进，提供完备的 REST 和 gRPC API，以及 GitOps 流程。缺点是国内的信创数据库支持有限，以及开源版本和商业版本能力差距较大。
+
+更多信息见开源地址
+
+https://github.com/bytebase/bytebase
+## 数据库流行度
+
+- [db-engines：数据库流行度排行榜](https://db-engines.com/en/)
+
+    - [db-engine 数据分析](https://demo.pigsty.cc/d/db-analysis)
+
+- [墨天轮国产数据库排行榜](https://www.modb.pro/dbRank)
+
+- [StackOverflow 7年调研数据](https://demo.pigsty.cc/d/sf-survey/stackoverflow-survey?orgId=1)
+
+## 国产数据库
+
+- [爱可生开源社区：第八期话题：国产数据库，TiDB、巨杉、OceanBase，谁会最终胜出？](https://mp.weixin.qq.com/s/M6W-6wvOc8zGnQnlNQhQZw)
+
+- [未来智库：数据库行业专题研究：关键三问深度解读](https://mp.weixin.qq.com/s/RlF0eTu5xBQ-LosJ6Vt7Zg)
+
+- [非法加冯：国产数据库到底能不能打？](https://mp.weixin.qq.com/s/AqcYpOgVj91JnkB1B3s4sA)
+
+### [白鳝的洞穴：体系化与碎片化孰优孰劣？](https://mp.weixin.qq.com/s/KBd0LIBFTtDbEi4sq3RYKw)
+
+- 目前的国产数据库的服务网站和知识库还是可以用来做系统学习的，这一点和三十年前的Oracle官网很像。不是因为知识库更加强大，而是因为碎片化的知识不够丰富，所以我们还可以以系统化的方式来学习。
+
+- 而实际上的数据库知识世界是网状的，是接近于混乱的，想要系统学习的时候，只能在表层，要想往下下钻，很快就会被相互缠绕的藤蔓搞得晕头转向。很多DBA朋友都会有这种感觉，刚开始体系化学习某个数据库技术的时候，会觉得学得很明白了，不过遇到具体的问题都会麻爪。随后学习了一些碎片化的技巧和方法，处理起问题来就逐渐有点得心应手了。如果没有碎片化的知识做补充，那么我们学到的体系化知识无法发挥作用。而仅仅是碎片化地去学习，那么学到的可能是一团浆糊。
+
+- RDBMS的核心最初是被按照某种理想的模型设计并开发出来的。不过这种被严格设计出来的系统在面对各种千奇百怪的应用需求的时候，往往无法很好地应对，因此必须对RDBMS核心做大量的优化与改造，打上各种样式的补丁，才能适应多样化的用户需求。另外随着新技术的出现，也需要对RDBMS做升级。
+
+- 大量的改造、补丁与升级叠加起来，数据库系统会变得越来越复杂。而要保持对老版本系统的兼容性，又对升级改造提出了新要求，大大增加了升级改造的难度。新业务可能会对数据库存储引擎提出新的要求，数据块的结构、日志流的结构等等可能都需要变更才能满足新的功能需求，但是我们还需要保证老版本的数据库能够直接UPGRADE到新版本，这种痛苦目前的一些国产数据库厂商可能刚刚尝到。
+
+- 牵一发而动全身，有时候改进一项功能并非易事。经常有朋友在吐槽某开源数据库的某个功能为啥做了N多年还搞不出来，实际上这是数据库的复杂性导致的。2016年ORACLE CAB大会上，我提了一个功能，到去年的大会上回顾环节，这个功能才被部分实现。并不是这个功能没啥用，而是因为这个功能太有用了，牵涉到内核太多的功能模块了。
+
+- 我曾经和一位新锐数据库核心研发的同学做过交流，他认为他们的数据库全面超越Oracle只是时间的问题了，因为Oracle的历史包袱太重，设计思想严重落后，目前堆积的几千万行屎山代码已经快改不动了。而他们的产品是在全新的数据库理念指导下，利用最新的IT技术架构设计出来的，代码高效而优雅，并能充分利用现代硬件的技术能力，因此没有理由会比Oracle差。
+
+    - 他在得意于自己产品的体系化而鄙视Oracle的碎片化的时候，可能没有弄明白一件事，那就是数据库产品不是依靠设计就能做好的，好的数据库产品是在海量的用户场景中不断打磨出来的。他眼中的屎山不是Oracle的弱点，反而是Oracle的优势所在。Oracle在搞出这个屎山的时候还没有崩溃，还依然高质量地帮用户应对各种应用场景，这就是Oracle的最大的成功。
+
+    - 而如果给那位朋友的设计精良的数据库系统以同样的机会，去面对用户千差万别的应用场景的时候，也将开启他们堆积屎山的旅程。我估计他们可能等不到堆积到Oracle 1/10的高度的时候，可能就崩溃了。
+
+- 做数据库产品是要奉行长期主义的，特别是通用关系型数据库，新鲜出炉的产品自己感觉挺好，到用户现场去练练就会发现很多地方是不契合的。
+
+    - 十年可能才是一个数据库厂商刚刚度过童年，仍然不够强健，随时可能会夭折。
+    - 能够坚持二十年以上的国产数据库厂商目前还寥寥无几。
+    - 而很多国外商用数据库厂商死在了自己的三十岁左右。
+
+- 目前来看，数据库国产化替代的时间要求很紧，国产数据库目前大多没有充分经受应用场景的磨练，存在问题很多。
+    - 研发人员觉得产品是体系化的，但是到了用户现场却是项目化的，这实际上还是初级阶段的体系化或者说是设计上的体系化。等第一阶段的磨合完成了，才可能形成较为产品化的版本，进入真正的体系化，然后才能初步满足用户的需求，在用户各种各样变态的场景中继续磨练，逐渐形成体系化下的碎片化能力。
+    - 不过O记不也是从不大易用，不大好用，不大稳定的时代经过了三十多年蜕变出来的。国产数据库在大量关键行业应用的锤炼下，所需的成长时间会大大缩短，我坚信5-10年里一定会出现优秀的国产数据库产品。
+
+### [InfoQ：2024 中国数据库十大发展趋势总结](https://mp.weixin.qq.com/s/K5fQpG4f8Kbe4V6Fhp1Pag)
+
+## 数据库历史
+
+- [码农翻身：漫画 | 历经60年，数据库的王者终于出现了......](https://mp.weixin.qq.com/s/xacTZBq_IFTByH689csc7g)
+
 # dba行业
 
 ## 学习
@@ -1540,718 +2435,6 @@ http://127.0.0.1:3000
 
 ### [非法加冯：云计算泥石流：下云合订本](https://mp.weixin.qq.com/s?__biz=MzU5ODAyNTM5Ng==&mid=2247488410&idx=1&sn=e44705fce4221458244e7705258ca254&chksm=fe4b2641c93caf57cc46069b82827da873af95b3e157e7e8d2943977bdd1cbb547d79bc16373&scene=21#wechat_redirect)
 
-# 业务
-
-- 2019年淘宝 11.11 活动。去年 11.11 一共成交了 12.92 亿笔订单，在电商领域是核心业务。算了一下，差不多每秒 15000 笔下单的操作。
-
-    - 看起来还好并不高，但这是个平均值，我们要看峰值。11.11 前 1 小时肯定是最高峰的，根据我的经验，峰值少说应该是平均值的 10 倍，但 11.11 少说是 20 倍。
-
-    - 每笔事务里有 5 - 6 次 SQL Query 操作，那 QPS 就可能达到 150 万。
-
-# 第三方工具
-
-- [ingestr：不同数据库的数据源导入导出](https://github.com/bruin-data/ingestr)
-
-## sql
-
-- [natural-sql：文本生成sql的llm模型](https://github.com/cfahlgren1/natural-sql)
-
-- [SQLkiller：在线的AI生成sql语句](https://www.sqlkiller.com/)
-
-- [sqlfluff: sql语句语法检查](https://github.com/sqlfluff/sqlfluff)
-
-- [sql-formatter：sql语句格式化的js库](https://github.com/sql-formatter-org/sql-formatter)
-
-- [Migrate：数据库迁移/变更工具](https://github.com/golang-migrate/migrate)
-
-    - 支持 MySQL、MariaDB、PostgreSQL、SQLite、Neo4j、ClickHouse 等不同类型的数据库。
-
-- [sqlmap: 自动检测和利用 SQL 注入漏洞，获得数据库服务器的权限。](https://github.com/sqlmapproject/sqlmap)
-
-- [SQLGlot：sql转换器，支持20多种如DuckDB, Presto / Trino, Spark / Databricks, Snowflake, and BigQuery.](https://github.com/tobymao/sqlglot)
-    ```py
-    import sqlglot
-
-    # SQL 转 Spark
-    sql = """WITH baz AS (SELECT a, c FROM foo WHERE a = 1) SELECT f.a, b.b, baz.c, CAST("b"."a" AS REAL) d FROM foo f JOIN bar b ON f.a = b.a LEFT JOIN baz ON f.a = baz.a"""
-    print(transpile(sql, write="spark", identify=True, pretty=True)[0])
-    ```
-
-- [qstudio：分析sql执行结果的桌面工具](https://github.com/timeseries/qstudio)
-
-## 客户端tui
-
-- [harlequin：sql tui](https://github.com/tconbeer/harlequin)
-    ```sh
-    // sqlite
-    harlequin -a sqlite "path/to/sqlite.db" "another_sqlite.db"
-
-    // DuckDB
-    harlequin "path/to/duck.db" "another_duck.db"
-
-    // mysql
-    pip install harlequin-mysql
-    harlequin -a mysql -h localhost -p 3306 -U root --password example --database dev
-    ```
-
-- [lazysql：支持MySQL、 PostgreSQL、 SQLite、 MSSQL、 MongoDB](https://github.com/jorgerojas26/lazysql)
-
-- [peepdb：支持MySQL, PostgreSQL, MariaDB, SQLite, MongoDB and Firebase.](https://github.com/PeepDB-dev/peepdb)
-
-## AI
-
-- [sqlchat](https://github.com/sqlchat/sqlchat)
-
-- [DB-GPT:local GPT](https://github.com/csunny/DB-GPT)
-
-- [Chat with your SQL database 📊. Accurate Text-to-SQL Generation via LLMs using RAG](https://github.com/vanna-ai/vanna)
-
-- [vanna](https://github.com/vanna-ai/vanna)
-    - 与你的 SQL 数据库聊天。该项目使用 LLM+RAG+数据库技术，让用户能够通过自然语言查询 SQL 数据库，用生成的 SQL 回答你的问题。
-
-## 画图
-
-- [dbdiagram：在线创建数据库的实体-关系图的工具](https://dbdiagram.io)
-
-- [drawdb：数据库实体关系（DBER）在线编辑器，无需注册即可直接在浏览器中使用。它提供了直观、可视化的操作界面，用户通过点击即可构建数据库表和导出建表语句，还可以导入建表语句，实现可视化编辑、错误检查等。支持 MySQL、PostgreSQL、SQLite、MariaDB、SQL Server 共 5 种常用的关系数据库。](https://github.com/drawdb-io/drawdb)
-    - [在线运行](https://drawdb.vercel.app/editor)
-
-- [chartdb：在线画数据库架构图](https://app.chartdb.io/diagrams/hwomiaf01nirsyqekjqdx9gbg)
-
-## gui客户端工具
-
-- MySQL Workbench：这是 Oracle 公司开发的一款免费的 MySQL 集成环境。MySQL Workbench 提供了数据建模、SQL开发、数据库管理、用户管理、备份等功能，并支持导入和导出数据，以及与其他数据库进行交互。MySQL Workbench 面向数据库架构师、开发人员和 DBA。 MySQL Workbench 可在 Windows、Linux 和 Mac OS X 上使用。
-
-- HeidiSQL：HeidiSQL 是免费软件，其目标是易于学习。“Heidi”可让您查看和编辑运行数据库系统 MariaDB、MySQL、Microsoft SQL、PostgreSQL 和 SQLite 的数据和结构。
-
-- phpMyAdmin：phpMyAdmin 是一个用 PHP 编写的免费软件工具，旨在通过 Web 处理 MySQL 的管理。 phpMyAdmin 支持 MySQL 和 MariaDB 上的各种操作。 常用的操作（管理数据库、表、列、关系、索引、用户、权限等）可以通过用户界面执行，同时您仍然可以直接执行任何 SQL 语句。
-
-- Navicat for MySQL：Navicat for MySQL 是管理和开发 MySQL 或 MariaDB 的理想解决方案。它是一套单一的应用程序，能同时连接 MySQL 和 MariaDB 数据库，并与 OceanBase 数据库及 Amazon RDS、Amazon Aurora、Oracle Cloud、Microsoft Azure、阿里云、腾讯云和华为云等云数据库兼容。这套全面的前端工具为数据库管理、开发和维护提供了一款直观而强大的图形界面。
-
-- [Navicat Premium Lite](https://navicat.com/en/products/navicat-premium-lite)：Navicat的免费版
-
-- DBeaver：DBeaver 是一个通用的数据库管理和开发工具，支持包括 MySQL 在内的几乎所有的数据库产品。它基于 Java 开发，可以运行在 Windows、Linux、macOS 等各种操作系统上。
-
-- DataGrip：DataGrip 是一个多引擎数据库环境，使用者无需切换多种数据库工具，即可轻松管理 MySQL 等数据库。DataGrip 支持智能代码补全、实时分析和快速修复特性，並集成了版本控制。
-
-- SQL Developer：這是一款由 Oracle 公司开发的集成开发环境（IDE），它专为数据库管理和开发而设计。这款工具提供了从数据库设计、建模、开发到维护的一站式服务，使得开发者能够在一个统一的界面中完成所有的数据库相关工作。Oracle SQL Developer 是基於 Java 開發的，不僅可以連接到 Oracle 数据库，也可以连接到选定的第三方（非 Oracle）数据库、查看元数据和数据，以及将这些数据库迁移到 Oracle。
-
-- [dbgate](https://github.com/dbgate/dbgate) 是一款跨平台数据库管理工具，它适用于 MySQL、PostgreSQL、SQL Server、MongoDB、SQLite 及其他数据库，可在 Windows、Linux、Mac 运行。dbgate 还可以作为 Web 应用程序运行，使用户能够通过浏览器轻松访问和管理数据库。
-
-- [mayfly-go](https://github.com/dromara/mayfly-go)web 版 linux(终端[终端回放] 文件 脚本 进程 计划任务)、数据库（mysql postgres oracle sqlserver 达梦 高斯 sqlite）、redis(单机 哨兵 集群)、mongo 等集工单流程审批于一体的统一管理操作平台
-
-- [FastoNoSQL](https://github.com/fastogt/fastonosql)支持Redis, Memcached, SSDB, LevelDB, RocksDB, UnQLite, LMDB, ForestDB, Pika, Dynomite, KeyDB
-
-- [Chat2DB](https://github.com/chat2db/Chat2DB)集成了AI和BI报表功能的新一代数据库管理系统。支持MySQL, PostgreSQL, H2, Oracle, SQLServer, SQLite, MariaDB, ClickHouse, DM, Presto, DB2, OceanBase, Hive, KingBase, MongoDB, Redis, Snowflake
-
-- [whodb](https://github.com/clidey/whodb?tab=readme-ov-file)一个基于浏览器的数据库管理工具，支持 Postgres、MySQL、SQLite、MongoDB、 Redis。
-
-## BI数据可视化工具
-
-- [dataease：人人可用的开源 BI 工具，Tableau、帆软的开源替代。](https://github.com/dataease/dataease)
-
-# 数据迁移
-
-## 数据迁移案例
-
-### [爱可生开源社区：技术分享 | 一次数据库迁移](https://mp.weixin.qq.com/s/wqjmTi1IG74wSDQx0Kl8gA)
-
-- 总的来说数据库迁移总共分三步，和把大象装冰箱差不多。
-
-    - 1.迁移前准备
-    - 2.进行迁移
-    - 3.数据验证
-
-- 背景描述
-
-    - 客户共有三套业务库，需要迁移至新的实例中，这里称为业务 A，业务 B，业务 C。其中业务 B 和业务 C 需要合并成一套。
-
-- 迁移前准备
-
-    - 迁移前准备包含：环境信息收集，数据同步，迁移前确认
-
-    ![image](./Pictures/mysql/数据迁移案例-迁移前后清单.avif)
-
-    - 数据同步的部分我们需要明确的是，当该步骤完成后应该保证旧实例与新实例数据实时同步，在迁移下发窗口只进行单纯的迁移以及数据验证。
-
-- 数据同步步骤
-
-    - 1.创建新实例
-
-        - 创建新的实例时，尤其需要注意对比旧实例的配置文件，防止由于配置不同，导致数据在新实例出现异常。
-
-    - 2.备份旧实例数据，导入新实例
-
-        - 由于客户旧实例环境只能使用 mysqldump 备份，所以备份还原使用的是 mysqldump。
-
-        - 业务 A 是可以直接全库备份的，但需要注意，全库备份不仅要备份数据，还要备份触发器，存储过程，事件。
-
-            ```sh
-            # 全库备份
-            mysqldump -h127.0.0.1 -P3306 -uroot -p --default-character-set=utf8mb4 --single-transaction --master-data=2 --flush-logs --hex-blob --triggers --routines --events --all-databases > all_db.sql
-            ```
-
-        - 业务 B 以及业务 C 由于需要进行合并，并且这两个业务在各自实例中都是使用了一个单独的库，所以备份时进行单库备份。
-
-            ```sh
-            # 单库备份
-            mysqldump -h127.0.0.1 -uroot -P3306 -p --default-character-set=utf8mb4 --master-data=2 --flush-logs --single-transaction --set-gtid-purged=off --hex-blob --databases  databasename  > one_database.sql
-            ```
-
-        - 在导入完成时需要注意，MySQL 5.7 全库备份时不会备份 mysql.proc 下的系统自身的存储过程，可以在执行完导入后先执行一次升级。
-
-            ```sh
-            # 执行升级
-            mysql_upgrade --upgrade-system-tables --skip-verbose --force
-            ```
-
-    - 3.建立复制保证数据实时同步。
-
-        - 将旧实例与新实例建立复制关系，保证数据实时同步 新实例与旧实例建立复制的地址建议使用 vip 进行，这样能够保证当前使用复制地址的可靠性，若无 vip 或者必须使用旧实例的从库地址进行级联复制，则一定要确保各级复制的正常运行。
-
-        - 首先需要有复制用户，用来建立复制，若无法提供则需要专门创建一个迁移用的复制用户，该用户建议迁移结束后进行回收。
-
-        - 业务 A 旧实例与新实例的复制建立比较简单直接正常建立就没问题。
-
-            ```
-            # 新实例的主库执行，建立旧实例到新实例的复制
-            CHANGE MASTER TO MASTER_HOST='10.186.60.201',
-            MASTER_USER='repl',
-            MASTER_PORT=3307,
-            MASTER_PASSWORD='repl',
-            MASTER_AUTO_POSITION = 1;
-
-            start slave;
-            ```
-
-        - 业务 B 与 C 需要合并，所以这次保证数据实时同步采用了多源复制的方式。
-
-            ```
-            # 在新实例的主库执行，将业务B与C的数据都复制到新实例中。
-            CHANGE MASTER TO MASTER_HOST='10.186.60.209',
-            MASTER_USER='repl',
-            MASTER_PORT=3307,
-            MASTER_PASSWORD='repl',
-            MASTER_AUTO_POSITION = 1 FOR CHANNEL 'channel1';
-
-            CHANGE MASTER TO MASTER_HOST='10.186.60.210',
-            MASTER_USER='repl',
-            MASTER_PORT=3307,
-            MASTER_PASSWORD='repl',
-            MASTER_AUTO_POSITION = 1 FOR CHANNEL 'channel2';
-
-            start slave;
-            ```
-
-- 迁移前确认
-
-    - 迁移前确认事项我这边同样是列了清单，具体事项需要根据具体情况修改。
-    ![image](./Pictures/mysql/数据迁移案例-检查清单.avif)
-
-    - 其中 OM 是旧主实例，NM 是新主实例，OS 是旧从实例，NS 是新从实例。
-
-    - 迁移检查需要在迁移前多次确认，比如在迁移准备完成时确认一次，迁移正式开始前再确认一次。
-
-- 进行迁移
-
-    - 1.确认无流量写入
-
-        - 下发开始后首先需要确认业务是否全部停止，是否还有流量写入，
-
-        - 我们也可以查看 gtid 是否还有变化判断。
-        ```sql
-        # 查看实例状态
-        show master status\G
-        ```
-
-    - 2.解绑旧集群的 VIP，设置旧实例为只读
-
-        - 在确认无流量写入后，解除旧集群 vip，设置旧实例为只读模式，防止有数据再次写入。
-        ```sql
-        # 解绑vip
-        ip addr del 10.186.60.201/25 dev eth0
-
-        # 设置旧实例为只读库，防止数据写入
-        show global variables like '%read_on%';
-        set global super_read_only=1;
-        show global variables like '%read_on%';
-        ```
-
-    - 3.断开新老集群复制
-
-        ```sql
-        # 断开复制
-        stop slave;
-        ```
-
-        - 做完该步骤，新老集群状态应该完全一致，可以对比新老集群状态。
-
-- 数据验证
-    - 在确认新老集群状态一致后，可以由业务部门进行数据验证。
-
-## 数据迁移工具（支持多种数据库）
-
-### [CloudCanal：可视化数据同步迁移工具](https://www.clougence.com/)
-
-- [Se7en的架构：笔记可视化数据同步迁移工具 CloudCanal](https://mp.weixin.qq.com/s/fRACj3W1Yn0o9k_MqKyaeQ)
-
-- [cloudcanal-exporter：prometheus监控](https://github.com/dream-mo/cloudcanal-exporter)
-
-### [DataX-Web：异构数据迁移工具](https://github.com/WeiYe-Jing/datax-web)
-
-- 简介：
-    - DataX 是阿里巴巴集团内被广泛使用的离线数据同步工具/平台，实现包括 MySQL、SQL Server、Oracle、PostgreSQL、HDFS、Hive、HBase、OTS、ODPS 等各种异构数据源之间高效的数据同步功能。
-
-- 优点：
-    - 支持多种同步模式（全量、增量、混合）。
-    - 支持MongoDB集群和副本集的同步。
-    - 高性能，支持大规模数据传输。
-
-- 缺点：
-    - 仅支持MongoDB数据库，适用范围有限。
-    - 对于某些复杂场景的配置和调优较为复杂。
-
-- 使用场景：
-    - MongoDB数据迁移：在不影响业务运行的情况下，将数据从一个MongoDB集群迁移到另一个集群。
-    - 灾备恢复：将MongoDB数据同步到备份集群，用于灾难恢复。
-    - 数据同步：在多环境下同步MongoDB数据，保持数据一致性。
-
-- [DBA实战：DataX 异构数据迁移工具：实现 Web 页面轻松操作](https://mp.weixin.qq.com/s/DiwSXFU15QZVwOT9MrUCUg)
-
-## ETL数据迁移
-
-- ETL是数据抽取（Extract）、转换（Transform）、加载（Load ）的简写，它是将OLTP系统中的数据经过抽取，并将不同数据源的数据进行转换、整合，得出一致性的数据，然后加载到数据仓库中。简而言之ETL是完成从 OLTP系统到OLAP系统的过程
-
-- 数据仓库的架构
-    - 星型架构中间为事实表，四周为维度表， 类似星星
-    - 雪花型架构中间为事实表，两边的维度表可以再有其关联子表，而在星型中只允许一张表作为维度表与事实表关联，雪花型一维度可以有多张表，而星型 不可以。
-    - 考虑到效率时，星型聚合快，效率高，不过雪花型结构明确，便于与OLTP系统交互。
-
-- ETL和SQL的区别与联系
-
-    - ETL的优点：
-        - 比如我有两个数据源，一个是数据库的表，另外一个是excel数据，而我需要合并这两个数据，通常这种东西在SQL语句中比较难实现。但是ETL却有很多现成的组件和驱动，几个组件就搞定了。
-        - 比如跨服务器，并且服务器之间不能建立连接的数据源，比如我们公司系统分为一期和二期，存放的数据库是不同的，数据结构也不相同，数据库之间也不能建立连接，这种情况下，ETL就显得尤为重要和突出。
-
-    - SQL的优点：效率高的多
-
-### ETL构建企业级数据仓库五步法的流程
-
-- 1.确定主题
-    - 即 确定数据分析或前端展现的某一方面的分析主题，例如我们分析某年某月某一地区的啤酒销售情况，就是一个主题。主题要体现某一方面的各分析角度（维度）和统 计数值型数据（量度），确定主题时要综合考虑，一个主题在数据仓库中即为一个数据集市，数据集市体现了某一方面的信息，多个数据集市构成了数据仓库。
-
-- 2.确定量度
-    - 在 确定了主题以后，我们将考虑要分析的技术指标，诸如年销售额此类，一般为数值型数据，或者将该数据汇总，或者将该数据取次数，独立次数或取最大最小值 等，这样的数据称之为量度。量度是要统计的指标，必须事先选择恰当，基于不同的量度可以进行复杂关键性能指标（KPI）等的计算。
-
-- 3.确定事实数据粒度
-    - 在 确定了量度之后我们要考虑到该量度的汇总情况和不同维度下量度的聚合情况，考虑到量度的聚合程度不同，我们将采用“最小粒度原则”，即将量度的粒度设置 到最小，例如我们将按照时间对销售额进行汇总，目前的数据最小记录到天，即数据库中记录了每天的交易额，那么我们不能在ETL时将数据进行按月或年汇总， 需要保持到天，以便于后续对天进行分析。而且我们不必担心数据量和数据没有提前汇总带来的问题，因为在后续的建立CUBE时已经将数据提前汇总了。
-
-- 4.确定维度
-
-    - 维 度是要分析的各个角度，例如我们希望按照时间，或者按照地区，或者按照产品进行分析，那么这里的时间、地区、产品就是相应的维度，基于不同的维度我们可 以看到各量度的汇总情况，我们可以基于所有的维度进行交叉分析。这里我们首先要确定维度的层次（Hierarchy）和级别（Level），维度的层次是指该维度的所有级别，包括各级别的属性；维度的级别是指该维度下的成员，例如当建立地区维度时我们将地区维度作为一 个级别，层次为省、市、县三层，考虑到维度表要包含尽量多的信息，所以建立维度时要符合“矮胖原则”，即维度表要尽量宽，尽量包含所有的描述性信息，而不 是统计性的数据信息。
-
-    - 还有一种常见的情况，就是父子型维度，该维度一般用于非叶子节点含有成员等情况，例如公司员工 的维度，在统计员工的工资时，部 门主管的工资不能等于下属成员工资的简单相加，必须对该主管的工资单独统计，然后该主管部门的工资等于下属员工工资加部门主管的工资，那么在建立员工维度 时，我们需要将员工维度建立成父子型维度，这样在统计时，主管的工资会自动加上，避免了都是叶子节点才有数据的情况。
-
-    - 另外，在建立维度表时要充 分使用代理键，代理键是数值型的ID号码，好处是代理键唯一标识了每一维度成员信息，便于区分，更重要的是在聚合时由于数值型匹 配，JOIN效率高，便于聚合，而且代理键对缓慢变化维度有更重要的意义，它起到了标识历史数据与新数据的作用，在原数据主键相同的情况下，代理键起到了 对新数据与历史数据非常重要的标识作用。
-
-    - 有时我们也会遇到维度缓慢变化的情况，比如增加了新的产品，或者产品的ID号码修改了，或者产品增加了一个新的属性，此时某一维度的成员会随着新的数据的加入而增加新的维度成员，这样我们要考虑到缓慢变化维度的处理，对于缓慢变化维度，有三种情况：
-
-        - 1.缓慢变化维度第一种类型：历史数据需要修改。这样新来的数据要改写历史数据，这时我们要使用UPDATE，例如产品的ID号码为123，后来发现ID 号码错误了，需要改写成456，那么在修改好的新数据插入时，维度表中原来的ID号码会相应改为456，这样在维度加载时要使用第一种类型，做法是完全更 改。
-
-        - 2.缓慢变化维度第二种类型：历史数据保留，新增数据也要保留。这时要将原数据更新，将新数据插入，需要使用UPDATE / INSERT，比如某一员工2005年在A部门，2006年时他调到了B部门。那么在统计2005年的数据时就应该将该员工定位到A部门；而在统计 2006年数据时就应该定位到B部门，然后再有新的数据插入时，将按照新部门（B部门）进行处理，这样我们的做法是将该维度成员列表加入标识列，将历史的 数据标识为“过期”，将目前的数据标识为“当前的”。另一种方法是将该维度打上时间戳，即将历史数据生效的时间段作为它的一个属性，在与原始表匹配生成事 实表时将按照时间段进行关联，这样的好处是该维度成员生效时间明确。
-
-        - 3.缓慢变化维度第三种类型：新增数据维度成员改变了属性。例如某一维度成 员新加入了一列，该列在历史数据中不能基于它浏览，而在目前数据和将来数据中可 以按照它浏览，那么此时我们需要改变维度表属性，即加入新的列，那么我们将使用存储过程或程序生成新的维度属性，在后续的数据中将基于新的属性进行查看。
-
-- 5.创建事实表
-
-    - 在确定好事实数据和维度后，我们将考虑加载事实表。
-
-    - 在公司的大量数据堆积如山时，我们想看看里面究竟是什么，结果发现里面是一笔笔生产记录，一笔笔交易记录… 那么这些记录是我们将要建立的事实表的原始数据，即关于某一主题的事实记录表。
-
-    - 我 们的做法是将原始表与维度表进行关联，生成事实表。注意在关联时有为空的数据时（数据源脏），需要使用外连接，连接后我们将 各维度的代理键取出放于事实表中，事实表除了各维度代理键外，还有各量度数据，这将来自原始表，事实表中将存在维度代理键和各量度，而不应该存在描述性信 息，即符合“瘦高原则”，即要求事实表数据条数尽量多（粒度最小），而描述性信息尽量少。
-
-    - 如果考虑到扩展，可以将事实表加一唯一标识列，以为了以后扩展将该事实作为雪花型维度，不过不需要时一般建议不用这样做。
-
-    - 事 实数据表是数据仓库的核心，需要精心维护，在JOIN后将得到事实数据表，一般记录条数都比较大，我们需要为其设置复合主键和索引，以为了数据的完整性和 基于数据仓库的查询性能优化，事实数据表与维度表一起放于数据仓库中，如果前端需要连接数据仓库进行查询，我们还需要建立一些相关的中间汇总表或物化视图，以方便查询。
-
-### ETL工具
-
-- [数仓与大数据：数据仓库ETL工具全解](https://mp.weixin.qq.com/s/JTE3K6VfiYEAOSyYgN-KPA)
-
-#### [kettle](https://github.com/pentaho/pentaho-kettle)
-
-- [Kettle实战100篇博文](https://github.com/xiaoymin/KettleInAction100)
-
-- [kettle-scheduler：一款简单易用的Kettle调度监控平台](https://github.com/zhaxiaodong9860/kettle-scheduler)
-
-#### [canal](https://github.com/alibaba/canal)
-
-- [李文周：Canal介绍和使用指南](https://mp.weixin.qq.com/s/9jDlMssry-_UWzSm1R-Ypg)
-
-- Canal 是阿里开源的一款 MySQL 数据库增量日志解析工具，提供增量数据订阅和消费。使用Canal能够实现异步更新数据，配合MQ使用可在很多业务场景下发挥巨大作用。
-    ![image](./Pictures/mysql/canal.avif)
-
-- MySQL主备复制原理
-    - MySQL master 将数据变更写入二进制日志( binary log, 其中记录叫做二进制日志事件binary log events，可以通过 show binlog events 进行查看)
-    - MySQL slave 将 master 的 binary log events 拷贝到它的中继日志(relay log)
-    - MySQL slave 重放 relay log 中事件，将数据变更反映它自己的数据
-
-- Canal 工作原理
-    - Canal 模拟 MySQL slave 的交互协议，伪装自己为 MySQL slave ，向 MySQL master 发送 dump 协议
-    - MySQL master 收到 dump 请求，开始推送 binary log 给 slave (即 Canal )
-    - Canal 解析 binary log 对象(原始为 byte 流)
-
-[canal 运维工具安装](https://github.com/alibaba/canal/wiki/Canal-Admin-QuickStart)
-
-##### 安装
-
-- [canal 安装](https://github.com/alibaba/canal/wiki/QuickStart) 目前不支持 jdk 高版本
-
-- 1.需要先开启MySQL的 Binlog 写入功能。`my.cnf`配置
-    ```ini
-    [mysqld]
-    log-bin=mysql-bin # 开启 binlog
-    binlog-format=ROW # 选择 ROW 模式
-    server_id=1 # 配置 MySQL replaction 需要定义，不要和 canal 的 slaveId 重复
-    ```
-
-    - 重启mysql
-
-    - 验证
-        ```sql
-        -- 查看是否开启了binlog
-        show variables like 'log_bin';
-        +---------------+-------+
-        | Variable_name | Value |
-        +---------------+-------+
-        | log_bin       | ON    |
-        +---------------+-------+
-
-        -- 查看是否为row格式
-        show variables like 'binlog_format';
-        +---------------+-------+
-        | Variable_name | Value |
-        +---------------+-------+
-        | binlog_format | ROW   |
-        +---------------+-------+
-        ```
-
-- 2.添加授权
-    ```sql
-    -- 下面的命令是先创建一个名为canal的账号，密码为canal。再对其进行授权，如果已有账户可直接 grant。
-    CREATE USER canal IDENTIFIED BY 'canal';
-    GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'canal'@'%';
-    -- GRANT ALL PRIVILEGES ON *.* TO 'canal'@'%' ;
-    FLUSH PRIVILEGES;
-    ```
-
-- 3.安装canal
-
-    - 在[release页面](https://github.com/alibaba/canal/releases) 下载
-
-    ```sh
-    # 这里的版本为1.0.17
-    curl -LO https://github.com/alibaba/canal/releases/download/canal-1.1.7/canal.deployer-1.1.7.tar.gz
-
-    # 解压缩
-    x canal.deployer-1.1.7.tar.gz
-
-    # 一共5个目录
-    cd canal.deployer-1.1.7
-    ll
-    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I bin/
-    drwxr-xr-x 5 - tz tz 20 Apr 17:31 -I conf/
-    drwxr-xr-x 2 - tz tz 20 Apr 17:31 -I lib/
-    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I logs/
-    drwxr-xr-x 2 - tz tz 13 Oct  2023 -I plugin/
-    ```
-
-- 4.修改配置文件`canal.deployer-1.1.7/conf/example/instance.properties`
-
-    - 将canal.instance.master.address修改为你的MySQL地址。
-    - 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
-    - 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
-
-    ```
-    canal.instance.master.address=127.0.0.1:3306
-    canal.instance.tsdb.dbUsername=canal
-    canal.instance.tsdb.dbPassword=canal
-    ```
-- 启动
-
-    ```sh
-    sh bin/startup.sh
-    ```
-
-- 查看server日志
-    ```sh
-    cat logs/canal/canal_stdout.log
-    ```
-
-- 关闭
-    ```sh
-    sh bin/stop.sh
-    ```
-
-##### docker安装
-
-```sh
-# 拉取canal
-docker pull canal/canal-server:latest
-
-# 启动容器
-docker run -d --name canal-server -p 11111:11111 canal/canal-server
-
-# 进入容器
-docker exec -it canal-server /bin/bash
-
-# 修改配置
-# 将canal.instance.master.address修改为你的MySQL地址。
-# 将canal.instance.tsdb.dbUsername修改为你上面授权的账号。
-# 将canal.instance.tsdb.dbPassword修改为你上面授权账号的密码。
-vi canal-server/conf/example/instance.properties
-
-# 重启容器
-docker container restart canal-server
-```
-
-- 启动Canal Server之后，我们可以使用Canal客户端连接Canal进行消费，本文以Go客户端canal-go为例，演示如何从canal-server消费数据。
-
-```go
-package main
-
-import (
- "fmt"
- "time"
-
- pbe "github.com/withlin/canal-go/protocol/entry"
-
- "github.com/golang/protobuf/proto"
- "github.com/withlin/canal-go/client"
-)
-
-// canal-go client demo
-
-func main() {
- // 连接canal-server
- connector := client.NewSimpleCanalConnector(
-  "127.0.0.1", 11111, "", "", "example", 60000, 60*60*1000)
- err := connector.Connect()
- if err != nil {
-  panic(err)
- }
-
- // mysql 数据解析关注的表，Perl正则表达式.
- err = connector.Subscribe(".*\\..*")
- if err != nil {
-  fmt.Printf("connector.Subscribe failed, err:%v\n", err)
-  panic(err)
- }
-
- // 消费消息
- for {
-  message, err := connector.Get(100, nil, nil)
-  if err != nil {
-   fmt.Printf("connector.Get failed, err:%v\n", err)
-   continue
-  }
-  batchId := message.Id
-  if batchId == -1 || len(message.Entries) <= 0 {
-   time.Sleep(time.Second)
-   fmt.Println("===暂无数据===")
-   continue
-  }
-  printEntry(message.Entries)
- }
-}
-
-func printEntry(entries []pbe.Entry) {
- for _, entry := range entries {
-  // 忽略事务开启和事务关闭类型
-  if entry.GetEntryType() == pbe.EntryType_TRANSACTIONBEGIN || entry.GetEntryType() == pbe.EntryType_TRANSACTIONEND {
-   continue
-  }
-  // RowChange对象，包含了一行数据变化的所有特征
-  rowChange := new(pbe.RowChange)
-  // protobuf解析
-  err := proto.Unmarshal(entry.GetStoreValue(), rowChange)
-  if err != nil {
-   fmt.Printf("proto.Unmarshal failed, err:%v\n", err)
-  }
-  if rowChange == nil {
-   continue
-  }
-  // 获取并打印Header信息
-  header := entry.GetHeader()
-  fmt.Printf("binlog[%s : %d],name[%s,%s], eventType: %s\n",
-   header.GetLogfileName(),
-   header.GetLogfileOffset(),
-   header.GetSchemaName(),
-   header.GetTableName(),
-   header.GetEventType(),
-  )
-  //判断是否为DDL语句
-  if rowChange.GetIsDdl() {
-   fmt.Printf("isDdl:true, sql:%v\n", rowChange.GetSql())
-  }
-
-  // 获取操作类型：insert/update/delete等
-  eventType := rowChange.GetEventType()
-  for _, rowData := range rowChange.GetRowDatas() {
-   if eventType == pbe.EventType_DELETE {
-    printColumn(rowData.GetBeforeColumns())
-   } else if eventType == pbe.EventType_INSERT || eventType == pbe.EventType_UPDATE {
-    printColumn(rowData.GetAfterColumns())
-   } else {
-    fmt.Println("---before---")
-    printColumn(rowData.GetBeforeColumns())
-    fmt.Println("---after---")
-    printColumn(rowData.GetAfterColumns())
-   }
-  }
- }
-}
-
-func printColumn(columns []*pbe.Column) {
- for _, col := range columns {
-  fmt.Printf("%s:%s  update=%v\n", col.GetName(), col.GetValue(), col.GetUpdated())
- }
-}
-```
-
-##### 配置kafka
-
-- Canal 1.1.1版本之后，默认支持将Canal Server接收到的binlog数据直接投递到MQ，目前默认支持的MQ系统有Kafka、RocketMQ、RabbitMQ、PulsarMQ。
-
-- 加入mq配置`canal.deployer-1.1.7/conf/example/instance.properties`
-    ```
-    # mq config
-    # 设置默认的topic
-    canal.mq.topic=example
-    # 针对库名或者表名发送动态topic
-    #canal.mq.dynamicTopic=mytest,.*,mytest.user,mytest\\..*,.*\\..*
-    canal.mq.partition=0
-    # hash partition config
-    #canal.mq.partitionsNum=3
-    #库名.表名: 唯一主键，多个表之间用逗号分隔
-    #canal.mq.partitionHash=mytest.person:id,mytest.role:id
-    ```
-
-    - `canal.mq.dynamicTopic`配置说明。
-
-        - Canal 1.1.3版本之后, 支持配置格式为：schema 或 schema.table，多个配置之间使用逗号或分号分隔。
-
-            - 例子1：test\\.test 指定匹配的单表，发送到以test_test为名字的topic上
-            - 例子2：.*\\..* 匹配所有表，则每个表都会发送到各自表名的topic上
-            - 例子3：test 指定匹配对应的库，一个库的所有表都会发送到库名的topic上
-            - 例子4：test\\..* 指定匹配的表达式，针对匹配的表会发送到各自表名的topic上
-            - 例子5：test,test1\\.test1，指定多个表达式，会将test库的表都发送到test的topic上，test1\\.test1的表发送到对应的test1_test1 topic上，其余的表发送到默认的canal.mq.topic值
-
-        - 为满足更大的灵活性，Canal还允许对匹配条件的规则指定发送的topic名字，配置格式：topicName:schema 或 topicName:schema.table。
-
-            - 例子1: test:test\\.test 指定匹配的单表，发送到以test为名字的topic上
-            - 例子2: test:.*\\..* 匹配所有表，因为有指定topic，则每个表都会发送到test的topic下
-            - 例子3: test:test 指定匹配对应的库，一个库的所有表都会发送到test的topic下
-            - 例子4：testA:test\\..* 指定匹配的表达式，针对匹配的表会发送到testA的topic下
-            - 例子5：test0:test,test1:test1\\.test1，指定多个表达式，会将test库的表都发送到test0的topic下，test1\\.test1的表发送到对应的test1的topic下，其余的表发送到默认的canal.mq.topic值
-
-- 修改canal 配置文件 `canal.deployer-1.1.7/conf/canal.properties`
-
-    ```
-    # ...
-    # 可选项: tcp(默认), kafka,RocketMQ,rabbitmq,pulsarmq
-    canal.serverMode = kafka
-    # ...
-
-    # 是否为flat json格式对象
-    canal.mq.flatMessage = true
-    # Canal的batch size, 默认50K, 由于kafka最大消息体限制请勿超过1M(900K以下)
-    canal.mq.canalBatchSize = 50
-    # Canal get数据的超时时间, 单位: 毫秒, 空为不限超时
-    canal.mq.canalGetTimeout = 100
-    canal.mq.accessChannel = local
-
-    ...
-
-    ##################################################
-    #########                    Kafka                   #############
-    ##################################################
-    # 此处配置修改为你的Kafka环境地址
-    kafka.bootstrap.servers = 127.0.0.1:9092
-    kafka.acks = all
-    kafka.compression.type = none
-    kafka.batch.size = 16384
-    kafka.linger.ms = 1
-    kafka.max.request.size = 1048576
-    kafka.buffer.memory = 33554432
-    kafka.max.in.flight.requests.per.connection = 1
-    kafka.retries = 0
-
-    kafka.kerberos.enable = false
-    kafka.kerberos.krb5.file = ../conf/kerberos/krb5.conf
-    kafka.kerberos.jaas.file = ../conf/kerberos/jaas.conf
-
-    # sasl demo
-    # kafka.sasl.jaas.config = org.apache.kafka.common.security.scram.ScramLoginModule required \\n username=\"alice\" \\npassword="alice-secret\";
-    # kafka.sasl.mechanism = SCRAM-SHA-512
-    # kafka.security.protocol = SASL_PLAINTEXT
-    ```
-
-- 按上述修改Canal配置后，重启Canal服务即可。
-
-# 数据库流行度
-
-- [db-engines：数据库流行度排行榜](https://db-engines.com/en/)
-
-    - [db-engine 数据分析](https://demo.pigsty.cc/d/db-analysis)
-
-- [墨天轮国产数据库排行榜](https://www.modb.pro/dbRank)
-
-- [StackOverflow 7年调研数据](https://demo.pigsty.cc/d/sf-survey/stackoverflow-survey?orgId=1)
-
-## 国产数据库
-
-- [爱可生开源社区：第八期话题：国产数据库，TiDB、巨杉、OceanBase，谁会最终胜出？](https://mp.weixin.qq.com/s/M6W-6wvOc8zGnQnlNQhQZw)
-
-- [未来智库：数据库行业专题研究：关键三问深度解读](https://mp.weixin.qq.com/s/RlF0eTu5xBQ-LosJ6Vt7Zg)
-
-- [非法加冯：国产数据库到底能不能打？](https://mp.weixin.qq.com/s/AqcYpOgVj91JnkB1B3s4sA)
-
-### [白鳝的洞穴：体系化与碎片化孰优孰劣？](https://mp.weixin.qq.com/s/KBd0LIBFTtDbEi4sq3RYKw)
-
-- 目前的国产数据库的服务网站和知识库还是可以用来做系统学习的，这一点和三十年前的Oracle官网很像。不是因为知识库更加强大，而是因为碎片化的知识不够丰富，所以我们还可以以系统化的方式来学习。
-
-- 而实际上的数据库知识世界是网状的，是接近于混乱的，想要系统学习的时候，只能在表层，要想往下下钻，很快就会被相互缠绕的藤蔓搞得晕头转向。很多DBA朋友都会有这种感觉，刚开始体系化学习某个数据库技术的时候，会觉得学得很明白了，不过遇到具体的问题都会麻爪。随后学习了一些碎片化的技巧和方法，处理起问题来就逐渐有点得心应手了。如果没有碎片化的知识做补充，那么我们学到的体系化知识无法发挥作用。而仅仅是碎片化地去学习，那么学到的可能是一团浆糊。
-
-- RDBMS的核心最初是被按照某种理想的模型设计并开发出来的。不过这种被严格设计出来的系统在面对各种千奇百怪的应用需求的时候，往往无法很好地应对，因此必须对RDBMS核心做大量的优化与改造，打上各种样式的补丁，才能适应多样化的用户需求。另外随着新技术的出现，也需要对RDBMS做升级。
-
-- 大量的改造、补丁与升级叠加起来，数据库系统会变得越来越复杂。而要保持对老版本系统的兼容性，又对升级改造提出了新要求，大大增加了升级改造的难度。新业务可能会对数据库存储引擎提出新的要求，数据块的结构、日志流的结构等等可能都需要变更才能满足新的功能需求，但是我们还需要保证老版本的数据库能够直接UPGRADE到新版本，这种痛苦目前的一些国产数据库厂商可能刚刚尝到。
-
-- 牵一发而动全身，有时候改进一项功能并非易事。经常有朋友在吐槽某开源数据库的某个功能为啥做了N多年还搞不出来，实际上这是数据库的复杂性导致的。2016年ORACLE CAB大会上，我提了一个功能，到去年的大会上回顾环节，这个功能才被部分实现。并不是这个功能没啥用，而是因为这个功能太有用了，牵涉到内核太多的功能模块了。
-
-- 我曾经和一位新锐数据库核心研发的同学做过交流，他认为他们的数据库全面超越Oracle只是时间的问题了，因为Oracle的历史包袱太重，设计思想严重落后，目前堆积的几千万行屎山代码已经快改不动了。而他们的产品是在全新的数据库理念指导下，利用最新的IT技术架构设计出来的，代码高效而优雅，并能充分利用现代硬件的技术能力，因此没有理由会比Oracle差。
-
-    - 他在得意于自己产品的体系化而鄙视Oracle的碎片化的时候，可能没有弄明白一件事，那就是数据库产品不是依靠设计就能做好的，好的数据库产品是在海量的用户场景中不断打磨出来的。他眼中的屎山不是Oracle的弱点，反而是Oracle的优势所在。Oracle在搞出这个屎山的时候还没有崩溃，还依然高质量地帮用户应对各种应用场景，这就是Oracle的最大的成功。
-
-    - 而如果给那位朋友的设计精良的数据库系统以同样的机会，去面对用户千差万别的应用场景的时候，也将开启他们堆积屎山的旅程。我估计他们可能等不到堆积到Oracle 1/10的高度的时候，可能就崩溃了。
-
-- 做数据库产品是要奉行长期主义的，特别是通用关系型数据库，新鲜出炉的产品自己感觉挺好，到用户现场去练练就会发现很多地方是不契合的。
-
-    - 十年可能才是一个数据库厂商刚刚度过童年，仍然不够强健，随时可能会夭折。
-    - 能够坚持二十年以上的国产数据库厂商目前还寥寥无几。
-    - 而很多国外商用数据库厂商死在了自己的三十岁左右。
-
-- 目前来看，数据库国产化替代的时间要求很紧，国产数据库目前大多没有充分经受应用场景的磨练，存在问题很多。
-    - 研发人员觉得产品是体系化的，但是到了用户现场却是项目化的，这实际上还是初级阶段的体系化或者说是设计上的体系化。等第一阶段的磨合完成了，才可能形成较为产品化的版本，进入真正的体系化，然后才能初步满足用户的需求，在用户各种各样变态的场景中继续磨练，逐渐形成体系化下的碎片化能力。
-    - 不过O记不也是从不大易用，不大好用，不大稳定的时代经过了三十多年蜕变出来的。国产数据库在大量关键行业应用的锤炼下，所需的成长时间会大大缩短，我坚信5-10年里一定会出现优秀的国产数据库产品。
-
-## 数据库历史
-
-- [码农翻身：漫画 | 历经60年，数据库的王者终于出现了......](https://mp.weixin.qq.com/s/xacTZBq_IFTByH689csc7g)
-
-# 性能测试
-
-- [ClickBench：a Benchmark For Analytical DBMS](https://benchmark.clickhouse.com/)
 
 # 新闻
 

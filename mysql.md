@@ -1,3 +1,9 @@
+---
+id: mysql
+aliases: []
+tags: []
+---
+
 
 <!-- mtoc-start -->
 
@@ -32,9 +38,12 @@
       * [基本命令](#基本命令)
       * [爱可生开源社区：技术分享 | 如何通过 binlog 定位大事务？](#爱可生开源社区技术分享--如何通过-binlog-定位大事务)
       * [第三方binlog工具](#第三方binlog工具)
-        * [mysqlbinlog 日志分析](#mysqlbinlog-日志分析)
+        * [mysqlbinlog](#mysqlbinlog)
           * [--flashback 还原被添加、删除、修改的数据](#--flashback-还原被添加删除修改的数据)
+        * [Mysqlbinlog_flashback](#mysqlbinlog_flashback)
         * [binlog2sql](#binlog2sql)
+        * [MyFlash](#myflash)
+        * [My2sql](#my2sql)
         * [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](#analysis_binlog查看分析binlog统计dml多个binlog并行解析)
         * [reverse_sql](#reverse_sql)
     * [Redo Log (重做日志)](#redo-log-重做日志)
@@ -91,9 +100,12 @@
     * [docker 主从复制](#docker-主从复制)
   * [高可用](#高可用)
     * [高可用方案](#高可用方案)
-    * [MHA](#mha)
-    * [MGR（MySQL Group Replication）](#mgrmysql-group-replication)
+    * [keepalived](#keepalived)
+    * [MHA（Master High Availability）](#mhamaster-high-availability)
+    * [PXC（Percona XtraDB Cluster）](#pxcpercona-xtradb-cluster)
+    * [MGR（MySQL Group Replication）：Oracle 在 MySQL 5.7.17 版本推出 Group Replication 插件](#mgrmysql-group-replicationoracle-在-mysql-5717-版本推出-group-replication-插件)
       * [AustinDatabases：MySQL Innodb Cluster 高可用推广“失败” 了？](#austindatabasesmysql-innodb-cluster-高可用推广失败-了)
+  * [Orchestrator：github的高可用性和复制管理的工具](#orchestratorgithub的高可用性和复制管理的工具)
   * [中间件](#中间件)
     * [DBLE](#dble)
   * [备份与恢复](#备份与恢复)
@@ -135,7 +147,9 @@
         * [例子：将列类型由 char(20) 修改为 varchar(200)](#例子将列类型由-char20-修改为-varchar200)
         * [索引添加到一半的时候，如何停止？](#索引添加到一半的时候如何停止)
         * [pt-osc工具引发的主从延迟](#pt-osc工具引发的主从延迟)
-      * [Online DDL copy和gh-ost和pt-osc 的对比测试](#online-ddl-copy和gh-ost和pt-osc-的对比测试)
+        * [爱可生开源社区：故障分析 | pt-osc：特定场景下的数据清理神器](#爱可生开源社区故障分析--pt-osc特定场景下的数据清理神器)
+      * [OnlineSchemaChange](#onlineschemachange)
+      * [对比测试](#对比测试)
     * [字段变更](#字段变更)
       * [爱可生开源社区：技术分享 | MySQL VARCHAR 最佳长度评估实践](#爱可生开源社区技术分享--mysql-varchar-最佳长度评估实践)
     * [大表变更](#大表变更)
@@ -149,6 +163,9 @@
     * [字符集相关sql语句](#字符集相关sql语句)
     * [乱码](#乱码)
   * [常见错误](#常见错误)
+    * [启动错误](#启动错误)
+      * [目录没有初始化创建](#目录没有初始化创建)
+      * [爱可生开源社区：故障分析 | MySQL 通过 systemd 启动时 hang 住了……](#爱可生开源社区故障分析--mysql-通过-systemd-启动时-hang-住了)
     * [登录错误](#登录错误)
       * [ERROR 1046 (28000)](#error-1046-28000)
       * [ERROR 1819 (HY000)： 密码不满足策略安全](#error-1819-hy000-密码不满足策略安全)
@@ -157,7 +174,6 @@
     * [ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined](#error-1075-42000-incorrect-table-definition-there-can-be-only-one-auto-column-and-it-must-be-defined)
     * [爱可生开源社区：故障分析 | ERROR 1709: Index column size too large 引发的思考](#爱可生开源社区故障分析--error-1709-index-column-size-too-large-引发的思考)
     * [插入中文错误(1366, "Incorrect string value:](#插入中文错误1366-incorrect-string-value)
-    * [启动错误](#启动错误)
     * [表损坏](#表损坏)
     * [爱可生开源社区：第 54 期：MySQL Too many open files 报错](#爱可生开源社区第-54-期mysql-too-many-open-files-报错)
     * [爱可生开源社区：故障分析 | 重启数据库之后无法写入数据了？](#爱可生开源社区故障分析--重启数据库之后无法写入数据了)
@@ -191,14 +207,18 @@
     * [iibench-mysql：基于 Java 的 MySQL/Percona/MariaDB 索引进行插入性能测试工具](#iibench-mysql基于-java-的-mysqlperconamariadb-索引进行插入性能测试工具)
     * [tpcc-mysql：Percona开发的TPC-C测试工具](#tpcc-mysqlpercona开发的tpc-c测试工具)
     * [benchmarksql](#benchmarksql)
+  * [性能优化](#性能优化-1)
+    * [使用jemalloc内存管理器](#使用jemalloc内存管理器)
   * [第三方工具](#第三方工具)
     * [服务端](#服务端)
       * [gt-checksum：静态数据库校验修复工具](#gt-checksum静态数据库校验修复工具)
       * [percona-toolkit 运维监控工具](#percona-toolkit-运维监控工具)
       * [undrop-for-innodb(\*数据恢复)](#undrop-for-innodb数据恢复)
+      * [vitess：解锁 MySQL 的水平扩展能力](#vitess解锁-mysql-的水平扩展能力)
     * [客户端](#客户端)
       * [mycli](#mycli)
       * [mitzasql](#mitzasql)
+      * [phpMyAdmin：web ui](#phpmyadminweb-ui)
     * [监控客户端](#监控客户端)
       * [innotop](#innotop)
       * [dbatool](#dbatool)
@@ -1538,7 +1558,20 @@ pugre master logs before current_date - interval 1 day;
 #### [爱可生开源社区：技术分享 | 如何通过 binlog 定位大事务？](https://mp.weixin.qq.com/s/lR3CZyM8_Mz0nGC53MxcKg)
 
 #### 第三方binlog工具
-##### mysqlbinlog 日志分析
+
+| 工具                  | 数据库类型 | 开发语言 | 功能                           | 性能                   | 生态支持               |
+| -                     | -          | -        | -                              | -                      | -                      |
+| MySQLbinlog           | MySQL      | c++      | 解析binlog，无法生成反向语句   | 中低，适合小规模日志   | 社区活跃，文档较为齐全 |
+| myflash               | MySQL      | c++      | 解析binlog，生成正向和反向语句 | 中高，适合中大规模日志 | 社区维护较少           |
+| my2sql                | MySQL      | go       | 解析binlog，生成正向和反向语句 | 高，适合恢复大规模日志 | 社区活跃，文档齐全     |
+| bingo2sql             | MySQL      | python   | 解析binlog，生成正向和反向语句 | 中等，适合中等规模日志 | 社区活跃，文档较为齐全 |
+| mysqlbinlog_flashback | MySQL      | python   | 解析binlog，生成正向和反向语句 | 中等，适合中等规模日志 | 社区活跃度较差         |
+
+##### mysqlbinlog
+
+- MySQLbinlog 是 MySQL 官方提供的一个命令行工具，用于解析和读取 MySQL 的binlog，将 binlog 文件中的事件转换为可读的 SQL 语句，便于用户进行数据恢复、审计和分析。他的原理是从指定的 binlog 文件中读取日志内容，支持多种过滤条件，如时间范围、数据库名称、表名称等筛选出需要的 SQL 语句或事件。
+
+- MySQLbinlog的优点是作为 MySQL 官方提供的工具，具有较高的可靠性和兼容性，还具备简单易用、灵活性较高的特性。缺点是生成反向SQL较为困难，在处理大规模 binlog 文件时，性能不如一些专门优化的第三方工具。
 
 ```sh
 mysqlbinlog /var/lib/mysql/bin.000001
@@ -1645,7 +1678,17 @@ mysqlbinlog /var/lib/mysql/bin.000001
 
         ![image](./Pictures/mysql/mysqlbinlog1.gif)
 
+##### [Mysqlbinlog_flashback](https://github.com/58daojia-dba/mysqlbinlog_flashback)
+
+- mysqlbinlog_flashback 是一款58同城开源，用于解析 MySQL 的Binlog并生成可读的 SQL 语句工具，由Python 语言编写。通过读取row格式的binlog，然后生成反向的SQL语句，一般用于数据恢复的目的。他的原理和MyFlash 类似，也是通过解析binlog 日志，也支持用户自定义过滤条件，如时间范围、数据库名称、表名称等筛选出需要的 SQL 语句。
+
+- mysqlbinlog_flashback 的优点是简单易用，上手方便；缺点是社区活跃度差，支持的MySQL版本较低，且对复杂SQL支出度较差。
+
 ##### [binlog2sql](https://github.com/danfengcao/binlog2sql)
+
+- Binlog2SQL 是一款个人开源，用于解析 MySQL binlog 并将其转换为可读的 SQL 语句的工具，由python实现，可帮助用户从 binlog 中提取出原始的 SQL 语句，甚至生成反向 SQL 语句以进行数据回滚。由于，MySQL 的 binlog 记录了所有对数据库的DML、DDL 等操作，这些操作以二进制格式存储，通过mysql-replication 库来解析 binlog 文件中的事件，然后将其转换为可读的 SQL 语句。
+
+- Binlog2SQL的优点是灵活性高、简单易用，支持多种过滤条件，可以根据需求灵活选择需要解析的 binlog 事件，同时提供了命令行接口，能快速生成 SQL 语句。缺点是处理大规模 binlog 文件时性能较弱，另外不支持实时解析日志。
 
 ```sql
 drop table if exists test;
@@ -1707,6 +1750,18 @@ python binlog2sql/binlog2sql.py -uroot -p -dtest --start-file='bin.000014' --sta
 python binlog2sql/binlog2sql.py -uroot -p -dtest --flashback --start-file='bin.000014' --start-datetime="2020-11-19 01:59:05" --stop-datetime="2020-11-19 01:59:34" > /tmp/tmp.log
 # 失败
 ```
+
+##### [MyFlash](https://github.com/Meituan-Dianping/MyFlash)
+
+- MyFlash 是一款美团用于解析 MySQL 的binlog并生成可执行的 SQL 语句或反向 SQL 语句的工具，由 C++ 实现，具有较高的性能，适合处理大规模 binlog 文件。他的原理是从指定的 binlog 文件中读取日志内容，解析器解析 binlog 中的各种事件。根据解析的结果生成相应的 SQL 语句，可以选择生成正向或反向 SQL 语句。此外，用户可以自定义过滤条件，如时间范围、数据库名称、表名称等筛选出需要的 SQL 语句。
+
+- MyFlash 的优点是灵活性好、性能较高、简单易用，同时提供了 GUI 版本，降低了用户的使用门槛，提升了用户体验。缺点是社区活跃度较低，官方文档较为简略，但提供了基本的使用指南和示例，不支持8.0版本，且对大事务不友好。
+
+##### [My2sql](https://github.com/liuhr/my2sql)
+
+- My2SQL 是一款个人开源，用于解析 MySQL 的Binlog并生成可读的 SQL 语句或  JSON 格式输出的的工具，由 Go 语言编写，具有高性能和灵活性，适合处理大规模 binlog 文件。他的原理和MyFlash，也是通过解析binlog 日志，也支持用户自定义过滤条件，如时间范围、数据库名称、表名称等筛选出需要的 SQL 语句。
+
+- My2SQL的优点是由于是go实现，具有更高的效率，支持Json的输出格式，更适合对数据库审计、分析等；缺点是不支持GUI管理，需要一定的学习成本。
 
 ##### [analysis_binlog：查看分析binlog、统计dml、多个binlog并行解析](https://gitee.com/mo-shan/analysis_binlog)
 
@@ -4688,9 +4743,21 @@ docker 主从复制测试:
 
 - [MySQL数据库联盟：MySQL 常用高可用方案](https://mp.weixin.qq.com/s/3ICMQUF_vQpuDm2nHi1qqw)
 
+| 高可用方案   | 主要功能                           | 数据一致性                         | 扩展性                             | 生态支持                            | 适用场景                             |
+| -            | -                                  | -                                  | -                                  | -                                   | -                                    |
+| MHA          | 自动故障转移和主从复制管理         | 异步或半同步复制，存在数据丢失风险 | 扩展性有限，适合小型到中型环境     | 社区活跃度一般，文档较为齐全        | 成本敏感的小型企业级应用             |
+| Orchestrator | 自动故障转移、拓扑管理和可视化     | 支持异步/半同步复制                | 良好的扩展性，支持大规模集群管理   | 活跃社区，丰富的插件和API支持       | 复杂拓扑管理和大规模生产环境         |
+| MGR          | 原生组复制支持高可用性和分布式控制 | 强一致性，保证数据同步             | 高度可扩展，适合大型分布式系统     | 官方支持，广泛使用和认可            | 高要求的数据一致性和高可用性需求     |
+| PXC          | 同步复制集群，适用于读写分离       | 强一致性，所有节点数据实时同步     | 中等到高度可扩展，适合读多写少场景 | Percona社区支持，良好的兼容性和扩展 | 需要强一致性和高可用性的读密集型应用 |
+| Keepalived   | 主备切换，基于心跳检测             | 不直接处理数据一致性               | 扩展性较差                         | 开源且广泛应用，但与数据库集成较弱  | 需要简单快速的主备切换解决方案       |
+
 ![image](./Pictures/mysql/高可用-高可用方案投票.avif)
 
 - 1.主从或主主 + Keepalived
+
+    - Keepalived 是一个开源的工具，主要用于管理虚拟IP地址（VIP）和健康检查。在 MySQL 数据库环境中，与 MySQL 主从复制结合使用，可实现MySQL 数据库的自动故障发现和转移。
+
+        - Keepalived 的实现方式是，基于MySQL 原生的主从能力，Keepalived 提供 VRRP（虚拟路由冗余协议）提供VIP，当出现主节点故障时，可以根据 VIP 的自动切换，客户端可以通过 VIP 访问新主节点，从而实现高可用。Keepalived 实现简单，成本较低，适合对数据一致性要求不是特别高的场景；缺点是需要手动处理主从切换，可能会有一定的数据丢失风险，也无法自动处理从节点的故障。
 
     - 主从或主主 + Keepalived 算是历史比较悠久的 MySQL 高可用方案
 
@@ -4708,6 +4775,8 @@ docker 主从复制测试:
 - 2.MHA
 
     - MHA（Master High Avaliable） 是一款 MySQL 开源高可用程序，MHA 在监测到主实例无响应后，可以自动将同步最靠前的 Slave 提升为 Master，然后将其他所有的 Slave 重新指向新的 Master。
+        - 根据文档介绍，MHA 能做到在0~30秒之内自动完成数据库的故障切换，并且在故障切换的过程中，能最大程度上保证数据的一致性。
+        - MHA 主要由 Manager 和 Node 节点组成，其中 Manager 是管控节点，主要负责监控主库健康状态以及协调故障切换流程；Node 是数据节点，主要负责执行数据库的具体操作，比如复制配置、日志解析。经过多年的发展，MHA 是一款成熟且市场上比较流行的MySQL 高可用架构产品。缺点是配置、运维管理相对复杂，并且只支持一主多从，且依赖 ssh 模式。
 
     ![image](./Pictures/mysql/高可用-MHA.avif)
 
@@ -4723,7 +4792,11 @@ docker 主从复制测试:
 
 - 3.PXC
 
-    - PXC（Percona XtraDB Cluster）是一个完全开源的 MySQL 高可用解决方案。它将 Percona Server、Percona XtraBackup 与 Galera 库集成在一起，以实现多主复制的 MySQL 集群。
+    - PXC（Percona XtraDB Cluster）是一个基于 Galera Cluster 技术的高可用性、强一致性的开源 MySQL 集群解决方案，由 Percona 公司开源。其核心目标是通过多主同步复制实现数据库的高可用与横向扩展能力，适用于对数据一致性和容灾能力要求较高的场景。
+
+        - PXC 由 Percona XtraDB Server、WSREP API（write set replication patches）和 Galera library 组成。它所有节点均可读写，写入操作通过 Galera 库实时同步到其他节点，采用 Certification-Based Replication机制，事务在本地执行后，生成 Write-Set，广播到所有节点，各节点检查有无冲突数据。若所有节点返回成功，事务发起节点提交事务并返回客户端；否则取消事务操作。这种机制确保了PXC 可以实现金融级别的数据一致性。同时，这种机制也保证了当某个节点出现故障，并不影响整个集群的运行。
+
+        - 和MGR 类似，PXC 的数据强一致算法以及节点间频繁通信，对节点间的网络要求非常高，同时也需要平衡数据强一致性和数据写入性能的关系。
 
     ![image](./Pictures/mysql/高可用-PXC.avif)
 
@@ -4783,7 +4856,10 @@ docker 主从复制测试:
         - 默认情况下，Xenon 和 MySQL 跑在同一个账号下。
 
 - 6.Orchestrator
-    - Orchestrator是 Go 语音编写的 MySQL 高可用性和复制管理工具，作为服务运行并提供命令行访问、HTTP API 和 Web 界面。
+
+    - Orchestrator是 Go 语音编写的 MySQL 高可用性和复制管理工具，由 GitHub 开源的一款MySQL 高可用性和复制管理的工具，主要负责监控和管理 MySQL 复制拓扑结构，同时提供提供命令行、HTTP API 和 Web 界面三种方式管理、配置节点。在故障发生时，它可以快速进行故障转移，提升新的主节点，确保服务的连续性。
+
+        - 相对比传统的 MHA 架构，Orchestrator 首先是简化管理， 通过可视化界面和自动化操作，简化了 MySQL 复制和集群的管理；来看最重要的是解决了管理节点的单点问 题，其通过raft协议保证本身的高可用，以及 web可视化管理集群拓扑关系和更完善、可靠的故障转移机制。
 
     ![image](./Pictures/mysql/高可用-Orchestrator.avif)
 
@@ -4796,11 +4872,23 @@ docker 主从复制测试:
         - 相对于其他高可用组件，参数多很多。
         - 在某些场景可能出现丢数据的情况，数据补偿机制需要优化。
 
-### MHA
+### keepalived
+
+- [Se7en的架构笔记：MySQL + Keepalived 双主热备搭建](https://mp.weixin.qq.com/s/yb0aIwLPxiJuFV0ZJfCNvA)
+
+### [MHA（Master High Availability）](https://github.com/yoshinorim/mha4mysql-manager)
 
 - [运维记事：MySQL高可用之MHA+延迟备份搭建指导](https://mp.weixin.qq.com/s?__biz=MzU0MTgyMjA1MA==&mid=2247483800&idx=1&sn=0c2652dea2b27115e3e793f626690d7f&chksm=fb255c95cc52d5833507ccd78dd54f9b3c528c630f4d9311c0d5a27da493cddce611cea224e8&cur_album_id=2629958258165809153&scene=190#rd)
 
-### MGR（MySQL Group Replication）
+### [PXC（Percona XtraDB Cluster）](https://github.com/percona/percona-xtradb-cluster)
+
+### MGR（MySQL Group Replication）：Oracle 在 MySQL 5.7.17 版本推出 Group Replication 插件
+
+- Oracle 在 MySQL 5.7.17 版本推出 Group Replication 插件， MGR 是基于 Group Replication 插件实现。通过 Paxos 协议管理成员的状态和达成共识。当一个节点接收到写时，首先在本地执行，然后将写请求发给其他节点，其他节点该写集进行认证，如果多数节点认可该写没有冲突，事务就会在所有成员上按相同顺序提交。这一过程，使得在内核层面保证数据的一致性。
+
+- 同时，MGR 支持自动的故障检测和故障转移。当某个节点出现故障时，组内其他节点可以快速检测到并将其移除，同时选举出新的主节点（在单主模式下）或继续正常工作（在多主模式下），确保服务的连续性。MHA 是支持单主模式（Single-Primary Mode）和多主模式（Multi-Primary Mode）。
+
+- MGR 虽好，但也有待改进。比如由于MGR需要在组内成员之间进行频繁的通信和共识达成，会消耗一定的网络带宽和 CPU 资源，尤其是在节点数量较多或网络状况不佳的情况下。因此，官方建议一般不超过9个节点。另外，在多主模式下，当多个节点同时对同一数据进行写操作时，可能会发生写冲突。
 
 - [爱可生开源社区：第四期话题：MySQL Group Replication 能否在生产环境中大规模使用？](https://mp.weixin.qq.com/s/gYb3yE8IfiOFqkTvMYfjQA)
 
@@ -4856,6 +4944,8 @@ docker 主从复制测试:
 - 平心而论，当前的MySQL的innodb cluster 已经走向的成熟，其实现在使用作为一个稳定的高可用形式，还是不错的，可既定的影响已经产生，人的观念很难改变，同时还存在一个问题，innodb replicaiton的方式也不错，相对innodb cluster更加的皮实，且学习的知识也不是太多。
 
 - 最重要的灵一个问题是，当今MySQL的高速发展期已经过去了，现在数据库对于MySQL来说是存量市场，新兴的市场被 OceanBase,Tidb,PostgreSQL,等商业产品和开源产品逐渐霸占，更多的人不是不想研究，是没有动力研究。
+
+## [Orchestrator：github的高可用性和复制管理的工具](https://github.com/openark/orchestrator)
 
 ## 中间件
 
@@ -7810,7 +7900,22 @@ pt-online-schema-change并不能缩短表变更的时间，它只是会减少表
 
 - 今天这篇文章告诉大家的一个知识点就是：在使用pt-osc进行主从复制时候，可能会产生比较大的复制延迟，如果你的应用能够接受，那ok，如果不能接受，你可能就需要考虑其他的方法，比如调节--chunk-size参数(优化空间有限)，有或者Online DDL等(我没测试，有兴趣可以测试下)...
 
-#### Online DDL copy和gh-ost和pt-osc 的对比测试
+##### [爱可生开源社区：故障分析 | pt-osc：特定场景下的数据清理神器](https://mp.weixin.qq.com/s/NZKIa2B_juojsQQlZeOW2Q)
+
+#### [OnlineSchemaChange](https://github.com/facebookincubator/OnlineSchemaChange)
+
+- OnlineSchemaChange 是 Facebook 开源的额MySQL 在线变更schema 开源产品，其最初的版本是 PHP 的，改成 Python 之后非常方便开发者对其内部原理进行了解和掌握。他的主要功能是在线修改表结构，并且整个过程主要可以分为 init 、dump、load、replay、checksum、cut-over以及cleanup 等步骤，其增量过程也是基于增删改三个触发器所实现。
+
+- OnlineSchemaChange 的优势是支持多种变更类型，变更效率高，对业务影响较小；缺点是社区阅读读、文档丰富性均不如Percona 相关产品，另外有一定使用门槛。
+
+#### 对比测试
+
+
+| 工具               | 数据库类型 | 功能                                             | 增量实现方式 | 开源组织    | 生态支持                         |
+| -                  | -          | -                                                | -            | -           | -                                |
+| Pt-osc             | MySQL      | 支持多种表结构变更，无锁表                       | 触发器       | Percona公司 | 社区活跃，官方文档齐全           |
+| Gh-ost             | MySQL      | 支持多种表结构变更，无锁表，变更期间可自定义状态 | 事务日志     | Github      | 社区活跃，GitHub上广泛使用和支持 |
+| OnlineSchemaChange | MySQL      | 支持多种表结构变更，无锁表                       | 触发器       | Facebook    | 社区活跃度一般                   |
 
 - 如何选择
 
@@ -9000,6 +9105,65 @@ pt-online-schema-change并不能缩短表变更的时间，它只是会减少表
 
 - 日志目录`/var/lib/mysql`
 
+### 启动错误
+
+#### 目录没有初始化创建
+
+```sh
+● mariadb.service - MariaDB 10.5.8 database server
+     Loaded: loaded (/usr/lib/systemd/system/mariadb.service; enabled; vendor preset: disabled)
+     Active: failed (Result: exit-code) since Sun 2020-11-29 10:05:15 CST; 10min ago
+       Docs: man:mariadbd(8)
+             https://mariadb.com/kb/en/library/systemd/
+    Process: 11236 ExecStartPre=/bin/sh -c systemctl unset-environment _WSREP_START_POSITION (code=exited, status=0/SUCCESS)
+    Process: 11237 ExecStartPre=/bin/sh -c [ ! -e /usr/bin/galera_recovery ] && VAR= ||   VAR=`cd /usr/bin/..; /usr/bin/galera_recovery`; [ $? -eq 0 ]   && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1 (code=exited, status=0/SUCCESS)
+    Process: 11246 ExecStart=/usr/bin/mariadbd $MYSQLD_OPTS $_WSREP_NEW_CLUSTER $_WSREP_START_POSITION (code=exited, status=1/FAILURE)
+   Main PID: 11246 (code=exited, status=1/FAILURE)
+     Status: "MariaDB server is down"
+```
+
+解决:
+
+```sh
+# 先删除目录
+mv /var/lib/mysql /tmp
+# 初始化
+mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+```
+
+#### [爱可生开源社区：故障分析 | MySQL 通过 systemd 启动时 hang 住了……](https://mp.weixin.qq.com/s/vNA9Hny9wmF5ZFCAJfEXXQ)
+
+- 问题：正如题目所述，在自动化测试场景下，通过 systemd 无法启动 MySQL。连续 kill -9 结束实例进程，检测 mysqld 在退出后是否会被正确拉起。
+
+- 原因：
+
+    - systemd 启动 mysqld 的过程中，会先根据 service 模板中的配置，执行：
+        - 1.ExecStart（启动 mysqld）
+        - 2.mysqld 启动创建 pid 文件
+        - 3.ExecStartPost（自定义的一些后置脚本：调整权限、将 pid 写入 cgroup 等）
+
+        - 在 步骤 2-3 的中间态，也就是 pid 文件刚创建出来时，主机上接收到了自动化测试下发的命令：`sudo -S kill -9 $(cat /opt/mysql/data/11690/mysqld.pid)`
+
+        - 由于这个 pid 文件和 pid 进程确实存在（如果不存在 kill 命令或 cat 会报错）
+            - 自动化的 CASE 认为 kill 操作已成功结束。
+            - 但由于 mysqld.pid 这个文件是由 MySQL 自身维护的，在 systemd 的视角中，还需要继续等待 步骤 3 完成，才认为启动成功。
+
+        - 在 systemd 使用 forking 模式时，会根据子进程的 PID 值判断服务是否成功启动。
+
+            - 如果子进程成功启动，并且没有发生意外退出，则 systemd 会认为服务已启动，并将子进程的 PID 作为 MAIN PID。
+            - 而如果子进程启动失败或意外退出，则 systemd 会认为服务未能成功启动。
+
+    - 总结：在执行 ExecStartPost 时，由于子进程 ID 31036 已经被 kill 掉，后置 shell 缺少了启动参数，但 ExecStart 步骤已完成，导致 MAIN PID 31036 成为了只存在于 systemd 里的 僵尸进程。
+
+- 排除过程和复现过程（省略...）
+- 解决方法：
+
+    - 先 kill 掉 hang 住的 systemctl start 命令，执行 systemctl stop mysqld_11690.service，这可以让 systemd 主动结束僵尸进程，虽然 stop 命令可能会报错但这并不影响。
+
+    - 等待 stop 执行完成后再次使用 start 命令启动，恢复正常。
+
+- 虽然文章跟 MySQL 没太大关系，但重要的是分析偶发故障的思考过程 :)
+
 ### 登录错误
 #### ERROR 1046 (28000)
 
@@ -9103,30 +9267,6 @@ alter table test drop primary key;
 ```sql
 -- 修改表为utf8mb4字符集编码
 ALTER TABLE table_name CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-### 启动错误
-
-```sh
-● mariadb.service - MariaDB 10.5.8 database server
-     Loaded: loaded (/usr/lib/systemd/system/mariadb.service; enabled; vendor preset: disabled)
-     Active: failed (Result: exit-code) since Sun 2020-11-29 10:05:15 CST; 10min ago
-       Docs: man:mariadbd(8)
-             https://mariadb.com/kb/en/library/systemd/
-    Process: 11236 ExecStartPre=/bin/sh -c systemctl unset-environment _WSREP_START_POSITION (code=exited, status=0/SUCCESS)
-    Process: 11237 ExecStartPre=/bin/sh -c [ ! -e /usr/bin/galera_recovery ] && VAR= ||   VAR=`cd /usr/bin/..; /usr/bin/galera_recovery`; [ $? -eq 0 ]   && systemctl set-environment _WSREP_START_POSITION=$VAR || exit 1 (code=exited, status=0/SUCCESS)
-    Process: 11246 ExecStart=/usr/bin/mariadbd $MYSQLD_OPTS $_WSREP_NEW_CLUSTER $_WSREP_START_POSITION (code=exited, status=1/FAILURE)
-   Main PID: 11246 (code=exited, status=1/FAILURE)
-     Status: "MariaDB server is down"
-```
-
-解决:
-
-```sh
-# 先删除目录
-mv /var/lib/mysql /tmp
-# 初始化
-mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
 ```
 
 ### 表损坏
@@ -9449,6 +9589,60 @@ sudo mysql -uroot -pYouPassword YouDatabase < /tmp/1018.sql
 
 - [yangyidba：工具| benchmarksql使用指南](https://mp.weixin.qq.com/s/JYPeP0hHJWZMTcqwWB_bXA)
 
+## 性能优化
+
+### [使用jemalloc内存管理器](https://github.com/jemalloc/jemalloc)
+
+- [JiekeXu DBA之路：MySQL 内存使用率高，jemalloc 来拯救](https://mp.weixin.qq.com/s/jlhBv3ZLOFu6tR02HrAxZA
+)
+- MySQL 默认的内存分配器是 `ptmalloc`，为了提高性能和减少内存碎片，则考虑使用第三方的内存分配器，如 `jemalloc`。
+
+    - `jemalloc` 强调了碎片避免和可扩展的并发支持。`jemalloc` 于 2005 年首次作为FreeBSD libc 分配器使用，从那以后它已经进入许多依赖于其可预测行为的应用程序。`jemalloc` 适合多线程下内存分配管理，jemalloc 从各方评测的结果可见与 google `tcmalloc` 都不相伯仲，皆为内存管理器领域最高水平。
+
+    - 有时候，我们想采用 `jemalloc` 来替代 glibc 库的 `malloc` 内存管理方式，或者如果想启用 `TokuDB` 引擎，则就必须启用 `jemalloc` 才行了。
+
+- jemalloc 被广泛用于各种需要高性能内存管理的应用中，例如：
+
+    - Web服务器：如 Nginx 和 Apache HTTP Server。
+    - 数据库系统：如 Redis。
+    - 游戏引擎：对于实时性和资源管理有高要求的游戏开发。
+    - 其他高性能应用：任何对内存管理和性能有严格要求的软件。
+
+- 主要特点
+    - 高效性：通过优化分配算法，jemalloc 可以快速地分配和释放内存。
+    - 低碎片率：使用多种策略来管理内存块，减少内存碎片的产生。
+    - 可扩展性：支持多线程环境下的高效并发操作，通过锁粒度细化等技术减少竞争。
+    - 调试支持：提供了丰富的调试功能，可以帮助开发者诊断内存泄漏等问题。
+    - 自定义配置：用户可以根据自己的需求调整 jemalloc 的行为，比如通过环境变量或编译时选项进行配置。
+
+- 安装：
+
+    - 包管理器安装
+        ```sh
+        yum install -y jemalloc
+        ```
+
+    - 手动编译
+        ```sh
+        curl -LO https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
+        tar jxvf jemalloc-5.3.0.tar.bz2
+        cd jemalloc-5.3.0
+        ./configure --prefix=/usr
+        make && make install
+        ```
+
+- mysql启动jemalloc
+
+    ```sh
+    # 关闭mysql
+    sudo mysqladmin shutdown
+    # 重新启动mysql，指定--malloc-lib参数
+    sudo mysqld_safe --malloc-lib=/usr/lib/libjemalloc.so.2 --user=mysql
+
+    # 客户端连接
+    sudo mysql -u root
+    ```
+
 ## 第三方工具
 
 - [awesome-mysql](http://shlomi-noach.github.io/awesome-mysql/)
@@ -9527,7 +9721,12 @@ sudo mysql -uroot -p dictionary < dictionary/*.sql
 sudo ./sys_parser -uroot -p -d dictionary sakila/actor
 ```
 
+#### [vitess：解锁 MySQL 的水平扩展能力](https://github.com/vitessio/vitess)
+
+- 这是一个专为 MySQL 打造的分布式数据库集群系统，可用于部署、扩展和管理大型 MySQL 实例集群。它通过封装分片逻辑，减少了应用程序和数据库查询的复杂性，支持动态拆分/合并分片、高吞吐量和低延迟的数据库操作，适用于需要水平扩展 MySQL 数据库的企业级应用。
+
 ### 客户端
+
 #### [mycli](https://github.com/dbcli/mycli)
 
 - 更友好的 mysql 命令行
@@ -9547,6 +9746,81 @@ mysql root@localhost:(none)> SELECT DISTINCT CONCAT('User: ''',user,'''@''',host
 
 ![image](./Pictures/mysql/mysql-tui.avif)
 ![image](./Pictures/mysql/mysql-tui1.avif)
+
+#### [phpMyAdmin：web ui](https://github.com/phpmyadmin/phpmyadmin)
+
+- [archlinux文档](https://wiki.archlinux.org/title/PhpMyAdmin)
+
+- 安装
+    ```sh
+    # 我这里为archlinux
+    pacman -S php php-fpm
+    ```
+
+- 配置`/etc/php/php-fpm.d/www.conf`：以http用户和组启动php-fpm
+
+    ```
+    [www]
+    user = http
+    group = http
+
+    listen = /run/php-fpm/php-fpm.sock
+
+    listen.owner = http
+    listen.group = http
+    ```
+
+- 配置允许用户登陆时输入空密码：`/usr/share/webapps/phpMyAdmin/config.inc.php`
+
+    ```php
+    $cfg['Servers'][$i]['user'] = 'root';
+    $cfg['Servers'][$i]['AllowNoPassword'] = true;
+    ```
+
+- nginx配置
+
+    ```nginx
+    # 要和php-fpm用户一样为http
+    user  http;
+
+    http {
+      # phpMyAdmin
+      server {
+          server_name localhost;
+          # 我这里为端口8082
+          listen 8082;
+          index index.php;
+          access_log logs/phpMyAdmin.access.log;
+          error_log logs/phpMyAdmin.error.log;
+
+          root /usr/share/webapps/phpMyAdmin;
+          location / {
+              try_files $uri $uri/ =404;
+          }
+
+          error_page 404 /index.php;
+
+          location ~ \.php$ {
+              try_files $uri $document_root$fastcgi_script_name =404;
+
+              fastcgi_split_path_info ^(.+\.php)(/.*)$;
+              fastcgi_pass unix:/run/php-fpm/php-fpm.sock;
+              fastcgi_index index.php;
+              fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+              include fastcgi_params;
+
+              fastcgi_request_buffering off;
+         }
+      }
+    }
+    ```
+
+- 重启
+
+    ```sh
+    sudo systemctl restart php-fpm
+    sudo systemctl restart nginx
+    ```
 
 ### 监控客户端
 

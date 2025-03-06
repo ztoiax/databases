@@ -1,3 +1,9 @@
+---
+id: mongodb
+aliases: []
+tags: []
+---
+
 
 <!-- mtoc-start -->
 
@@ -127,8 +133,10 @@
       * [mongotop](#mongotop)
       * [mongostat：每秒打印统计信息](#mongostat每秒打印统计信息)
       * [datadog-agent](#datadog-agent)
-    * [mongoimport和mongoexport导入和导出](#mongoimport和mongoexport导入和导出)
-    * [mongodump和mongorestore备份和恢复](#mongodump和mongorestore备份和恢复)
+    * [备份和恢复](#备份和恢复)
+      * [mongoimport和mongoexport导入和导出](#mongoimport和mongoexport导入和导出)
+      * [mongodump和mongorestore备份和恢复](#mongodump和mongorestore备份和恢复)
+    * [Percona Backup for MongoDB](#percona-backup-for-mongodb)
     * [mtool](#mtool)
       * [mlaunch：快速启动实例，支持副本集和分片](#mlaunch快速启动实例支持副本集和分片)
     * [mongobee是一款数据升级的变更管理框架，与Liquibase or Flyway这类sql变更管理工具十分类似。](#mongobee是一款数据升级的变更管理框架与liquibase-or-flyway这类sql变更管理工具十分类似)
@@ -7730,7 +7738,9 @@ mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
 
 - [datadog-agent](https://docs.datadoghq.com/integrations/mongo/?tab=standalone)
 
-### mongoimport和mongoexport导入和导出
+### 备份和恢复
+
+#### mongoimport和mongoexport导入和导出
 
 - 导出工具`mongoexport`：可以将集合中的每一条BSON文档，导出JSON和CSV文件
 
@@ -7823,7 +7833,7 @@ mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
     mongoimport --host=127.0.0.1 --port=27017 --db=test --collection=account1 --mode=upsert --upsertFields=name --file=/tmp/account1.json
     ```
 
-### mongodump和mongorestore备份和恢复
+#### mongodump和mongorestore备份和恢复
 
 - `mongoimport`和`mongoexport`针对的是文本文件；而`mongodump`和`mongorestore`针对的是二进制文件
 
@@ -7898,6 +7908,11 @@ mongostat -o='host,opcounters.insert.rate()=Insert Rate,\
     # 打开mongosh，切换数据库
     use newtest
     ```
+### [Percona Backup for MongoDB](https://github.com/percona/percona-backup-mongodb)
+
+- Percona Backup for MongoDB（PBM）是 Percona  公司提供的一款用于MongoDB 数据库物理备份工具，支持对 MongoDB 单节点、副本集和分片集群进行高效、一致性的数据备份与恢复，支持全量、增量备份。PBM 通过使用快照技术和 Oplog 回放机制，实现备份数据的一致性，并且能够支持时间点恢复（Point-In-Time Recovery, PITR）。其原理是，首先对主节点执行快照，接着复制 Oplog 日志，最后在恢复时先应用快照数据，然后回放 Oplog 直到所需的时间点。
+
+- PBM 的备份优点是备份数据一致性的保证以及全量增量备份的高效性；缺点是对于初学者来说，PBM 的配置和使用可能有一定的难度，需要花费时间来学习和掌握；其次是备份时需要消耗较多的系统资源，比如网络以及磁盘的IO，尤其是在备份大容量数据时。
 
 ### mtool
 
@@ -8342,11 +8357,15 @@ mlaunch stop shard0002
 
 - 简介：
     - MongoShake是阿里巴巴开源的MongoDB数据迁移和同步工具，支持MongoDB集群和副本集之间的数据同步,支持全量和增量迁移。
+        - 全量迁移：是扫描数据库集合实现
+        - 增量迁移：是基于  oplog 实现，从源 MongoDB 数据库获取 oplog，解析其中记录的DML操作，然后将这些操作按照顺序在目标端进行重放。
 
 - 优点：
     - 支持多种同步模式（全量、增量、混合）。
     - 支持MongoDB集群和副本集的同步。
     - 高性能，支持大规模数据传输。
+    - 兼容性，支持不同版本的 MongoDB
+    - 目标端除了 MongoDB，还支持其他存储系统
 
 - 缺点：
     - 仅支持MongoDB数据库，适用范围有限。

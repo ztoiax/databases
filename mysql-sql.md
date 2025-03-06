@@ -1,3 +1,9 @@
+---
+id: mysql-sql
+aliases: []
+tags: []
+---
+
 
 <!-- mtoc-start -->
 
@@ -98,6 +104,8 @@
       * [select_type各种值的解释](#select_type各种值的解释)
       * [type各种值的解释](#type各种值的解释)
       * [Extra各种值的解释](#extra各种值的解释)
+        * [爱可生开源社区：第 50 期：根据 EXPLAIN EXTRA 栏提示进行优化（二）](#爱可生开源社区第-50-期根据-explain-extra-栏提示进行优化二)
+        * [爱可生开源社区：第 51 期：根据 EXPLAIN EXTRA 栏提示进行优化（三）](#爱可生开源社区第-51-期根据-explain-extra-栏提示进行优化三)
       * [爱可生开源社区：技术分享 | explain format=json 详解](#爱可生开源社区技术分享--explain-formatjson-详解)
       * [对比有无索引的执行计划](#对比有无索引的执行计划)
     * [索引的分类](#索引的分类)
@@ -147,13 +155,12 @@
       * [增删改语句优化](#增删改语句优化)
       * [慢查询优化](#慢查询优化)
         * [mysqldumpslow：慢查询工具](#mysqldumpslow慢查询工具)
-        * [pt-query-digest(percona-toolkit)：慢查询工具](#pt-query-digestpercona-toolkit慢查询工具)
-      * [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](#mysql数据库联盟如何通过chatgpt优化mysql的sql语句)
-      * [MySQL数据库联盟：全网最全MySQL Prompt](#mysql数据库联盟全网最全mysql-prompt)
       * [第三方优化工具](#第三方优化工具)
+        * [SOAR：小米的](#soar小米的)
+        * [SQLAdvisor：美团的](#sqladvisor美团的)
+        * [pt-query-digest(percona-toolkit)：慢查询工具](#pt-query-digestpercona-toolkit慢查询工具)
         * [MySQLTuner-perl：性能诊断工具，主要检查参数设置的合理性包括日志文件、存储引擎、安全建议及性能分析。针对潜在的问题，给出改进的建议。是mysql优化的好帮手。](#mysqltuner-perl性能诊断工具主要检查参数设置的合理性包括日志文件存储引擎安全建议及性能分析针对潜在的问题给出改进的建议是mysql优化的好帮手)
         * [tuning-primer.sh](#tuning-primersh)
-        * [美团SQL优化工具SQLAdvisor](#美团sql优化工具sqladvisor)
 
 <!-- mtoc-end -->
 
@@ -6164,6 +6171,11 @@ possible_keys 和 key
     | 1  | SIMPLE      | <null> | <null> | <null>        | <null> | <null>  | <null> | <null> | Zero limit |
     +----+-------------+--------+--------+---------------+--------+---------+--------+--------+------------+
     ```
+
+##### [爱可生开源社区：第 50 期：根据 EXPLAIN EXTRA 栏提示进行优化（二）](https://mp.weixin.qq.com/s/U9JDFEpfxdMN-nul49ggaA)
+
+##### [爱可生开源社区：第 51 期：根据 EXPLAIN EXTRA 栏提示进行优化（三）](https://mp.weixin.qq.com/s/YxPEGvCA7pTJbn7vJU5D5w)
+
 #### [爱可生开源社区：技术分享 | explain format=json 详解](https://mp.weixin.qq.com/s/enVUxwZrkw40XAtV_EeU2A)
 
 #### 对比有无索引的执行计划
@@ -9072,7 +9084,31 @@ mysqldumpslow -s t -t 10 -g “left join” /var/log/mysql/mysql_slow.log
 mysqldumpslow -s r -t 10 -g 'left join' /var/log/mysqld/mysql_slow.log
 ```
 
+#### 第三方优化工具
+
+| 工具            | 数据库类型  | 功能                            | 性能                     | 生态支持                     |
+| -               | -           | -                               | -                        | -                            |
+| Soar            | MySQL, TiDB | SQL优化建议，查询重写，索引建议 | 高，适合大规模应用       | 社区活跃，文档较为齐全       |
+| SQLAdvisor      | MySQL       | SQL优化建议，索引建议           | 中等，适合中小规模应用   | 社区维护较少，文档有限       |
+| Pt-query-digest | MySQL       | 查询分析，慢查询日志解析        | 中等到高，适合大规模部署 | 社区活跃，官方支持，文档齐全 |
+
+##### [SOAR：小米的](https://github.com/XiaoMi/soar)
+
+- SOAR(SQL Optimizer And Rewriter) 是由小米维护、开发的一款针对 MySQL 数据库 SQL 语句进行优化和改写的自动化工具。他的主要功能包括跨平台支持 MySQL 语法族协议的 SQL 优化，SQL 提示和补充，自定义规则的 SQL 改写，EXPLAIN 信息解读等。
+
+- SOAR 的优点是自动化程度高、灵活的规则扩展以及简单易用；缺点是目前只支持MySQL 数据库，对复杂的SQL 的解析能力较弱，导致在负载SQL 优化提示待改进。
+
+##### [SQLAdvisor：美团的](https://github.com/Meituan-Dianping/SQLAdvisor)
+
+- SQLAdvisor 是由美团开发维护的一个分析SQL给出索引优化建议的工具，基于MySQL原生态词法解析，结合分析SQL中的where条件、聚合条件、多表Join关系 给出索引优化建议，支持用户通过命令行或 API 提交需要分析的 SQL 语句。
+
+- SQLAdvisor 的优点是拥有一个活跃的开源社区、易用性高以及自动化程度高。缺点是目前支持MySQL 数据库，且复杂SQL 解析能力较弱，比如对SQL中的子查询、or条件、使用函数的条件会忽略不处理 
+
 ##### [pt-query-digest(percona-toolkit)：慢查询工具](https://www.percona.com/doc/percona-toolkit/LATEST/pt-query-digest.html)
+
+- pt-query-digest 是由 Percona 公司开发并开源的一款强大的 MySQL 慢查询日志分析工具，可以帮助DBA 和开发人员深入分析和优化 SQL 查询性能，识别慢查询，并提供详细的统计信息和优化建议。他的主要功能包括MySQL 的慢查询分析、统计，能够将相似的查询归类为同一个“查询指纹”，便于识别常见问题。主要原理是通过解析和汇总 MySQL 慢查询日志中的数据，生成详细的性能分析报告。
+
+- pt-query-digest  主要优点是Percona 强大的社区和生态，产品本身具有强大的分析、统计能力。缺点是缺少一个Web 平台方便用户使用，另外其功能是完全依赖MySQL 慢日志功能。
 
 - pt-query-digest 主要功能是从日志、进程列表和tcpdump分析MySQL查询。
     - 与mysqldumpshow工具相比，py-query_digest 工具的分析结果更具体，更完善。
@@ -9130,11 +9166,6 @@ pt-query-digest --filter '(($event->{Full_scan} || "") eq "yes") ||(($event->{Fu
     | Tables                  | 查询中涉及到的表                 |
     | Explain                 | SQL语句                          |
 
-#### [MySQL数据库联盟：如何通过ChatGPT优化MySQL的SQL语句](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247484892&idx=1&sn=6207963a72bddf9e6c5fa70a57297a64&chksm=e8406095df37e98399b5e2f5347478f6e09061e3c0679e0231e117d0b8c88b1e32d61e622c7f&scene=21#wechat_redirect)
-
-#### [MySQL数据库联盟：全网最全MySQL Prompt](https://mp.weixin.qq.com/s?__biz=MzIyOTUzNjgwNg==&mid=2247485114&idx=1&sn=9b09f028e20605ab9d1c561ac8303c7c&chksm=e84063f3df37eae564e6944793d124b28563101600e4727bc4158dff685cc959e54c6951267f&scene=178&cur_album_id=2861367280583032837#rd)
-
-#### 第三方优化工具
 
 ##### [MySQLTuner-perl：性能诊断工具，主要检查参数设置的合理性包括日志文件、存储引擎、安全建议及性能分析。针对潜在的问题，给出改进的建议。是mysql优化的好帮手。](https://github.com/major/MySQLTuner-perl)
 
@@ -9145,5 +9176,3 @@ pt-query-digest --filter '(($event->{Full_scan} || "") eq "yes") ||(($event->{Fu
 ##### [tuning-primer.sh](https://github.com/BMDan/tuning-primer.sh)
 
 - 针于mysql的整体进行一个体检，对潜在的问题，给出优化的建议。
-
-##### [美团SQL优化工具SQLAdvisor](https://github.com/Meituan-Dianping/SQLAdvisor)
